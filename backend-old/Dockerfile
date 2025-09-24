@@ -21,21 +21,20 @@ COPY backend/package*.json ./
 # Install dependencies
 RUN npm install
 
+# Install @types/node explicitly to ensure it's available
+RUN npm install --save-dev @types/node@^20.0.0
+
 # Copy source code
 COPY backend/ .
 
 # Create symlink to shared package
 RUN mkdir -p node_modules/@agentdb9 && ln -sf /shared node_modules/@agentdb9/shared
 
-# Build the NestJS application
+# Build the application
 RUN npm run build
 
 # Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
-
 # Start the application
-CMD ["npm", "run", "start:prod"]
+CMD ["npm", "run", "dev"]
