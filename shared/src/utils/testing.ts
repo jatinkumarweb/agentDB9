@@ -2,6 +2,30 @@
 
 import { ServiceStatus, EnvironmentTest, TestSuite, ModelTest, DatabaseTest, EnvironmentHealth } from '../types/testing';
 
+// Polyfills for Node.js environment
+let fetch: any;
+let AbortController: any;
+
+if (typeof globalThis !== 'undefined' && globalThis.fetch) {
+  // Browser environment
+  fetch = globalThis.fetch;
+  AbortController = globalThis.AbortController;
+} else {
+  // Node.js environment
+  try {
+    const nodeFetch = require('node-fetch');
+    fetch = nodeFetch.default || nodeFetch;
+    AbortController = globalThis.AbortController || require('abort-controller');
+  } catch (error) {
+    // Fallback for environments without node-fetch
+    fetch = () => Promise.reject(new Error('fetch not available'));
+    AbortController = class {
+      signal = { aborted: false };
+      abort() { this.signal.aborted = true; }
+    };
+  }
+}
+
 export class EnvironmentTester {
   private baseUrls = {
     frontend: 'http://localhost:3000',
