@@ -9,7 +9,9 @@
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "lint": "eslint src/**/*.ts",
-    "test": "jest"
+    "test": "jest",
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build"
   },
   "dependencies": {},
   "devDependencies": {

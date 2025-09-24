@@ -8,6 +8,13 @@ RUN apk add --no-cache python3 make g++ curl
 # Copy shared package first
 COPY shared/ /shared/
 
+# Build shared package
+WORKDIR /shared
+RUN npm install && npm run build
+
+# Switch back to app directory
+WORKDIR /app
+
 # Copy package files
 COPY llm-service/package*.json ./
 

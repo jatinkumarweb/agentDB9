@@ -13,7 +13,10 @@
   "scripts": {
     "install:all": "npm install && npm run install:workspaces",
     "install:workspaces": "npm install --workspaces",
-    "build": "npm run build --workspaces",
+    "postinstall": "npm run build --workspace=shared --if-present",
+    "build": "npm run build:shared && npm run build:services",
+    "build:shared": "npm run build --workspace=shared",
+    "build:services": "npm run build --workspace=frontend & npm run build --workspace=backend & npm run build --workspace=llm-service & wait",
     "dev": "./scripts/docker-setup.sh up --build",
     "dev:frontend": "./scripts/docker-setup.sh exec frontend npm run dev",
     "dev:backend": "./scripts/docker-setup.sh exec backend npm run dev",
