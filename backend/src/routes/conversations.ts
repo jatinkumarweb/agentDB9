@@ -111,6 +111,27 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Get conversations for a specific agent
+router.get('/agent/:agentId', async (req, res) => {
+  try {
+    const agentId = req.params.agentId;
+    const agentConversations = Array.from(conversations.values())
+      .filter(conv => conv.agentId === agentId)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+    res.json({
+      success: true,
+      data: agentConversations
+    } as APIResponse<AgentConversation[]>);
+  } catch (error) {
+    console.error('Get agent conversations error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    } as APIResponse);
+  }
+});
+
 // Send a message in a conversation
 router.post('/:id/messages', async (req, res) => {
   try {
@@ -186,8 +207,9 @@ router.get('/:id/messages', async (req, res) => {
       } as APIResponse);
     }
 
+    const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const offset = (page - 1) * limit;
     
     const conversationMessages = messages.get(req.params.id) || [];
     const paginatedMessages = conversationMessages
@@ -195,7 +217,13 @@ router.get('/:id/messages', async (req, res) => {
 
     res.json({
       success: true,
-      data: paginatedMessages
+      data: paginatedMessages,
+      pagination: {
+        page,
+        limit,
+        total: conversationMessages.length,
+        totalPages: Math.ceil(conversationMessages.length / limit)
+      }
     } as APIResponse<ConversationMessage[]>);
   } catch (error) {
     console.error('Get messages error:', error);
