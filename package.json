@@ -17,9 +17,15 @@
     "dev:frontend": "docker-compose exec frontend npm run dev",
     "dev:backend": "docker-compose exec backend npm run dev",
     "dev:llm": "docker-compose exec llm-service npm run dev",
+    "setup:ollama": "docker-compose exec ollama ollama pull codellama:13b && docker-compose exec ollama ollama pull deepseek-coder:6.7b && docker-compose exec ollama ollama pull mistral:7b",
+    "setup:vscode": "curl -X POST http://localhost:8000/api/vscode/setup-extensions",
     "test": "npm run test --workspaces",
     "lint": "npm run lint --workspaces",
-    "clean": "npm run clean --workspaces && docker-compose down -v"
+    "clean": "npm run clean --workspaces && docker-compose down -v",
+    "logs": "docker-compose logs -f",
+    "logs:frontend": "docker-compose logs -f frontend",
+    "logs:backend": "docker-compose logs -f backend",
+    "logs:llm": "docker-compose logs -f llm-service"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

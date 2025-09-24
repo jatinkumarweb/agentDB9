@@ -4,13 +4,16 @@ A multi-container TypeScript development environment for building AI-powered cod
 
 ## Architecture
 
-This project implements a microservices architecture with the following components:
+This project implements a comprehensive microservices architecture with the following components:
 
-- **Frontend**: Next.js 14+ with TypeScript and Tailwind CSS
-- **Backend**: Node.js with Express and Socket.IO for real-time communication
-- **LLM Service**: AI processing service for code generation and analysis
+- **Frontend**: Next.js 14+ with TypeScript, Tailwind CSS, and Monaco Editor
+- **Backend**: Node.js with Express, Socket.IO, and Redis for real-time communication
+- **LLM Service**: Multi-provider AI service (Ollama, OpenAI, Anthropic, Cohere)
+- **Ollama**: Local LLM inference server with GPU acceleration
+- **VS Code Server**: Full IDE experience in the browser
 - **Vector Database**: Qdrant for code embeddings and semantic search
 - **Database**: PostgreSQL for metadata and user data
+- **Redis**: Caching and session management
 - **Shared**: Common TypeScript types and utilities
 
 ## Machine Type Selection
@@ -74,8 +77,11 @@ agentdb9/
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
    - LLM Service: http://localhost:9000
+   - VS Code Server: http://localhost:8080
+   - Ollama: http://localhost:11434
    - Qdrant Vector DB: http://localhost:6333
    - PostgreSQL: localhost:5432
+   - Redis: localhost:6379
 
 ### Development Commands
 
@@ -86,10 +92,22 @@ npm run install:all
 # Start development environment
 npm run dev
 
+# Setup Ollama models (run after first startup)
+npm run setup:ollama
+
+# Setup VS Code extensions
+npm run setup:vscode
+
 # Run individual services
 npm run dev:frontend
 npm run dev:backend
 npm run dev:llm
+
+# View logs
+npm run logs
+npm run logs:frontend
+npm run logs:backend
+npm run logs:llm
 
 # Run tests
 npm run test
@@ -111,22 +129,37 @@ npm run clean
 ## Service Responsibilities
 
 ### Frontend (Port 3000)
-- **Code Editor**: Monaco/VS Code Web integration
+- **Monaco Editor Integration**: Full-featured code editor with IntelliSense
+- **Model Selection UI**: Switch between Ollama, OpenAI, Anthropic, etc.
 - **Chat Interface**: Real-time communication with AI agent
-- **Project Browser**: File system navigation and management
-- **Visualization**: Code analysis and dependency graphs
+- **Project Browser**: File system navigation with real-time updates
+- **Code Visualization**: Dependency graphs and architecture diagrams
 
 ### Backend (Port 8000)
-- **API Gateway**: Routes requests to appropriate services
-- **Authentication**: User management and sessions
-- **Project Management**: CRUD operations for code projects
-- **WebSocket Hub**: Real-time communication coordination
+- **API Gateway**: Routes requests to appropriate services and models
+- **Model Management**: Orchestrate between Ollama, external APIs, and local models
+- **Authentication**: User management and API key handling
+- **Project Management**: CRUD operations with Git integration
+- **WebSocket Hub**: Real-time communication between VS Code and agent
 
 ### LLM Service (Port 9000)
-- **Model Inference**: Local or remote LLM calls
-- **Code Generation**: Structured code output
-- **Code Analysis**: Understanding and reasoning
-- **Vector Operations**: Embedding generation and search
+- **Multi-Provider Support**: Ollama, OpenAI, Anthropic, Cohere, HuggingFace
+- **Model Routing**: Intelligent selection based on task type and complexity
+- **Context Management**: Maintain conversation state and project context
+- **Code Generation**: Structured output with TypeScript interfaces
+- **Vector Operations**: Embedding generation for code search and RAG
+
+### Ollama Service (Port 11434)
+- **Local Model Management**: Pull, update, and serve local models
+- **GPU Acceleration**: Optimized inference with CUDA/ROCm support
+- **Model Library**: CodeLlama, DeepSeek-Coder, Mistral, Llama3, Qwen2.5-Coder
+- **Streaming Support**: Real-time token generation for better UX
+
+### VS Code Server (Port 8080)
+- **Full IDE Experience**: Complete VS Code environment in browser
+- **Extension Ecosystem**: Auto-install project-specific extensions
+- **Terminal Integration**: Direct command execution in containers
+- **Git Integration**: Version control with GitLens and conventional commits
 
 ## Environment Variables
 
@@ -151,16 +184,72 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000
 ```
 NODE_ENV=development
 PORT=9000
-MODEL_PATH=/models
-GPU_ENABLED=true
+OLLAMA_HOST=http://ollama:11434
+OPENAI_API_KEY=your_openai_key_here
+ANTHROPIC_API_KEY=your_anthropic_key_here
+HUGGINGFACE_API_KEY=your_hf_key_here
+MODEL_CACHE_DIR=/models/cache
+REDIS_URL=redis://redis:6379
 ```
 
 ## Data Persistence
 
 - **Vector Store**: Qdrant data in `./qdrant_data/`
 - **Database**: PostgreSQL data in `./postgres_data/`
-- **Models**: LLM models in `./models/`
+- **Cache**: Redis data in `./redis_data/`
+- **Models**: Ollama models in `./ollama_data/`
+- **LLM Cache**: Model cache in `./models/`
+- **VS Code Config**: Extensions and settings in `./vscode-config/`
 - **Projects**: User projects mounted to containers
+
+## Model Management & Selection
+
+### 🤖 **Ollama Integration**
+
+Recommended local models for different tasks:
+
+| Model | Size | Speed | Quality | Use Case |
+|-------|------|-------|---------|----------|
+| `codellama:7b` | 3.8GB | Fast | Good | Quick code completion |
+| `codellama:13b` | 7.3GB | Medium | High | Complex code generation |
+| `deepseek-coder:6.7b` | 3.7GB | Fast | High | Code analysis & completion |
+| `mistral:7b` | 4.1GB | Fast | Good | General chat & documentation |
+| `qwen2.5-coder:7b` | 4.2GB | Fast | High | Multilingual code support |
+
+### ⚡ **Smart Model Routing**
+
+The system automatically selects the best model based on:
+- **Task Type**: Code generation, completion, analysis, documentation
+- **Complexity**: Simple vs complex requirements
+- **Performance**: Speed vs quality trade-offs
+- **Cost**: Budget considerations for external APIs
+- **Availability**: Local vs remote model availability
+
+### 🔄 **Fallback Chains**
+
+If a model fails or is unavailable, the system automatically falls back:
+- `gpt-4` → `claude-3-sonnet` → `codellama:13b` → `codellama:7b`
+- `codellama:13b` → `codellama:7b` → `deepseek-coder:6.7b` → `mistral:7b`
+
+## VS Code Integration
+
+### 🎨 **Extension Profiles**
+
+Automatically installs relevant extensions based on project type:
+
+- **TypeScript**: TypeScript Next, ESLint, Prettier
+- **React**: React snippets, React refactor tools
+- **Full-stack**: Docker, PostgreSQL, REST client
+- **AI Coding**: GitHub Copilot, TabNine, IntelliCode
+- **Git**: GitLens, GitHub PR, Git History
+
+### 🔧 **Workspace Configuration**
+
+- **Auto-formatting**: Prettier on save
+- **Linting**: ESLint with auto-fix
+- **IntelliSense**: Enhanced TypeScript support
+- **Debugging**: Pre-configured launch configurations
+- **Tasks**: Build, test, and deployment tasks
 
 ## Development Tips
 
@@ -183,13 +272,50 @@ GPU_ENABLED=true
 
 ```bash
 # View all service logs
-docker-compose logs -f
+npm run logs
 
 # View specific service logs
-docker-compose logs -f frontend
-docker-compose logs -f backend
-docker-compose logs -f llm-service
+npm run logs:frontend
+npm run logs:backend
+npm run logs:llm
+
+# Direct docker-compose commands
+docker-compose logs -f
+docker-compose logs -f ollama
+docker-compose logs -f vscode
 ```
+
+## Advanced Features
+
+### 🧠 **Context-Aware Code Generation**
+
+The system maintains rich context including:
+- Project structure and dependencies
+- Active file and cursor position
+- Recent changes and git history
+- Code style preferences
+- Test files and patterns
+
+### 🔄 **Real-time Collaboration**
+
+- **Multi-user editing**: Share workspaces with invite codes
+- **AI-human collaboration**: Suggest improvements and review code
+- **Model collaboration**: Consult multiple models for consensus
+
+### 📊 **Performance Monitoring**
+
+- **Model response times**: Track and optimize performance
+- **Success rates**: Monitor generation quality
+- **Resource utilization**: CPU, memory, and GPU usage
+- **Auto-optimization**: Adjust model selection based on metrics
+
+### 🎯 **Intelligent Features**
+
+- **Auto-completion**: Context-aware code suggestions
+- **Code review**: Automated analysis and suggestions
+- **Documentation**: Generate docs from code
+- **Testing**: Generate test cases and scenarios
+- **Refactoring**: Suggest and apply code improvements
 
 ## Contributing
 

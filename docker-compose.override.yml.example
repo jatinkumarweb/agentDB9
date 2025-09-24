@@ -1,0 +1,54 @@
+# Docker Compose override for local development
+# Copy this file to docker-compose.override.yml and customize as needed
+
+version: "3.9"
+
+services:
+  # Override for development with hot reload
+  frontend:
+    volumes:
+      - ./frontend:/app
+      - ./shared:/shared
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+
+  backend:
+    volumes:
+      - ./backend:/app
+      - ./shared:/shared
+      - /app/node_modules
+    environment:
+      - DEBUG=app:*
+
+  llm-service:
+    volumes:
+      - ./llm-service:/app
+      - ./shared:/shared
+      - /app/node_modules
+    environment:
+      - DEBUG=llm:*
+
+  # GPU configuration for NVIDIA
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Development database with exposed port
+  postgres:
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=coding_agent_dev
+      - POSTGRES_USER=dev_user
+      - POSTGRES_PASSWORD=dev_password
+
+  # Redis with persistence disabled for development
+  redis:
+    command: redis-server --save ""

@@ -20,3 +20,7 @@ export const validateEmail = (email: string): boolean => {
 export const sanitizeFilename = (filename: string): string => {
   return filename.replace(/[^a-z0-9.-]/gi, '_').toLowerCase();
 };
+
+// Export model and vscode utilities
+export * from './models';
+export * from './vscode';
