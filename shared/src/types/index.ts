@@ -195,3 +195,6 @@ export interface ModelMetrics {
   costPerRequest: number;
   successRate: number;
 }
+
+// Re-export testing types
+export * from './testing';

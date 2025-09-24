@@ -191,7 +191,7 @@ app.post('/api/vscode/setup-extensions', async (req, res) => {
 
 // Environment monitoring state
 let environmentHealth: any = null;
-let monitoringClients = new Set();
+let monitoringClients = new Set<string>();
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
