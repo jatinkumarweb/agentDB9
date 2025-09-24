@@ -1,0 +1,22 @@
+# Docker Compose override for GPU-enabled environments
+# This file is used when GPU support is available
+# To use: docker-compose -f docker-compose.yml -f docker-compose.override.yml up
+
+services:
+  llm-service:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
