@@ -74,7 +74,7 @@ export interface ModelAvailability {
 }
 
 export interface ModelCapability {
-  type: 'code-generation' | 'code-completion' | 'code-analysis' | 'chat' | 'documentation' | 'architecture' | 'code-review';
+  type: 'code-generation' | 'code-completion' | 'code-analysis' | 'chat' | 'documentation' | 'architecture' | 'code-review' | 'debugging' | 'refactoring' | 'problem-solving' | 'reasoning';
   quality: 'low' | 'medium' | 'high' | 'excellent';
   speed: 'slow' | 'medium' | 'fast' | 'very-fast';
 }

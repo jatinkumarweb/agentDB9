@@ -112,6 +112,176 @@ export const OLLAMA_MODELS: Record<string, ModelConfig> = {
       requiresApiKey: false,
       apiKeyConfigured: true
     }
+  },
+  'codegemma:7b': {
+    id: 'codegemma:7b',
+    name: 'CodeGemma 7B',
+    provider: 'ollama',
+    description: 'Google\'s specialized code model with excellent completion',
+    capabilities: [
+      { type: 'code-generation', quality: 'excellent', speed: 'fast' },
+      { type: 'code-completion', quality: 'excellent', speed: 'very-fast' },
+      { type: 'code-analysis', quality: 'high', speed: 'fast' },
+      { type: 'debugging', quality: 'high', speed: 'medium' }
+    ],
+    parameters: {
+      maxTokens: 8192,
+      contextLength: 8192,
+      temperature: { min: 0.0, max: 1.0, default: 0.1 }
+    },
+    performance: {
+      averageResponseTime: 1800,
+      tokensPerSecond: 55,
+      memoryUsage: 4200,
+      gpuRequired: false
+    },
+    availability: {
+      status: 'unknown',
+      requiresApiKey: false,
+      apiKeyConfigured: true
+    }
+  },
+  'starcoder2:7b': {
+    id: 'starcoder2:7b',
+    name: 'StarCoder2 7B',
+    provider: 'ollama',
+    description: 'Advanced code generation model trained on diverse codebases',
+    capabilities: [
+      { type: 'code-generation', quality: 'excellent', speed: 'fast' },
+      { type: 'code-completion', quality: 'excellent', speed: 'fast' },
+      { type: 'code-analysis', quality: 'high', speed: 'fast' },
+      { type: 'refactoring', quality: 'high', speed: 'medium' }
+    ],
+    parameters: {
+      maxTokens: 16384,
+      contextLength: 16384,
+      temperature: { min: 0.0, max: 1.0, default: 0.1 }
+    },
+    performance: {
+      averageResponseTime: 2200,
+      tokensPerSecond: 48,
+      memoryUsage: 4500,
+      gpuRequired: false
+    },
+    availability: {
+      status: 'unknown',
+      requiresApiKey: false,
+      apiKeyConfigured: true
+    }
+  },
+  'qwen2.5-coder:7b': {
+    id: 'qwen2.5-coder:7b',
+    name: 'Qwen2.5 Coder 7B',
+    provider: 'ollama',
+    description: 'Latest Qwen model optimized for coding tasks',
+    capabilities: [
+      { type: 'code-generation', quality: 'excellent', speed: 'fast' },
+      { type: 'code-completion', quality: 'excellent', speed: 'fast' },
+      { type: 'code-analysis', quality: 'excellent', speed: 'fast' },
+      { type: 'debugging', quality: 'high', speed: 'medium' },
+      { type: 'documentation', quality: 'high', speed: 'fast' }
+    ],
+    parameters: {
+      maxTokens: 32768,
+      contextLength: 32768,
+      temperature: { min: 0.0, max: 1.0, default: 0.1 }
+    },
+    performance: {
+      averageResponseTime: 2000,
+      tokensPerSecond: 50,
+      memoryUsage: 4300,
+      gpuRequired: false
+    },
+    availability: {
+      status: 'unknown',
+      requiresApiKey: false,
+      apiKeyConfigured: true
+    }
+  },
+  'magicoder:7b': {
+    id: 'magicoder:7b',
+    name: 'Magicoder 7B',
+    provider: 'ollama',
+    description: 'Code-specific model with strong problem-solving abilities',
+    capabilities: [
+      { type: 'code-generation', quality: 'excellent', speed: 'fast' },
+      { type: 'debugging', quality: 'excellent', speed: 'medium' },
+      { type: 'code-analysis', quality: 'high', speed: 'fast' },
+      { type: 'problem-solving', quality: 'excellent', speed: 'medium' }
+    ],
+    parameters: {
+      maxTokens: 16384,
+      contextLength: 16384,
+      temperature: { min: 0.0, max: 1.0, default: 0.1 }
+    },
+    performance: {
+      averageResponseTime: 2100,
+      tokensPerSecond: 47,
+      memoryUsage: 4400,
+      gpuRequired: false
+    },
+    availability: {
+      status: 'unknown',
+      requiresApiKey: false,
+      apiKeyConfigured: true
+    }
+  },
+  'codestral:22b': {
+    id: 'codestral:22b',
+    name: 'Codestral 22B',
+    provider: 'ollama',
+    description: 'Mistral\'s large coding model for complex tasks',
+    capabilities: [
+      { type: 'code-generation', quality: 'excellent', speed: 'medium' },
+      { type: 'architecture', quality: 'excellent', speed: 'slow' },
+      { type: 'code-analysis', quality: 'excellent', speed: 'medium' },
+      { type: 'refactoring', quality: 'excellent', speed: 'medium' },
+      { type: 'documentation', quality: 'excellent', speed: 'medium' }
+    ],
+    parameters: {
+      maxTokens: 32768,
+      contextLength: 32768,
+      temperature: { min: 0.0, max: 1.0, default: 0.1 }
+    },
+    performance: {
+      averageResponseTime: 5000,
+      tokensPerSecond: 25,
+      memoryUsage: 12000,
+      gpuRequired: true
+    },
+    availability: {
+      status: 'unknown',
+      requiresApiKey: false,
+      apiKeyConfigured: true
+    }
+  },
+  'llama3.1:8b': {
+    id: 'llama3.1:8b',
+    name: 'Llama 3.1 8B',
+    provider: 'ollama',
+    description: 'Meta\'s latest model with strong reasoning and coding',
+    capabilities: [
+      { type: 'code-generation', quality: 'high', speed: 'fast' },
+      { type: 'chat', quality: 'excellent', speed: 'fast' },
+      { type: 'reasoning', quality: 'excellent', speed: 'medium' },
+      { type: 'documentation', quality: 'high', speed: 'fast' }
+    ],
+    parameters: {
+      maxTokens: 128000,
+      contextLength: 128000,
+      temperature: { min: 0.0, max: 1.0, default: 0.3 }
+    },
+    performance: {
+      averageResponseTime: 2500,
+      tokensPerSecond: 42,
+      memoryUsage: 5000,
+      gpuRequired: false
+    },
+    availability: {
+      status: 'unknown',
+      requiresApiKey: false,
+      apiKeyConfigured: true
+    }
   }
 };
 

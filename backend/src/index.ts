@@ -86,7 +86,8 @@ app.post('/api/test/environment', async (req, res) => {
 // Models endpoint that proxies to LLM service
 app.get('/api/models', async (req, res) => {
   try {
-    const response = await fetch('http://llm-service:9000/api/models');
+    const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://localhost:9000';
+    const response = await fetch(`${llmServiceUrl}/api/models`);
     
     if (!response.ok) {
       throw new Error(`LLM service responded with ${response.status}`);
