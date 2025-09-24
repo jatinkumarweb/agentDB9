@@ -1,9 +1,10 @@
 {
   "name": "Coding Agent ONA Environment",
   "build": {
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    "context": ".."
   },
-  "workspaceFolder": "/workspace",
+  "workspaceFolder": "/workspaces/agentDB9",
   "shutdownAction": "none",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
@@ -11,7 +12,7 @@
       "enableNonRootDocker": "true"
     },
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "18",
+      "version": "20",
       "nodeGypDependencies": true,
       "installYarnUsingApt": false
     }

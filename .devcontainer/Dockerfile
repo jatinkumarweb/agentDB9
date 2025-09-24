@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/typescript-node:18
+FROM mcr.microsoft.com/devcontainers/typescript-node:20
 
 # Install additional tools
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
@@ -12,13 +12,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
-WORKDIR /workspace
+WORKDIR /workspaces/agentDB9
 
-# Copy package.json for dependency installation
-COPY package*.json ./
-
-# Install npm dependencies
-RUN npm install
-
-# Set proper permissions
-RUN chown -R node:node /workspace
+# Create workspace directory and set permissions
+RUN mkdir -p /workspaces/agentDB9 && chown -R node:node /workspaces
