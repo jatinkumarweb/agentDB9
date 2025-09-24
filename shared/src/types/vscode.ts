@@ -1,5 +1,5 @@
 // VS Code integration types
-import { Position, Range, FileInfo, VSCodeExtension } from './index';
+import { Position, Range, FileInfo, VSCodeExtension, CommandResult } from './index';
 
 export interface VSCodeBridge {
   editor: EditorAPI;
@@ -58,9 +58,4 @@ export interface Terminal {
   active: boolean;
 }
 
-export interface CommandResult {
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-  duration: number;
-}
+// CommandResult is imported from ./agent

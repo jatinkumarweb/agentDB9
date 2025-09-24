@@ -8,25 +8,7 @@ export interface User {
   updatedAt: Date;
 }
 
-export interface Project {
-  id: string;
-  name: string;
-  description?: string;
-  userId: string;
-  files: ProjectFile[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface ProjectFile {
-  id: string;
-  projectId: string;
-  path: string;
-  content: string;
-  language: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// Project and ProjectFile interfaces are now in agent.ts
 
 export interface ChatMessage {
   id: string;
@@ -196,5 +178,8 @@ export interface ModelMetrics {
   successRate: number;
 }
 
-// Re-export testing types
+// Re-export all types
 export * from './testing';
+export * from './agent';
+export * from './mcp';
+export * from './api';

@@ -5,6 +5,11 @@ import morgan from 'morgan';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
+// Import route handlers
+import agentsRouter from './routes/agents';
+import projectsRouter from './routes/projects';
+import conversationsRouter from './routes/conversations';
+
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
@@ -43,6 +48,11 @@ app.get('/api/status', (req, res) => {
     version: '1.0.0'
   });
 });
+
+// Core API routes
+app.use('/api/agents', agentsRouter);
+app.use('/api/projects', projectsRouter);
+app.use('/api/conversations', conversationsRouter);
 
 // Environment testing endpoints
 app.post('/api/test/environment', async (req, res) => {
