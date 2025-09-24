@@ -31,7 +31,7 @@ export class EnvironmentTester {
       const responseTime = Date.now() - startTime;
       
       if (response.ok) {
-        const data = await response.json().catch(() => ({}));
+        const data = await response.json().catch(() => ({})) as Record<string, any>;
         return {
           name,
           url,
@@ -72,7 +72,7 @@ export class EnvironmentTester {
       const modelsResponse = await fetch(`${this.baseUrls.llmService}/api/models`);
       
       if (modelsResponse.ok) {
-        const modelsData = await modelsResponse.json();
+        const modelsData = await modelsResponse.json() as Record<string, any>;
         const modelInfo = modelsData.models?.find((m: any) => m.id === modelId);
         
         if (modelInfo) {
@@ -110,7 +110,7 @@ export class EnvironmentTester {
       const responseTime = Date.now() - startTime;
       
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as Record<string, any>;
         return {
           modelId,
           provider,
@@ -124,7 +124,7 @@ export class EnvironmentTester {
           timestamp: new Date()
         };
       } else {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = await response.json().catch(() => ({})) as Record<string, any>;
         
         // Handle disabled model response
         if (response.status === 400 && errorData.reason) {
@@ -192,7 +192,7 @@ export class EnvironmentTester {
       const responseTime = Date.now() - startTime;
       
       if (response.ok) {
-        const data = await response.json().catch(() => ({}));
+        const data = await response.json().catch(() => ({})) as { version?: string; database?: string; collections?: string[]; keys?: number; };
         return {
           type,
           connected: true,

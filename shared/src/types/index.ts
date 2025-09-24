@@ -92,7 +92,7 @@ export interface ModelAvailability {
 }
 
 export interface ModelCapability {
-  type: 'code-generation' | 'code-completion' | 'code-analysis' | 'chat' | 'documentation';
+  type: 'code-generation' | 'code-completion' | 'code-analysis' | 'chat' | 'documentation' | 'architecture' | 'code-review';
   quality: 'low' | 'medium' | 'high' | 'excellent';
   speed: 'slow' | 'medium' | 'fast' | 'very-fast';
 }
@@ -166,4 +166,32 @@ export interface APIResponse<T = any> {
   data?: T;
   error?: string;
   message?: string;
+}
+
+// Additional types for models and VSCode integration
+export interface FileInfo {
+  path: string;
+  name: string;
+  extension: string;
+  size: number;
+  lastModified: Date;
+  content?: string;
+}
+
+export interface Position {
+  line: number;
+  character: number;
+}
+
+export interface Range {
+  start: Position;
+  end: Position;
+}
+
+export interface ModelMetrics {
+  responseTime: number;
+  tokensPerSecond: number;
+  qualityScore: number;
+  costPerRequest: number;
+  successRate: number;
 }

@@ -1,4 +1,5 @@
 // VS Code integration types
+import { Position, Range, FileInfo, VSCodeExtension } from './index';
 
 export interface VSCodeBridge {
   editor: EditorAPI;
@@ -42,15 +43,7 @@ export interface ExtensionAPI {
   isInstalled(extensionId: string): Promise<boolean>;
 }
 
-export interface Position {
-  line: number;
-  character: number;
-}
 
-export interface Range {
-  start: Position;
-  end: Position;
-}
 
 export interface FileEvent {
   type: 'created' | 'modified' | 'deleted';

@@ -5,14 +5,20 @@ WORKDIR /app
 # Install system dependencies
 RUN apk add --no-cache python3 make g++
 
+# Copy shared package first
+COPY shared/ /shared/
+
 # Copy package files
-COPY package*.json ./
+COPY backend/package*.json ./
 
 # Install dependencies
 RUN npm install
 
 # Copy source code
-COPY . .
+COPY backend/ .
+
+# Create symlink to shared package
+RUN mkdir -p node_modules/@agentdb9 && ln -sf /shared node_modules/@agentdb9/shared
 
 # Build the application
 RUN npm run build

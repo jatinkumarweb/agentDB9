@@ -1,16 +1,19 @@
 {
   "name": "Coding Agent ONA Environment",
-  "dockerComposeFile": "../docker-compose.yml",
-  "service": "workspace",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
   "workspaceFolder": "/workspace",
-  "shutdownAction": "stopCompose",
+  "shutdownAction": "none",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "version": "latest",
       "enableNonRootDocker": "true"
     },
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "18"
+      "version": "18",
+      "nodeGypDependencies": true,
+      "installYarnUsingApt": false
     }
   },
   "customizations": {
@@ -23,6 +26,9 @@
       ]
     }
   },
-  "postCreateCommand": "npm install && docker-compose build",
-  "forwardPorts": [3000, 8000, 9000, 6333]
+  "postCreateCommand": "npm install",
+  "forwardPorts": [3000, 8000, 9000, 6333],
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ]
 }

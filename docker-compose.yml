@@ -11,8 +11,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./frontend/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -22,7 +22,7 @@ services:
       - NEXT_PUBLIC_VSCODE_URL=http://localhost:8080
     volumes:
       - ./frontend:/app
-      - ./shared:/app/node_modules/@agentdb9/shared
+      - ./shared:/shared
       - /app/node_modules
       - /app/.next
     depends_on:
@@ -30,8 +30,8 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/Dockerfile
     ports:
       - "8000:8000"
     environment:
@@ -46,8 +46,7 @@ services:
       - REDIS_URL=redis://redis:6379
     volumes:
       - ./backend:/app
-      - ./shared:/app/node_modules/@agentdb9/shared
-      - ./workspace:/workspace/projects
+      - ./shared:/shared
       - /app/node_modules
     depends_on:
       - llm-service
@@ -58,8 +57,8 @@ services:
 
   llm-service:
     build:
-      context: ./llm-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./llm-service/Dockerfile
     ports:
       - "9000:9000"
     environment:
@@ -72,7 +71,7 @@ services:
       - REDIS_URL=redis://redis:6379
     volumes:
       - ./llm-service:/app
-      - ./shared:/app/node_modules/@agentdb9/shared
+      - ./shared:/shared
       - ./models:/models
       - /app/node_modules
     depends_on:

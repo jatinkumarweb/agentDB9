@@ -1,4 +1,5 @@
 // Model management and selection types
+import { ModelConfig, FileInfo, Position, Range } from './index';
 
 export interface ModelSelector {
   selectForTask(task: CodeTask): ModelConfig;
@@ -55,6 +56,15 @@ export interface Dependency {
   name: string;
   version: string;
   type: 'dependency' | 'devDependency' | 'peerDependency';
+}
+
+export interface CodeStylePreferences {
+  indentSize: number;
+  indentType: 'spaces' | 'tabs';
+  lineLength: number;
+  semicolons: boolean;
+  quotes: 'single' | 'double';
+  trailingCommas: boolean;
 }
 
 export interface CodeStylePreferences {

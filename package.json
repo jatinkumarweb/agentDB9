@@ -9,6 +9,7 @@
     "llm-service",
     "shared"
   ],
+
   "scripts": {
     "install:all": "npm install && npm run install:workspaces",
     "install:workspaces": "npm install --workspaces",

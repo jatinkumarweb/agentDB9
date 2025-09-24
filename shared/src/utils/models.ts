@@ -1,6 +1,7 @@
 // Model management utilities
 
-import { ModelConfig, ModelProvider, CodeTask, PerformanceRequirements, ModelMetrics } from '../types/models';
+import { ModelConfig, ModelProvider, ModelMetrics } from '../types/index';
+import { CodeTask, PerformanceRequirements } from '../types/models';
 
 export const OLLAMA_MODELS: Record<string, ModelConfig> = {
   'codellama:7b': {
