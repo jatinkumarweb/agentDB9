@@ -14,6 +14,7 @@ export default function ChatPage({}: ChatPageProps) {
   const [currentConversation, setCurrentConversation] = useState<AgentConversation | null>(null);
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -34,16 +35,18 @@ export default function ChatPage({}: ChatPageProps) {
     scrollToBottom();
   }, [currentConversation?.messages]);
 
-  // Auto-refresh conversation for real-time updates
+  // Auto-refresh conversation for real-time updates (only when not loading)
   useEffect(() => {
-    if (!currentConversation) return;
+    if (!currentConversation || isLoading || isRefreshing) return;
 
     const interval = setInterval(() => {
-      refreshConversation();
-    }, 3000); // Refresh every 3 seconds
+      if (!isLoading && !isRefreshing) {
+        refreshConversation();
+      }
+    }, 5000); // Refresh every 5 seconds (reduced frequency)
 
     return () => clearInterval(interval);
-  }, [currentConversation?.id]);
+  }, [currentConversation?.id, isLoading, isRefreshing]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -153,9 +156,10 @@ export default function ChatPage({}: ChatPageProps) {
   };
 
   const refreshConversation = async () => {
-    if (!currentConversation) return;
+    if (!currentConversation || isRefreshing) return;
 
     try {
+      setIsRefreshing(true);
       // Fetch messages separately since the conversation endpoint has issues
       const messagesResponse = await fetch(`/api/conversations/${currentConversation.id}/messages`);
       const messagesData = await messagesResponse.json();
@@ -166,7 +170,6 @@ export default function ChatPage({}: ChatPageProps) {
           ...currentConversation,
           messages: messagesData.data
         };
-        console.log('Refreshed conversation with', messagesData.data.length, 'messages');
         setCurrentConversation(updatedConversation);
         
         // Update in conversations list
@@ -176,6 +179,8 @@ export default function ChatPage({}: ChatPageProps) {
       }
     } catch (error) {
       console.error('Failed to refresh conversation:', error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
