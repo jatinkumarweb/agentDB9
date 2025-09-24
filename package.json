@@ -1,0 +1,34 @@
+{
+  "name": "agentdb9",
+  "version": "1.0.0",
+  "description": "Coding Agent ONA Environment - Multi-container TypeScript development environment",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "llm-service",
+    "shared"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm run install:workspaces",
+    "install:workspaces": "npm install --workspaces",
+    "build": "npm run build --workspaces",
+    "dev": "docker-compose up --build",
+    "dev:frontend": "docker-compose exec frontend npm run dev",
+    "dev:backend": "docker-compose exec backend npm run dev",
+    "dev:llm": "docker-compose exec llm-service npm run dev",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "clean": "npm run clean --workspaces && docker-compose down -v"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "prettier": "^3.0.0",
+    "eslint": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
