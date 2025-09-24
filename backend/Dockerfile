@@ -21,6 +21,9 @@ COPY backend/package*.json ./
 # Install dependencies
 RUN npm install
 
+# Install @types/node explicitly to ensure it's available
+RUN npm install --save-dev @types/node@^20.0.0
+
 # Copy source code
 COPY backend/ .
 
