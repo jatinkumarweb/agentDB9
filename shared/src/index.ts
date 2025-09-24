@@ -2,4 +2,5 @@
 export * from './types';
 export * from './types/vscode';
 export * from './types/models';
+export * from './types/testing';
 export * from './utils';

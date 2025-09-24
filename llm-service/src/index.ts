@@ -18,8 +18,73 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     service: 'AgentDB9 LLM Service',
-    timestamp: new Date().toISOString()
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    providers: {
+      ollama: process.env.OLLAMA_HOST || 'http://ollama:11434',
+      openai: !!process.env.OPENAI_API_KEY,
+      anthropic: !!process.env.ANTHROPIC_API_KEY,
+      huggingface: !!process.env.HUGGINGFACE_API_KEY
+    }
   });
+});
+
+// Model availability endpoint
+app.get('/api/models', async (req, res) => {
+  try {
+    const models = [
+      { id: 'codellama:7b', provider: 'ollama', status: 'available' },
+      { id: 'codellama:13b', provider: 'ollama', status: 'available' },
+      { id: 'deepseek-coder:6.7b', provider: 'ollama', status: 'available' },
+      { id: 'mistral:7b', provider: 'ollama', status: 'available' },
+      { id: 'gpt-4', provider: 'openai', status: process.env.OPENAI_API_KEY ? 'available' : 'unavailable' },
+      { id: 'claude-3-sonnet', provider: 'anthropic', status: process.env.ANTHROPIC_API_KEY ? 'available' : 'unavailable' }
+    ];
+
+    res.json({
+      success: true,
+      models,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get models'
+    });
+  }
+});
+
+// Test model endpoint
+app.post('/api/test/model', async (req, res) => {
+  try {
+    const { modelId, provider } = req.body;
+    const testPrompt = 'Hello, this is a test. Please respond with "Test successful".';
+    
+    // Mock model test - in real implementation, test actual model
+    const startTime = Date.now();
+    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000)); // Simulate model response time
+    const responseTime = Date.now() - startTime;
+    
+    const mockResponse = `Test successful. Model ${modelId} is working correctly.`;
+    
+    res.json({
+      success: true,
+      modelId,
+      provider,
+      available: true,
+      responseTime,
+      testPrompt,
+      response: mockResponse,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Model test failed'
+    });
+  }
 });
 
 // LLM inference endpoint

@@ -24,3 +24,4 @@ export const sanitizeFilename = (filename: string): string => {
 // Export model and vscode utilities
 export * from './models';
 export * from './vscode';
+export * from './testing';
