@@ -1,6 +1,12 @@
-FROM public.ecr.aws/docker/library/node:18-slim
+# Explicitly specify platform to avoid architecture confusion
+FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:18-slim
 
 WORKDIR /app
+
+# Set environment variables to force correct architecture detection
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=development
+ENV FORCE_COLOR=1
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -25,8 +31,9 @@ COPY frontend/package*.json ./
 # Install dependencies
 RUN npm install
 
-# Explicitly install the correct SWC binary for the platform
-RUN npm install @next/swc-linux-x64-gnu --save-optional
+# Force install the correct SWC binary and remove any ARM64 binaries
+RUN npm install @next/swc-linux-x64-gnu --save-optional && \
+    npm uninstall @next/swc-linux-arm64-gnu @next/swc-linux-arm64-musl 2>/dev/null || true
 
 # Copy source code
 COPY frontend/ .
