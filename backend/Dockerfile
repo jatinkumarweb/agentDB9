@@ -1,9 +1,9 @@
-FROM node:20-alpine
+FROM mcr.microsoft.com/devcontainers/typescript-node:20
 
 WORKDIR /app
 
 # Install system dependencies
-RUN apk add --no-cache python3 make g++ wget
+RUN apt-get update && apt-get install -y python3 make g++ wget && rm -rf /var/lib/apt/lists/*
 
 # Copy shared package first
 COPY shared/ /shared/

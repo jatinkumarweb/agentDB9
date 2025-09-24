@@ -1,9 +1,9 @@
-FROM node:18-alpine
+FROM mcr.microsoft.com/devcontainers/typescript-node:18
 
 WORKDIR /app
 
 # Install system dependencies for potential native modules
-RUN apk add --no-cache python3 make g++ curl
+RUN apt-get update && apt-get install -y python3 make g++ curl && rm -rf /var/lib/apt/lists/*
 
 # Copy shared package first
 COPY shared/ /shared/
