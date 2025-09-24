@@ -104,6 +104,11 @@ services:
     environment:
       - OLLAMA_ORIGINS=*
       - OLLAMA_HOST=0.0.0.0
+    # Uncomment the following lines to run without GPU (CPU-only mode)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: []
 
   vscode:
     image: codercom/code-server:latest

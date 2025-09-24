@@ -18,7 +18,19 @@ export class HealthService {
   async getModels() {
     try {
       const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://localhost:9000';
-      const response = await fetch(`${llmServiceUrl}/api/models`);
+      
+      // Add timeout and better error handling for local environments
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+      
+      const response = await fetch(`${llmServiceUrl}/api/models`, {
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`LLM service responded with ${response.status}`);
@@ -26,21 +38,24 @@ export class HealthService {
       
       return await response.json();
     } catch (error) {
-      // Fallback to shared package models
+      console.log('LLM service unavailable, using fallback models:', error.message);
+      
+      // Fallback to shared package models with better local environment support
       const availableModels = getAvailableModels(true);
       return {
         success: true,
         models: availableModels.map(model => ({
           id: model.id,
           provider: model.provider,
-          status: model.availability.status,
-          reason: model.availability.reason,
+          status: model.provider === 'ollama' ? 'unavailable' : model.availability.status,
+          reason: model.provider === 'ollama' ? 'Ollama service not available' : model.availability.reason,
           requiresApiKey: model.availability.requiresApiKey,
           apiKeyConfigured: model.availability.apiKeyConfigured,
         })),
-        available: availableModels.filter(m => m.availability.status !== 'disabled').length,
-        disabled: availableModels.filter(m => m.availability.status === 'disabled').length,
+        available: availableModels.filter(m => m.provider !== 'ollama' && m.availability.status !== 'disabled').length,
+        disabled: availableModels.filter(m => m.provider === 'ollama' || m.availability.status === 'disabled').length,
         timestamp: new Date().toISOString(),
+        warning: 'Local LLM services (Ollama) are not available. Only external API models can be used.',
       };
     }
   }
