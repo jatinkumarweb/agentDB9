@@ -21,7 +21,7 @@ export class Agent implements CodingAgent {
 
   @Column({
     type: 'enum',
-    enum: ['idle', 'working', 'error', 'disabled'],
+    enum: ['idle', 'thinking', 'coding', 'testing', 'error', 'offline'],
     default: 'idle'
   })
   status: AgentStatus;
