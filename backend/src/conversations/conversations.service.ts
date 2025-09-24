@@ -100,8 +100,18 @@ export class ConversationsService {
       if (isOllamaModel) {
         // Check if Ollama is available before making the call
         const isOllamaHealthy = await this.checkOllamaHealth();
+        console.log(`Ollama health check result: ${isOllamaHealthy} for model: ${model}`);
+        
         if (isOllamaHealthy) {
-          agentResponse = await this.callOllamaAPI(userMessage, model);
+          try {
+            agentResponse = await this.callOllamaAPI(userMessage, model);
+          } catch (error) {
+            console.log('Ollama API call failed despite health check passing, using fallback');
+            agentResponse = this.getOllamaUnavailableMessage(userMessage);
+            // Mark Ollama as unavailable to avoid future calls
+            this.ollamaAvailable = false;
+            this.lastOllamaCheck = Date.now();
+          }
         } else {
           agentResponse = this.getOllamaUnavailableMessage(userMessage);
         }
@@ -169,15 +179,24 @@ This agent is configured to use "${model}" which requires external API access.
   private async checkOllamaHealth(): Promise<boolean> {
     const now = Date.now();
     
-    // Use cached result if recent
+    // Use cached result if recent, but only if it was false (failed)
+    // If it was true (success), recheck more frequently to catch failures
     if (this.ollamaAvailable !== null && (now - this.lastOllamaCheck) < this.OLLAMA_CHECK_INTERVAL) {
-      return this.ollamaAvailable;
+      if (!this.ollamaAvailable) {
+        return this.ollamaAvailable; // Keep using cached false result
+      }
+      // For true results, recheck more frequently (every 10 seconds)
+      if ((now - this.lastOllamaCheck) < 10000) {
+        return this.ollamaAvailable;
+      }
     }
 
     try {
       const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000); // Quick health check
+      
+      console.log(`Checking Ollama health at: ${ollamaUrl}/api/version`);
       
       const response = await fetch(`${ollamaUrl}/api/version`, {
         signal: controller.signal,
@@ -187,8 +206,11 @@ This agent is configured to use "${model}" which requires external API access.
       this.ollamaAvailable = response.ok;
       this.lastOllamaCheck = now;
       
+      console.log(`Ollama health check: ${response.ok ? 'HEALTHY' : 'UNHEALTHY'} (status: ${response.status})`);
+      
       return this.ollamaAvailable;
     } catch (error) {
+      console.log(`Ollama health check failed: ${error.message}`);
       this.ollamaAvailable = false;
       this.lastOllamaCheck = now;
       return false;
