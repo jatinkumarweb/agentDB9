@@ -104,9 +104,11 @@ export class ConversationsService {
         
         if (isOllamaHealthy) {
           try {
-            agentResponse = await this.callOllamaAPI(userMessage, model);
+            // Use streaming API which handles message creation internally
+            await this.callOllamaAPIStreaming(userMessage, model, conversation);
+            return; // Exit early since streaming handles message creation
           } catch (error) {
-            console.log('Ollama API call failed despite health check passing, using fallback');
+            console.log('Ollama streaming API call failed despite health check passing, using fallback');
             agentResponse = this.getOllamaUnavailableMessage(userMessage);
             // Mark Ollama as unavailable to avoid future calls
             this.ollamaAvailable = false;
@@ -238,15 +240,169 @@ I'm unable to connect to the Ollama service, which is expected in local environm
 Would you like help setting up external API access?`;
   }
 
+  private async callOllamaAPIStreaming(userMessage: string, model: string, conversation: any): Promise<string> {
+    try {
+      const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
+      const apiUrl = `${ollamaUrl}/api/chat`;
+      console.log('Calling Ollama API (streaming):', apiUrl, 'with model:', model);
+      
+      // Create initial agent message that will be updated
+      const agentMessageData = {
+        conversationId: conversation.id,
+        role: 'agent',
+        content: '🤖 *Thinking...*',
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          model: model,
+          provider: 'ollama',
+          streaming: true
+        }
+      };
+
+      const agentMessage = this.messagesRepository.create(agentMessageData);
+      const savedMessage = await this.messagesRepository.save(agentMessage);
+      
+      // Add timeout for local environments where Ollama might not be available
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 minute timeout for streaming
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.'
+            },
+            {
+              role: 'user',
+              content: userMessage
+            }
+          ],
+          stream: true,
+          options: {
+            temperature: 0.3,
+            top_p: 0.8,
+            num_predict: 1024
+          }
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+      }
+
+      let fullContent = '';
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
+
+      try {
+        let hasReceivedData = false;
+        const startTime = Date.now();
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            console.log('Streaming completed, total content length:', fullContent.length);
+            break;
+          }
+          
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n').filter(line => line.trim());
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line);
+              hasReceivedData = true;
+              
+              if (data.message?.content) {
+                fullContent += data.message.content;
+                
+                // Update the message in database every few tokens to show progress
+                if (fullContent.length % 50 === 0 || data.done) {
+                  await this.messagesRepository.update(savedMessage.id, {
+                    content: fullContent,
+                    metadata: {
+                      ...agentMessageData.metadata,
+                      streaming: !data.done,
+                      lastUpdate: new Date().toISOString()
+                    } as Record<string, any>
+                  });
+                }
+              }
+              
+              if (data.done) {
+                console.log('Received done signal, finalizing response');
+                // Final update with complete response
+                await this.messagesRepository.update(savedMessage.id, {
+                  content: fullContent || 'I apologize, but I was unable to generate a response at this time.',
+                  metadata: {
+                    ...agentMessageData.metadata,
+                    streaming: false,
+                    completed: true,
+                    responseTime: Date.now() - startTime,
+                    finalUpdate: new Date().toISOString()
+                  } as Record<string, any>
+                });
+                return fullContent;
+              }
+            } catch (parseError) {
+              console.log('Failed to parse streaming chunk:', line);
+            }
+          }
+          
+          // Safety check for hanging streams
+          if (Date.now() - startTime > 50000 && !hasReceivedData) {
+            console.log('Stream timeout - no data received');
+            throw new Error('Stream timeout - no data received');
+          }
+        }
+        
+        // If we exit the loop without done=true, finalize anyway
+        if (fullContent) {
+          await this.messagesRepository.update(savedMessage.id, {
+            content: fullContent,
+            metadata: {
+              ...agentMessageData.metadata,
+              streaming: false,
+              completed: true,
+              responseTime: Date.now() - startTime,
+              finalUpdate: new Date().toISOString()
+            } as Record<string, any>
+          });
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      return fullContent || 'I apologize, but I was unable to generate a response at this time.';
+    } catch (error) {
+      console.error('Error calling Ollama streaming API:', error);
+      throw error; // Re-throw to be handled by caller
+    }
+  }
+
   private async callOllamaAPI(userMessage: string, model: string): Promise<string> {
     try {
       const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
       const apiUrl = `${ollamaUrl}/api/chat`;
-      console.log('Calling Ollama API:', apiUrl, 'with model:', model);
+      console.log('Calling Ollama API (non-streaming):', apiUrl, 'with model:', model);
       
       // Add timeout for local environments where Ollama might not be available
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for AI responses
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -267,8 +423,9 @@ Would you like help setting up external API access?`;
           ],
           stream: false,
           options: {
-            temperature: 0.7,
-            top_p: 0.9
+            temperature: 0.3,
+            top_p: 0.8,
+            num_predict: 512
           }
         }),
         signal: controller.signal,

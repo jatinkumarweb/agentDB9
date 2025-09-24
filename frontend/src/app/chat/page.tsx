@@ -39,14 +39,23 @@ export default function ChatPage({}: ChatPageProps) {
   useEffect(() => {
     if (!currentConversation || isLoading || isRefreshing) return;
 
+    // Check if there's a streaming message (agent message with streaming metadata)
+    const hasStreamingMessage = currentConversation.messages?.some(msg => 
+      msg.role === 'agent' && 
+      msg.metadata?.streaming === true
+    );
+
+    // Use faster polling when streaming, slower when idle
+    const pollInterval = hasStreamingMessage ? 1000 : 5000; // 1s for streaming, 5s for idle
+
     const interval = setInterval(() => {
       if (!isLoading && !isRefreshing) {
         refreshConversation();
       }
-    }, 5000); // Refresh every 5 seconds (reduced frequency)
+    }, pollInterval);
 
     return () => clearInterval(interval);
-  }, [currentConversation?.id, isLoading, isRefreshing]);
+  }, [currentConversation?.id, currentConversation?.messages, isLoading, isRefreshing]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -316,9 +325,20 @@ export default function ChatPage({}: ChatPageProps) {
                       </span>
                     </div>
                     <div className="whitespace-pre-wrap">{msg.content}</div>
-                    {msg.metadata && (
+                    {msg.metadata?.streaming && (
+                      <div className="flex items-center mt-2">
+                        <div className="flex space-x-1 mr-2">
+                          <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce"></div>
+                          <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
+                        <span className="text-xs opacity-75">Streaming...</span>
+                      </div>
+                    )}
+                    {msg.metadata && !msg.metadata.streaming && (
                       <div className="text-xs opacity-75 mt-2">
-                        Execution time: {msg.metadata.executionTime}ms
+                        {msg.metadata.responseTime && `Response time: ${msg.metadata.responseTime}ms`}
+                        {msg.metadata.executionTime && `Execution time: ${msg.metadata.executionTime}ms`}
                       </div>
                     )}
                   </div>

@@ -119,6 +119,65 @@ To enable AI responses:
    - Changes reflect immediately
    - Located in `frontend/` directory
 
+## ✅ Final Verification
+
+The setup is working correctly when:
+
+1. **Health Check**: `curl http://localhost:3000/health` returns `{"status":"ok"}`
+2. **Database**: Backend can connect to PostgreSQL
+3. **Redis**: Backend can connect to Redis
+4. **Ollama**: AI responses work in conversations
+
+### Testing AI Functionality
+
+```bash
+# 1. Get available agents
+curl http://localhost:3000/api/agents
+
+# 2. Create a conversation (use an agent ID from step 1)
+curl -X POST http://localhost:3000/api/conversations \
+  -H "Content-Type: application/json" \
+  -d '{"agentId": "AGENT_ID_HERE", "title": "Test Chat"}'
+
+# 3. Send a message (replace CONVERSATION_ID with the ID from step 2)
+curl -X POST http://localhost:3000/api/conversations/CONVERSATION_ID/messages \
+  -H "Content-Type: application/json" \
+  -d '{"role": "user", "content": "Hello! What is 2+2?"}'
+
+# 4. Check for AI response (wait 10-30 seconds)
+curl http://localhost:3000/api/conversations/CONVERSATION_ID/messages
+```
+
+**Expected Results:**
+- ✅ **Immediate Response**: Users see "🤖 *Thinking...*" within 1-2 seconds
+- ✅ **Streaming Updates**: Content appears progressively as it's generated
+- ✅ **Simple queries**: Complete responses in 15-30 seconds
+- ✅ **Complex queries**: May take 60-120 seconds but show progress
+- ✅ **Visual Indicators**: Frontend shows streaming status with animated dots
+- ✅ Health checks show "HEALTHY" status
+
+## 🚀 Final Working Configuration
+
+The solution uses Docker networking and streaming responses for optimal performance:
+
+### Docker Networking
+- **Ollama Container**: `ollama-agentdb9` on `coding-agent-network`
+- **Backend Environment**: `OLLAMA_HOST=http://ollama-agentdb9:11434`
+- **Model**: `qwen2.5-coder:7b` (4.7GB, CPU-optimized)
+
+### Streaming Implementation
+- **Immediate Feedback**: Users see responses start within 1-2 seconds
+- **Progressive Updates**: Content streams in real-time as it's generated
+- **Timeout Settings**: 60 seconds for streaming, with fallback to non-streaming
+- **Frontend Polling**: 1-second intervals during streaming, 5-second when idle
+- **Visual Indicators**: Animated dots show streaming status
+
+### Performance Improvements
+- **Before**: 60+ second waits with potential timeouts
+- **After**: Immediate response start, progressive content delivery
+- **User Experience**: No more blank waiting periods
+- **Error Handling**: Graceful fallbacks prevent hanging requests
+
 2. **Backend development:**
    - Hot reload enabled with volume mounts
    - Located in `backend/` directory
@@ -153,6 +212,41 @@ To enable AI responses:
 3. Commit with descriptive messages
 4. Push to your fork
 5. Create a pull request
+
+## 🔄 Streaming Response Architecture
+
+The system implements real-time streaming responses for better user experience:
+
+### Backend Implementation
+```typescript
+// Streaming API call with progressive database updates
+const response = await fetch(ollamaUrl, {
+  method: 'POST',
+  body: JSON.stringify({
+    model: 'qwen2.5-coder:7b',
+    messages: [...],
+    stream: true  // Enable streaming
+  })
+});
+
+// Process streaming chunks and update database in real-time
+const reader = response.body?.getReader();
+while (true) {
+  const { done, value } = await reader.read();
+  // Update message content progressively
+}
+```
+
+### Frontend Features
+- **Adaptive Polling**: 1s during streaming, 5s when idle
+- **Visual Feedback**: Animated indicators for streaming status
+- **Real-time Updates**: Content appears as it's generated
+
+### Benefits
+- ✅ **No More Waiting**: Immediate response acknowledgment
+- ✅ **Progress Visibility**: Users see content being generated
+- ✅ **Better UX**: Eliminates blank waiting periods
+- ✅ **Timeout Resilience**: Graceful handling of long responses
 
 ## Support
 
