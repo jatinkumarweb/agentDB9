@@ -11,7 +11,8 @@ export class Conversation implements AgentConversation {
   @Column()
   agentId: string;
 
-  @Column()
+  // TODO: Make required when user management is implemented
+  @Column({ default: 'default-user' })
   userId: string;
 
   @Column({ nullable: true })

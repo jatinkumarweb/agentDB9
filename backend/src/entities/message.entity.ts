@@ -10,11 +10,8 @@ export class Message implements ConversationMessage {
   @Column()
   conversationId: string;
 
-  @Column({
-    type: 'enum',
-    enum: ['user', 'agent', 'system'],
-  })
-  role: 'user' | 'agent' | 'system';
+  @Column({ type: 'varchar', length: 50 })
+  role: string;
 
   @Column('text')
   content: string;

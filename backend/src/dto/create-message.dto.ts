@@ -1,11 +1,12 @@
 import { IsString, IsEnum, IsOptional, IsObject } from 'class-validator';
 
 export class CreateMessageDto {
-  @IsString()
-  conversationId: string;
+  // conversationId is set by the controller from URL parameter
+  conversationId?: string;
 
-  @IsEnum(['user', 'agent', 'system'])
-  role: 'user' | 'agent' | 'system';
+  // @IsEnum(['user', 'agent', 'system']) // TODO: Re-enable role validation after implementing proper role management
+  @IsString()
+  role: string;
 
   @IsString()
   content: string;

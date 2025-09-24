@@ -130,7 +130,7 @@ export interface AgentConversation {
 export interface ConversationMessage {
   id: string;
   conversationId: string;
-  role: 'user' | 'agent' | 'system';
+  role: string; // Allow any string for flexible role definitions
   content: string;
   metadata?: MessageMetadata;
   timestamp: Date;

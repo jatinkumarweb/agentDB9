@@ -151,13 +151,13 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Model
-            </label>
             <ModelSelector
               selectedModel={formData.configuration.model}
+              selectedProvider={formData.configuration.llmProvider}
               onModelChange={(modelId) => handleInputChange('configuration.model', modelId)}
+              onProviderChange={(provider) => handleInputChange('configuration.llmProvider', provider)}
               className="w-full"
+              showProviderSelector={true}
             />
           </div>
 

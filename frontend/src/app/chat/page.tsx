@@ -49,6 +49,12 @@ export default function ChatPage({}: ChatPageProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Helper function to determine if a role is user-like
+  const isUserRole = (role: string) => {
+    const userRoles = ['user', 'human', 'person'];
+    return userRoles.includes(role.toLowerCase());
+  };
+
   const fetchAgents = async () => {
     try {
       const response = await fetch('/api/agents');
@@ -126,6 +132,7 @@ export default function ChatPage({}: ChatPageProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          role: 'user',
           content: messageContent,
         }),
       });
@@ -149,13 +156,22 @@ export default function ChatPage({}: ChatPageProps) {
     if (!currentConversation) return;
 
     try {
-      const response = await fetch(`/api/conversations/${currentConversation.id}`);
-      const data = await response.json();
-      if (data.success) {
-        setCurrentConversation(data.data);
+      // Fetch messages separately since the conversation endpoint has issues
+      const messagesResponse = await fetch(`/api/conversations/${currentConversation.id}/messages`);
+      const messagesData = await messagesResponse.json();
+      
+      if (messagesData.success) {
+        // Update current conversation with new messages
+        const updatedConversation = {
+          ...currentConversation,
+          messages: messagesData.data
+        };
+        console.log('Refreshed conversation with', messagesData.data.length, 'messages');
+        setCurrentConversation(updatedConversation);
+        
         // Update in conversations list
         setConversations(prev => 
-          prev.map(conv => conv.id === data.data.id ? data.data : conv)
+          prev.map(conv => conv.id === currentConversation.id ? updatedConversation : conv)
         );
       }
     } catch (error) {
@@ -236,7 +252,7 @@ export default function ChatPage({}: ChatPageProps) {
                     {conversation.title}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {conversation.messages.length} messages
+                    {conversation.messages?.length} messages
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
                     {formatTimestamp(conversation.updatedAt.toString())}
@@ -269,24 +285,27 @@ export default function ChatPage({}: ChatPageProps) {
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {currentConversation.messages.map((msg) => (
+              {currentConversation.messages?.map((msg) => (
                 <div
                   key={msg.id}
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${isUserRole(msg.role) ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
                     className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      msg.role === 'user'
+                      isUserRole(msg.role)
                         ? 'bg-blue-600 text-white'
                         : 'bg-white border border-gray-200 text-gray-900'
                     }`}
                   >
                     <div className="flex items-center mb-1">
-                      {msg.role === 'user' ? (
+                      {isUserRole(msg.role) ? (
                         <User className="w-4 h-4 mr-2" />
                       ) : (
                         <Bot className="w-4 h-4 mr-2" />
                       )}
+                      <span className="text-xs font-medium opacity-75 mr-2">
+                        {msg.role}
+                      </span>
                       <span className="text-xs opacity-75">
                         {formatTimestamp(msg.timestamp.toString())}
                       </span>

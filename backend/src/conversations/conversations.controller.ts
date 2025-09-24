@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Param, Query, HttpStatus, HttpException } 
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ConversationsService } from './conversations.service';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
-import { CreateMessageDto } from '../dto/create-message.dto';
+import { AddMessageDto } from '../dto/add-message.dto';
 import { APIResponse } from '@agentdb9/shared';
 
 @ApiTags('conversations')
@@ -129,10 +129,14 @@ export class ConversationsController {
   @Post(':id/messages')
   @ApiOperation({ summary: 'Add a message to a conversation' })
   @ApiResponse({ status: 201, description: 'Message added successfully' })
-  async addMessage(@Param('id') id: string, @Body() createMessageDto: CreateMessageDto): Promise<APIResponse> {
+  async addMessage(@Param('id') id: string, @Body() addMessageDto: AddMessageDto): Promise<APIResponse> {
     try {
-      createMessageDto.conversationId = id;
-      const message = await this.conversationsService.addMessage(createMessageDto);
+      // Create full message data with conversationId from URL parameter
+      const messageData = { 
+        ...addMessageDto, 
+        conversationId: id 
+      };
+      const message = await this.conversationsService.addMessage(messageData);
       return {
         success: true,
         data: message,

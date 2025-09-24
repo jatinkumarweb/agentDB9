@@ -14,4 +14,9 @@ export class CreateConversationDto {
   @IsOptional()
   @IsObject()
   context?: Record<string, any>;
+
+  // TODO: Make required when user management is implemented
+  @IsOptional()
+  @IsString()
+  userId?: string;
 }
