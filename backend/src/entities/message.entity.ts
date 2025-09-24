@@ -3,7 +3,7 @@ import { ConversationMessage } from '@agentdb9/shared';
 import { Conversation } from './conversation.entity';
 
 @Entity('messages')
-export class Message implements ConversationMessage {
+export class Message implements Omit<ConversationMessage, 'role'> {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 

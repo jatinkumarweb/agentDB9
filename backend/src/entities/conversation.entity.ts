@@ -4,7 +4,7 @@ import { Agent } from './agent.entity';
 import { Message } from './message.entity';
 
 @Entity('conversations')
-export class Conversation implements AgentConversation {
+export class Conversation implements Omit<AgentConversation, 'messages'> {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
