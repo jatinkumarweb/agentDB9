@@ -6,8 +6,7 @@ module.exports = {
       testEnvironment: 'jsdom',
       setupFilesAfterEnv: ['<rootDir>/frontend/jest.setup.js'],
       moduleNameMapping: {
-        '^@/(.*)$': '<rootDir>/frontend/src/$1',
-        '^@shared/(.*)$': '<rootDir>/shared/src/$1',
+      '^@agentdb9/shared$': '<rootDir>/../shared/src',
       },
       transform: {
         '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
