@@ -34,18 +34,35 @@ app.get('/health', (req, res) => {
 // Model availability endpoint
 app.get('/api/models', async (req, res) => {
   try {
+    const { getAvailableModels, getDisabledModels } = await import('@agentdb9/shared');
+    
+    const availableModels = getAvailableModels();
+    const disabledModels = getDisabledModels();
+    
     const models = [
-      { id: 'codellama:7b', provider: 'ollama', status: 'available' },
-      { id: 'codellama:13b', provider: 'ollama', status: 'available' },
-      { id: 'deepseek-coder:6.7b', provider: 'ollama', status: 'available' },
-      { id: 'mistral:7b', provider: 'ollama', status: 'available' },
-      { id: 'gpt-4', provider: 'openai', status: process.env.OPENAI_API_KEY ? 'available' : 'unavailable' },
-      { id: 'claude-3-sonnet', provider: 'anthropic', status: process.env.ANTHROPIC_API_KEY ? 'available' : 'unavailable' }
+      ...availableModels.map(model => ({
+        id: model.id,
+        provider: model.provider,
+        status: model.availability.status,
+        reason: model.availability.reason,
+        requiresApiKey: model.availability.requiresApiKey,
+        apiKeyConfigured: model.availability.apiKeyConfigured
+      })),
+      ...disabledModels.map(model => ({
+        id: model.id,
+        provider: model.provider,
+        status: model.availability.status,
+        reason: model.availability.reason,
+        requiresApiKey: model.availability.requiresApiKey,
+        apiKeyConfigured: model.availability.apiKeyConfigured
+      }))
     ];
 
     res.json({
       success: true,
       models,
+      available: availableModels.length,
+      disabled: disabledModels.length,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -91,10 +108,33 @@ app.post('/api/test/model', async (req, res) => {
 app.post('/api/generate', async (req, res) => {
   try {
     const request: LLMRequest = req.body;
+    const { getModelById } = await import('@agentdb9/shared');
+    
+    // Check if model is available
+    const model = getModelById(request.modelId || 'codellama:7b');
+    
+    if (!model) {
+      return res.status(400).json({
+        success: false,
+        error: 'Model not found'
+      });
+    }
+    
+    if (model.availability.status === 'disabled') {
+      return res.status(400).json({
+        success: false,
+        error: 'Model is disabled',
+        reason: model.availability.reason,
+        requiresApiKey: model.availability.requiresApiKey,
+        apiKeyConfigured: model.availability.apiKeyConfigured
+      });
+    }
     
     // Mock LLM response for now
     const response: LLMResponse = {
-      content: `Mock response to: ${request.prompt}`,
+      content: `Mock response from ${model.name} to: ${request.prompt}`,
+      modelId: model.id,
+      provider: model.provider,
       usage: {
         promptTokens: request.prompt.length / 4,
         completionTokens: 50,

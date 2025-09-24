@@ -23,6 +23,11 @@ export const OLLAMA_MODELS: Record<string, ModelConfig> = {
       tokensPerSecond: 50,
       memoryUsage: 4000,
       gpuRequired: false
+    },
+    availability: {
+      status: 'unknown',
+      requiresApiKey: false,
+      apiKeyConfigured: true
     }
   },
   'codellama:13b': {
@@ -46,6 +51,11 @@ export const OLLAMA_MODELS: Record<string, ModelConfig> = {
       tokensPerSecond: 30,
       memoryUsage: 8000,
       gpuRequired: true
+    },
+    availability: {
+      status: 'unknown',
+      requiresApiKey: false,
+      apiKeyConfigured: true
     }
   },
   'deepseek-coder:6.7b': {
@@ -68,6 +78,11 @@ export const OLLAMA_MODELS: Record<string, ModelConfig> = {
       tokensPerSecond: 60,
       memoryUsage: 3500,
       gpuRequired: false
+    },
+    availability: {
+      status: 'unknown',
+      requiresApiKey: false,
+      apiKeyConfigured: true
     }
   },
   'mistral:7b': {
@@ -90,8 +105,32 @@ export const OLLAMA_MODELS: Record<string, ModelConfig> = {
       tokensPerSecond: 45,
       memoryUsage: 4000,
       gpuRequired: false
+    },
+    availability: {
+      status: 'unknown',
+      requiresApiKey: false,
+      apiKeyConfigured: true
     }
   }
+};
+
+// Function to check API key availability
+const checkApiKey = (provider: ModelProvider): boolean => {
+  if (typeof process !== 'undefined' && process.env) {
+    switch (provider) {
+      case 'openai':
+        return !!process.env.OPENAI_API_KEY;
+      case 'anthropic':
+        return !!process.env.ANTHROPIC_API_KEY;
+      case 'cohere':
+        return !!process.env.COHERE_API_KEY;
+      case 'huggingface':
+        return !!process.env.HUGGINGFACE_API_KEY;
+      default:
+        return false;
+    }
+  }
+  return false;
 };
 
 export const EXTERNAL_MODELS: Record<string, ModelConfig> = {
@@ -121,6 +160,12 @@ export const EXTERNAL_MODELS: Record<string, ModelConfig> = {
       tokensPerSecond: 20,
       memoryUsage: 0,
       gpuRequired: false
+    },
+    availability: {
+      status: checkApiKey('openai') ? 'unknown' : 'disabled',
+      reason: checkApiKey('openai') ? undefined : 'API key not configured',
+      requiresApiKey: true,
+      apiKeyConfigured: checkApiKey('openai')
     }
   },
   'claude-3-sonnet': {
@@ -148,6 +193,12 @@ export const EXTERNAL_MODELS: Record<string, ModelConfig> = {
       tokensPerSecond: 35,
       memoryUsage: 0,
       gpuRequired: false
+    },
+    availability: {
+      status: checkApiKey('anthropic') ? 'unknown' : 'disabled',
+      reason: checkApiKey('anthropic') ? undefined : 'API key not configured',
+      requiresApiKey: true,
+      apiKeyConfigured: checkApiKey('anthropic')
     }
   }
 };
@@ -162,11 +213,14 @@ export class ModelSelector {
 
   selectForTask(task: CodeTask): ModelConfig {
     const candidates = Object.values(this.models).filter(model =>
-      model.capabilities.some(cap => cap.type === task.type)
+      model.capabilities.some(cap => cap.type === task.type) &&
+      model.availability.status !== 'disabled'
     );
 
     if (candidates.length === 0) {
-      return this.models['codellama:13b']; // fallback
+      // Find any available fallback model
+      const availableModels = Object.values(this.models).filter(m => m.availability.status !== 'disabled');
+      return availableModels.length > 0 ? availableModels[0] : this.models['codellama:13b'];
     }
 
     // Score models based on task requirements
@@ -303,8 +357,19 @@ export class ModelSelector {
 
 export const modelSelector = new ModelSelector();
 
-export const getAvailableModels = (): ModelConfig[] => {
-  return Object.values({ ...OLLAMA_MODELS, ...EXTERNAL_MODELS });
+export const getAvailableModels = (includeDisabled = false): ModelConfig[] => {
+  const allModels = Object.values({ ...OLLAMA_MODELS, ...EXTERNAL_MODELS });
+  
+  if (includeDisabled) {
+    return allModels;
+  }
+  
+  return allModels.filter(model => model.availability.status !== 'disabled');
+};
+
+export const getDisabledModels = (): ModelConfig[] => {
+  return Object.values({ ...OLLAMA_MODELS, ...EXTERNAL_MODELS })
+    .filter(model => model.availability.status === 'disabled');
 };
 
 export const getModelById = (id: string): ModelConfig | undefined => {

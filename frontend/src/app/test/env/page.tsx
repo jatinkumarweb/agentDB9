@@ -343,6 +343,33 @@ function ServiceStatusCard({ services }: { services: ServiceStatus[] }) {
 }
 
 function ModelStatusCard({ models }: { models: ModelTest[] }) {
+  const getModelStatusColor = (status: string) => {
+    switch (status) {
+      case 'available': return 'text-green-600';
+      case 'disabled': return 'text-yellow-600';
+      case 'error': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const getModelStatusIcon = (status: string) => {
+    switch (status) {
+      case 'available': return '✅';
+      case 'disabled': return '⚠️';
+      case 'error': return '❌';
+      default: return '❓';
+    }
+  };
+
+  const getModelStatusText = (model: ModelTest) => {
+    if (model.status === 'disabled') {
+      return model.requiresApiKey && !model.apiKeyConfigured 
+        ? 'API Key Required' 
+        : 'Disabled';
+    }
+    return model.available ? 'Available' : 'Unavailable';
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <h3 className="text-lg font-semibold mb-4">Model Availability</h3>
@@ -355,20 +382,33 @@ function ModelStatusCard({ models }: { models: ModelTest[] }) {
               {model.responseTime && (
                 <div className="text-xs text-gray-500">{model.responseTime}ms</div>
               )}
+              {model.requiresApiKey && !model.apiKeyConfigured && (
+                <div className="text-xs text-yellow-600">Requires API key configuration</div>
+              )}
             </div>
             <div className="text-right">
-              <div className={`font-semibold ${
-                model.available ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {model.available ? '✅' : '❌'} {model.available ? 'Available' : 'Unavailable'}
+              <div className={`font-semibold ${getModelStatusColor(model.status)}`}>
+                {getModelStatusIcon(model.status)} {getModelStatusText(model)}
               </div>
-              {model.error && (
+              {model.reason && model.status === 'disabled' && (
+                <div className="text-xs text-yellow-600 max-w-32 truncate">{model.reason}</div>
+              )}
+              {model.error && model.status === 'error' && (
                 <div className="text-xs text-red-600 max-w-32 truncate">{model.error}</div>
               )}
             </div>
           </div>
         ))}
       </div>
+      
+      {/* Show configuration hint for disabled models */}
+      {models.some(m => m.status === 'disabled' && m.requiresApiKey && !m.apiKeyConfigured) && (
+        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+          <div className="text-sm text-yellow-800">
+            <strong>💡 Tip:</strong> Configure API keys in your <code>.env</code> file to enable external models.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,14 +7,12 @@ RUN apk add --no-cache python3 make g++ curl
 
 # Copy package files
 COPY package*.json ./
-COPY ../shared/package*.json /shared/
 
 # Install dependencies
 RUN npm install
 
 # Copy source code
 COPY . .
-COPY ../shared /shared
 
 # Build the application
 RUN npm run build

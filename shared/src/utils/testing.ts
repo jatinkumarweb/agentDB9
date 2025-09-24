@@ -68,6 +68,33 @@ export class EnvironmentTester {
     const startTime = Date.now();
     
     try {
+      // First check if model is available
+      const modelsResponse = await fetch(`${this.baseUrls.llmService}/api/models`);
+      
+      if (modelsResponse.ok) {
+        const modelsData = await modelsResponse.json();
+        const modelInfo = modelsData.models?.find((m: any) => m.id === modelId);
+        
+        if (modelInfo) {
+          // If model is disabled, return disabled status instead of testing
+          if (modelInfo.status === 'disabled') {
+            return {
+              modelId,
+              provider,
+              available: false,
+              status: 'disabled',
+              reason: modelInfo.reason || 'Model is disabled',
+              requiresApiKey: modelInfo.requiresApiKey || false,
+              apiKeyConfigured: modelInfo.apiKeyConfigured || false,
+              responseTime: Date.now() - startTime,
+              testPrompt,
+              timestamp: new Date()
+            };
+          }
+        }
+      }
+      
+      // Test model inference
       const response = await fetch(`${this.baseUrls.llmService}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -88,16 +115,40 @@ export class EnvironmentTester {
           modelId,
           provider,
           available: true,
+          status: 'available',
+          requiresApiKey: false,
+          apiKeyConfigured: true,
           responseTime,
           testPrompt,
           response: data.data?.content || 'No response content',
           timestamp: new Date()
         };
       } else {
+        const errorData = await response.json().catch(() => ({}));
+        
+        // Handle disabled model response
+        if (response.status === 400 && errorData.reason) {
+          return {
+            modelId,
+            provider,
+            available: false,
+            status: 'disabled',
+            reason: errorData.reason,
+            requiresApiKey: errorData.requiresApiKey || false,
+            apiKeyConfigured: errorData.apiKeyConfigured || false,
+            responseTime,
+            testPrompt,
+            timestamp: new Date()
+          };
+        }
+        
         return {
           modelId,
           provider,
           available: false,
+          status: 'error',
+          requiresApiKey: false,
+          apiKeyConfigured: false,
           responseTime,
           testPrompt,
           error: `HTTP ${response.status}`,
@@ -109,6 +160,9 @@ export class EnvironmentTester {
         modelId,
         provider,
         available: false,
+        status: 'error',
+        requiresApiKey: false,
+        apiKeyConfigured: false,
         responseTime: Date.now() - startTime,
         testPrompt,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -244,9 +298,19 @@ export class EnvironmentTester {
       const result = await this.testModelAvailability(model.id, model.provider);
       const duration = Date.now() - startTestTime;
       
-      test.status = result.available ? 'passed' : 'failed';
+      // Handle different model statuses
+      if (result.status === 'disabled') {
+        // Disabled models are not failures, they're expected when API keys are missing
+        test.status = result.requiresApiKey && !result.apiKeyConfigured ? 'skipped' : 'passed';
+        test.error = result.reason;
+      } else if (result.available) {
+        test.status = 'passed';
+      } else {
+        test.status = 'failed';
+        test.error = result.error;
+      }
+      
       test.duration = duration;
-      test.error = result.error;
       test.result = result;
       
       tests.push(test);
@@ -365,7 +429,12 @@ export class EnvironmentTester {
       if (test.id.includes('connectivity')) {
         recommendations.push(`Check if ${test.name} service is running and accessible`);
       } else if (test.id.includes('model')) {
-        recommendations.push(`Verify ${test.name} is installed and configured correctly`);
+        const result = test.result as ModelTest;
+        if (result?.status === 'disabled' && result?.requiresApiKey && !result?.apiKeyConfigured) {
+          recommendations.push(`Configure API key for ${result.provider} in .env file`);
+        } else {
+          recommendations.push(`Verify ${test.name} is installed and configured correctly`);
+        }
       } else if (test.id.includes('database')) {
         recommendations.push(`Check ${test.name} connection settings and ensure service is running`);
       }

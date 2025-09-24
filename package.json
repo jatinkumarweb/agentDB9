@@ -25,6 +25,8 @@
     "test:models": "./scripts/test-models.sh",
     "test:databases": "./scripts/test-databases.sh",
     "test:vscode": "./scripts/test-vscode.sh",
+    "test:api-keys": "./scripts/test-api-keys.sh",
+    "validate:docker": "./scripts/validate-docker.sh",
     "validate": "./scripts/validate-environment.sh",
     "lint": "npm run lint --workspaces",
     "clean": "npm run clean --workspaces && docker-compose down -v",

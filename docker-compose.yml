@@ -22,8 +22,9 @@ services:
       - NEXT_PUBLIC_VSCODE_URL=http://localhost:8080
     volumes:
       - ./frontend:/app
-      - ./shared:/shared
+      - ./shared:/app/node_modules/@agentdb9/shared
       - /app/node_modules
+      - /app/.next
     depends_on:
       - backend
 
@@ -45,7 +46,7 @@ services:
       - REDIS_URL=redis://redis:6379
     volumes:
       - ./backend:/app
-      - ./shared:/shared
+      - ./shared:/app/node_modules/@agentdb9/shared
       - ./workspace:/workspace/projects
       - /app/node_modules
     depends_on:
@@ -71,7 +72,7 @@ services:
       - REDIS_URL=redis://redis:6379
     volumes:
       - ./llm-service:/app
-      - ./shared:/shared
+      - ./shared:/app/node_modules/@agentdb9/shared
       - ./models:/models
       - /app/node_modules
     depends_on:

@@ -43,8 +43,12 @@ export interface ModelTest {
   modelId: string;
   provider: string;
   available: boolean;
+  status: 'available' | 'disabled' | 'error' | 'unknown';
   responseTime?: number;
   error?: string;
+  reason?: string;
+  requiresApiKey: boolean;
+  apiKeyConfigured: boolean;
   testPrompt: string;
   response?: string;
   timestamp: Date;

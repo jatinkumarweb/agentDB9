@@ -73,6 +73,41 @@ app.post('/api/test/environment', async (req, res) => {
   }
 });
 
+// Models endpoint that proxies to LLM service
+app.get('/api/models', async (req, res) => {
+  try {
+    const response = await fetch('http://llm-service:9000/api/models');
+    
+    if (!response.ok) {
+      throw new Error(`LLM service responded with ${response.status}`);
+    }
+    
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Models endpoint error:', error);
+    
+    // Fallback response when LLM service is unavailable
+    res.json({
+      success: true,
+      models: [
+        {
+          id: 'codellama:7b',
+          provider: 'ollama',
+          status: 'unknown',
+          reason: 'LLM service unavailable',
+          requiresApiKey: false,
+          apiKeyConfigured: true
+        }
+      ],
+      available: 0,
+      disabled: 1,
+      timestamp: new Date().toISOString(),
+      warning: 'LLM service is not available'
+    });
+  }
+});
+
 // Database connection test
 app.get('/api/test/database', async (req, res) => {
   try {

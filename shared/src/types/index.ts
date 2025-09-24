@@ -80,6 +80,15 @@ export interface ModelConfig {
   parameters: ModelParameters;
   pricing?: ModelPricing;
   performance: ModelPerformance;
+  availability: ModelAvailability;
+}
+
+export interface ModelAvailability {
+  status: 'available' | 'disabled' | 'error' | 'unknown';
+  reason?: string;
+  requiresApiKey: boolean;
+  apiKeyConfigured: boolean;
+  lastChecked?: Date;
 }
 
 export interface ModelCapability {
