@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Bot, User, Plus, Settings } from 'lucide-react';
 import { CodingAgent, AgentConversation, ConversationMessage } from '@agentdb9/shared';
 import AgentCreator from '@/components/AgentCreator';
@@ -17,6 +17,8 @@ export default function ChatPage({}: ChatPageProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastStreamingStateRef = useRef<boolean>(false);
 
   // Fetch agents on component mount
   useEffect(() => {
@@ -35,27 +37,63 @@ export default function ChatPage({}: ChatPageProps) {
     scrollToBottom();
   }, [currentConversation?.messages]);
 
-  // Auto-refresh conversation for real-time updates (only when not loading)
-  useEffect(() => {
-    if (!currentConversation || isLoading || isRefreshing) return;
+  // Smart polling that adjusts based on streaming status
+  const updatePollingInterval = useCallback(() => {
+    if (!currentConversation) return;
 
-    // Check if there's a streaming message (agent message with streaming metadata)
     const hasStreamingMessage = currentConversation.messages?.some(msg => 
       msg.role === 'agent' && 
       msg.metadata?.streaming === true
     );
 
-    // Use faster polling when streaming, slower when idle
-    const pollInterval = hasStreamingMessage ? 1000 : 5000; // 1s for streaming, 5s for idle
-
-    const interval = setInterval(() => {
-      if (!isLoading && !isRefreshing) {
-        refreshConversation();
+    // Only change interval if streaming status changed
+    if (hasStreamingMessage !== lastStreamingStateRef.current) {
+      lastStreamingStateRef.current = hasStreamingMessage;
+      
+      // Clear existing interval
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
       }
-    }, pollInterval);
 
-    return () => clearInterval(interval);
-  }, [currentConversation?.id, currentConversation?.messages, isLoading, isRefreshing]);
+      // Set new interval based on streaming status
+      const interval = hasStreamingMessage ? 1000 : 5000;
+      console.log(`Polling interval: ${interval}ms (streaming: ${hasStreamingMessage})`);
+      
+      pollingIntervalRef.current = setInterval(() => {
+        if (!isLoading && !isRefreshing) {
+          refreshConversation();
+        }
+      }, interval);
+    }
+  }, [currentConversation, isLoading, isRefreshing]);
+
+  // Update polling when conversation or messages change
+  useEffect(() => {
+    updatePollingInterval();
+  }, [currentConversation?.messages, updatePollingInterval]);
+
+  // Initialize polling when conversation changes
+  useEffect(() => {
+    if (!currentConversation) {
+      // Clear polling when no conversation
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Reset streaming state for new conversation
+    lastStreamingStateRef.current = false;
+    updatePollingInterval();
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [currentConversation?.id, updatePollingInterval]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
