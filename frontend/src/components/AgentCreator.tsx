@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { CreateAgentRequest } from '@agentdb9/shared';
+import ModelSelector from './ModelSelector';
 
 interface AgentCreatorProps {
   onAgentCreated: () => void;
@@ -153,13 +154,10 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Model
             </label>
-            <input
-              type="text"
-              value={formData.configuration.model}
-              onChange={(e) => handleInputChange('configuration.model', e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., codellama:7b"
-              required
+            <ModelSelector
+              selectedModel={formData.configuration.model}
+              onModelChange={(modelId) => handleInputChange('configuration.model', modelId)}
+              className="w-full"
             />
           </div>
 
