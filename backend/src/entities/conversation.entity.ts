@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { AgentConversation } from '@agentdb9/shared';
 import { Agent } from './agent.entity';
 import { Message } from './message.entity';
+import { User } from './user.entity';
 
 @Entity('conversations')
 export class Conversation implements Omit<AgentConversation, 'messages'> {
@@ -11,9 +12,12 @@ export class Conversation implements Omit<AgentConversation, 'messages'> {
   @Column()
   agentId: string;
 
-  // TODO: Make required when user management is implemented
-  @Column({ default: 'default-user' })
+  @Column()
   userId: string;
+
+  @ManyToOne(() => User, user => user.conversations)
+  @JoinColumn({ name: 'userId' })
+  user: User;
 
   @Column({ nullable: true })
   projectId?: string;

@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import type { CodingAgent, AgentStatus, AgentCapability, AgentConfiguration } from '@agentdb9/shared';
 import { Conversation } from './conversation.entity';
+import { User } from './user.entity';
 
 @Entity('agents')
 export class Agent implements CodingAgent {
@@ -15,6 +16,10 @@ export class Agent implements CodingAgent {
 
   @Column()
   userId: string;
+
+  @ManyToOne(() => User, user => user.agents)
+  @JoinColumn({ name: 'userId' })
+  user: User;
 
   @Column('jsonb')
   configuration: AgentConfiguration;
