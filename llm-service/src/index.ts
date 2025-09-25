@@ -51,8 +51,8 @@ async function checkOllamaAvailability(): Promise<{available: boolean, downloade
       });
       
       if (tagsResponse.ok) {
-        const tagsData = await tagsResponse.json();
-        const downloadedModels = tagsData.models ? tagsData.models.map(m => m.name) : [];
+        const tagsData = await tagsResponse.json() as { models?: Array<{ name: string }> };
+        const downloadedModels = tagsData.models ? tagsData.models.map((m: { name: string }) => m.name) : [];
         return {
           available: true,
           downloadedModels
