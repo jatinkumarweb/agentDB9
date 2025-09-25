@@ -31,6 +31,41 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Helper function to check Ollama availability
+async function checkOllamaAvailability(): Promise<{available: boolean, downloadedModels: string[]}> {
+  try {
+    const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    
+    const response = await fetch(`${ollamaUrl}/api/version`, {
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      // Check which models are actually downloaded
+      const tagsResponse = await fetch(`${ollamaUrl}/api/tags`, {
+        signal: controller.signal,
+      });
+      
+      if (tagsResponse.ok) {
+        const tagsData = await tagsResponse.json();
+        const downloadedModels = tagsData.models ? tagsData.models.map(m => m.name) : [];
+        return {
+          available: true,
+          downloadedModels
+        };
+      }
+    }
+    
+    return { available: false, downloadedModels: [] };
+  } catch (error) {
+    return { available: false, downloadedModels: [] };
+  }
+}
+
 // Model availability endpoint
 app.get('/api/models', async (req, res) => {
   try {
@@ -39,15 +74,34 @@ app.get('/api/models', async (req, res) => {
     const availableModels = getAvailableModels();
     const disabledModels = getDisabledModels();
     
+    // Check Ollama availability
+    const ollamaStatus = await checkOllamaAvailability();
+    
     const models = [
-      ...availableModels.map(model => ({
-        id: model.id,
-        provider: model.provider,
-        status: model.availability.status,
-        reason: model.availability.reason,
-        requiresApiKey: model.availability.requiresApiKey,
-        apiKeyConfigured: model.availability.apiKeyConfigured
-      })),
+      ...availableModels.map(model => {
+        if (model.provider === 'ollama') {
+          // Check if this specific model is downloaded in Ollama
+          const isDownloaded = ollamaStatus.downloadedModels.includes(model.id);
+          return {
+            id: model.id,
+            provider: model.provider,
+            status: isDownloaded ? 'available' : 'unavailable',
+            reason: isDownloaded ? 'Downloaded in Ollama' : 
+                   ollamaStatus.available ? 'Not downloaded in Ollama' : 'Ollama service not available',
+            requiresApiKey: false,
+            apiKeyConfigured: true,
+          };
+        } else {
+          return {
+            id: model.id,
+            provider: model.provider,
+            status: model.availability.status,
+            reason: model.availability.reason,
+            requiresApiKey: model.availability.requiresApiKey,
+            apiKeyConfigured: model.availability.apiKeyConfigured
+          };
+        }
+      }),
       ...disabledModels.map(model => ({
         id: model.id,
         provider: model.provider,
@@ -58,11 +112,14 @@ app.get('/api/models', async (req, res) => {
       }))
     ];
 
+    const availableCount = models.filter(m => m.status === 'available').length;
+    const disabledCount = models.filter(m => m.status !== 'available').length;
+
     res.json({
       success: true,
       models,
-      available: availableModels.length,
-      disabled: disabledModels.length,
+      available: availableCount,
+      disabled: disabledCount,
       timestamp: new Date().toISOString()
     });
   } catch (error) {

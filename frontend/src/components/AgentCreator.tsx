@@ -18,7 +18,7 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
     description: '',
     configuration: {
       llmProvider: 'ollama',
-      model: 'codellama:7b',
+      model: 'qwen2.5-coder:7b',
       temperature: 0.7,
       maxTokens: 2048,
     },
@@ -46,7 +46,7 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
           description: '',
           configuration: {
             llmProvider: 'ollama',
-            model: 'codellama:7b',
+            model: 'qwen2.5-coder:7b',
             temperature: 0.7,
             maxTokens: 2048,
           },
@@ -132,22 +132,6 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
               placeholder="Describe what this agent specializes in..."
               rows={3}
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              LLM Provider
-            </label>
-            <select
-              value={formData.configuration.llmProvider}
-              onChange={(e) => handleInputChange('configuration.llmProvider', e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="ollama">Ollama</option>
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="cohere">Cohere</option>
-            </select>
           </div>
 
           <div>
