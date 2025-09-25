@@ -41,24 +41,11 @@ export class HealthController {
         data: models,
       };
     } catch (error) {
+      // Use the service's fallback logic instead of hardcoded models
+      const fallbackModels = await this.healthService.getModels();
       return {
         success: true,
-        data: {
-          models: [
-            {
-              id: 'codellama:7b',
-              provider: 'ollama',
-              status: 'unknown',
-              reason: 'LLM service unavailable',
-              requiresApiKey: false,
-              apiKeyConfigured: true,
-            },
-          ],
-          available: 0,
-          disabled: 1,
-          timestamp: new Date().toISOString(),
-          warning: 'LLM service is not available',
-        },
+        data: fallbackModels,
       };
     }
   }
