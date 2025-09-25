@@ -2,7 +2,7 @@
 
 import React, { useState, Suspense } from 'react';
 import { User, Bell, Shield, Key, Trash2, Save } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/stores/authStore';
 import { useAuthRedirect, authRedirectConfigs } from '@/hooks/useAuthRedirect';
 import ProtectedRoute, { protectionLevels } from '@/components/ProtectedRoute';
 import AuthStatus from '@/components/AuthStatus';
@@ -12,7 +12,7 @@ import toast from 'react-hot-toast';
 export const dynamic = 'force-dynamic';
 
 function SettingsContent() {
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuthStore();
   const [activeTab, setActiveTab] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
 

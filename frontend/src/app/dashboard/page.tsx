@@ -13,13 +13,13 @@ import {
   Database,
   Zap
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/stores/authStore';
 import { useAuthRedirect, authRedirectConfigs } from '@/hooks/useAuthRedirect';
 import AuthGuard from '@/components/AuthGuard';
 import toast from 'react-hot-toast';
 
 function DashboardContent() {
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuthStore();
 
   const handleLogout = () => {
     logout();
@@ -41,7 +41,7 @@ function DashboardContent() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <User className="h-5 w-5 text-gray-400" />
-                <span className="text-sm text-gray-700">{user.username}</span>
+                <span className="text-sm text-gray-700">{user?.username || 'User'}</span>
               </div>
               
               <button
@@ -63,7 +63,7 @@ function DashboardContent() {
           <div className="bg-white overflow-hidden shadow rounded-lg mb-6">
             <div className="px-4 py-5 sm:p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Welcome back, {user.username}!
+                Welcome back, {user?.username || 'User'}!
               </h2>
               <p className="text-gray-600">
                 Manage your AI coding agents and projects from your dashboard.
@@ -210,7 +210,7 @@ function DashboardContent() {
                       Account created successfully
                     </p>
                     <p className="text-xs text-gray-500">
-                      {new Date(user.createdAt).toLocaleDateString()}
+                      {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
                     </p>
                   </div>
                 </div>

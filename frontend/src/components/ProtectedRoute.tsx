@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/stores/authStore';
 import { permissionUtils } from '@/utils/auth';
 
 interface ProtectedRouteProps {
@@ -26,7 +26,7 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuthStore();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
 
@@ -58,7 +58,7 @@ export default function ProtectedRoute({
 
       // If user is authenticated, check roles and permissions
       if (isAuthenticated && user) {
-        const userRoles = user.roles || [];
+        const userRoles = user.role ? [user.role] : [];
 
         // Check required roles
         if (requiredRoles.length > 0) {

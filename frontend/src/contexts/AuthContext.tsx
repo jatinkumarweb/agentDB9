@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, ReactNode, useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 
 interface AuthContextType {
@@ -22,8 +22,10 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const authStore = useAuthStore();
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
     // Initialize auth check on app start
     authStore.checkAuth();
   }, [authStore]);
@@ -41,7 +43,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   return (
     <AuthContext.Provider value={contextValue}>
-      {children}
+      {isClient ? children : (
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      )}
     </AuthContext.Provider>
   );
 }
@@ -59,7 +68,7 @@ export function withAuth<P extends object>(
   Component: React.ComponentType<P>
 ) {
   return function AuthenticatedComponent(props: P) {
-    const { isAuthenticated, isLoading } = useAuth();
+    const { isAuthenticated, isLoading } = useAuthStore();
 
     if (isLoading) {
       return (

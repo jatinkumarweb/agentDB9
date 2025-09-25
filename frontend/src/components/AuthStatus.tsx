@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { User, LogOut, Settings, Shield } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/stores/authStore';
 
 interface AuthStatusProps {
   showUserMenu?: boolean;
@@ -14,7 +14,7 @@ export default function AuthStatus({
   showUserMenu = true, 
   className = '' 
 }: AuthStatusProps) {
-  const { user, isAuthenticated, logout, isLoading } = useAuth();
+  const { user, isAuthenticated, logout, isLoading } = useAuthStore();
 
   if (isLoading) {
     return (
@@ -95,7 +95,7 @@ export default function AuthStatus({
 
 // Simplified version for mobile or compact layouts
 export function AuthStatusCompact({ className = '' }: { className?: string }) {
-  const { user, isAuthenticated, logout, isLoading } = useAuth();
+  const { user, isAuthenticated, logout, isLoading } = useAuthStore();
 
   if (isLoading) {
     return (
