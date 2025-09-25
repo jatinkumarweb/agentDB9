@@ -267,6 +267,21 @@ Automatically installs relevant extensions based on project type:
 2. **Docker permissions**: Make sure Docker daemon is running
 3. **Memory issues**: Increase Docker memory allocation for GPU workloads
 4. **Network issues**: Check Docker network configuration
+5. **Docker corruption**: See [Docker Corruption Fix Guide](docs/DOCKER_CORRUPTION_FIX.md)
+
+### Docker Corruption Fix
+
+If you encounter errors like `unable to get image` or `blob corruption`, use our automated fix:
+
+```bash
+# Quick fix for Docker corruption
+./scripts/fix-docker-corruption.sh --full-clean
+# Restart Docker Desktop manually
+./scripts/fix-docker-corruption.sh --verify
+./scripts/fix-docker-corruption.sh --rebuild
+```
+
+For detailed instructions, see [docs/DOCKER_CORRUPTION_FIX.md](docs/DOCKER_CORRUPTION_FIX.md)
 
 ### Logs
 
