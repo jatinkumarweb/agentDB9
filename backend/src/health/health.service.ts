@@ -131,6 +131,7 @@ export class HealthService {
 
   async testEnvironment(testData: any) {
     try {
+      // TODO: Fix environmentTester export from shared package
       const health = await environmentTester(testData);
       return health;
     } catch (error) {
