@@ -32,19 +32,19 @@ export const validationSchema = Joi.object({
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
 
   // External APIs
-  OPENAI_API_KEY: Joi.string().pattern(/^sk-/).optional(),
-  OPENAI_ORGANIZATION: Joi.string().optional(),
+  OPENAI_API_KEY: Joi.string().pattern(/^sk-/).allow('').optional(),
+  OPENAI_ORGANIZATION: Joi.string().allow('').optional(),
   OPENAI_TIMEOUT: Joi.number().default(60000),
   OPENAI_MAX_RETRIES: Joi.number().default(3),
 
-  ANTHROPIC_API_KEY: Joi.string().pattern(/^sk-ant-/).optional(),
+  ANTHROPIC_API_KEY: Joi.string().pattern(/^sk-ant-/).allow('').optional(),
   ANTHROPIC_TIMEOUT: Joi.number().default(60000),
   ANTHROPIC_MAX_RETRIES: Joi.number().default(3),
 
-  COHERE_API_KEY: Joi.string().optional(),
+  COHERE_API_KEY: Joi.string().allow('').optional(),
   COHERE_TIMEOUT: Joi.number().default(60000),
 
-  HUGGINGFACE_API_KEY: Joi.string().pattern(/^hf_/).optional(),
+  HUGGINGFACE_API_KEY: Joi.string().pattern(/^hf_/).allow('').optional(),
   HUGGINGFACE_TIMEOUT: Joi.number().default(60000),
 
   // Ollama
