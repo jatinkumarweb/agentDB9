@@ -46,9 +46,22 @@ export default function ChatPage({}: ChatPageProps) {
       msg.metadata?.streaming === true
     );
 
+    // Check if the last message is a completed agent response (within last 10 seconds)
+    const lastMessage = currentConversation.messages?.[currentConversation.messages.length - 1];
+    const isLastMessageCompletedAgent = lastMessage?.role === 'agent' && 
+      lastMessage?.metadata?.streaming === false && 
+      lastMessage?.metadata?.completed === true;
+
+    const now = Date.now();
+    const lastMessageTime = lastMessage ? new Date(lastMessage.timestamp).getTime() : 0;
+    const isRecentlyCompleted = isLastMessageCompletedAgent && (now - lastMessageTime) < 10000; // 10 seconds
+
+    // Use fast polling only if actively streaming, not if recently completed
+    const shouldUseFastPolling = hasStreamingMessage && !isRecentlyCompleted;
+
     // Only change interval if streaming status changed
-    if (hasStreamingMessage !== lastStreamingStateRef.current) {
-      lastStreamingStateRef.current = hasStreamingMessage;
+    if (shouldUseFastPolling !== lastStreamingStateRef.current) {
+      lastStreamingStateRef.current = shouldUseFastPolling;
       
       // Clear existing interval
       if (pollingIntervalRef.current) {
@@ -56,8 +69,8 @@ export default function ChatPage({}: ChatPageProps) {
       }
 
       // Set new interval based on streaming status
-      const interval = hasStreamingMessage ? 1000 : 5000;
-      console.log(`Polling interval: ${interval}ms (streaming: ${hasStreamingMessage})`);
+      const interval = shouldUseFastPolling ? 1000 : 5000;
+      console.log(`Polling interval: ${interval}ms (streaming: ${hasStreamingMessage}, completed: ${isLastMessageCompletedAgent})`);
       
       pollingIntervalRef.current = setInterval(() => {
         if (!isLoading && !isRefreshing) {

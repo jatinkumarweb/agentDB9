@@ -15,6 +15,51 @@ export class HealthService {
     };
   }
 
+  private async checkOllamaAvailability(): Promise<{available: boolean, reason: string, downloadedModels: string[]}> {
+    try {
+      const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      
+      const response = await fetch(`${ollamaUrl}/api/version`, {
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        // Check which models are actually downloaded
+        const tagsResponse = await fetch(`${ollamaUrl}/api/tags`, {
+          signal: controller.signal,
+        });
+        
+        if (tagsResponse.ok) {
+          const tagsData = await tagsResponse.json();
+          const downloadedModels = tagsData.models ? tagsData.models.map(m => m.name) : [];
+          const hasModels = downloadedModels.length > 0;
+          
+          return {
+            available: hasModels,
+            reason: hasModels ? `Ollama running with ${downloadedModels.length} models` : 'Ollama running but no models downloaded',
+            downloadedModels
+          };
+        }
+      }
+      
+      return {
+        available: false,
+        reason: `Ollama service responded with status ${response.status}`,
+        downloadedModels: []
+      };
+    } catch (error) {
+      return {
+        available: false,
+        reason: `Ollama service not reachable: ${error.message}`,
+        downloadedModels: []
+      };
+    }
+  }
+
   async getModels() {
     try {
       const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://localhost:9000';
@@ -38,24 +83,48 @@ export class HealthService {
       
       return await response.json();
     } catch (error) {
-      console.log('LLM service unavailable, using fallback models:', error.message);
+      console.log('LLM service unavailable, checking Ollama directly:', error.message);
       
-      // Fallback to shared package models with better local environment support
+      // Check if Ollama is available directly
+      const ollamaStatus = await this.checkOllamaAvailability();
+      
+      // Fallback to shared package models with actual Ollama status
       const availableModels = getAvailableModels(true);
+      const modelsWithStatus = availableModels.map(model => {
+        if (model.provider === 'ollama') {
+          // Check if this specific model is downloaded in Ollama
+          const isDownloaded = ollamaStatus.downloadedModels.includes(model.id);
+          return {
+            id: model.id,
+            provider: model.provider,
+            status: isDownloaded ? 'available' : 'unavailable',
+            reason: isDownloaded ? 'Downloaded in Ollama' : 
+                   ollamaStatus.available ? 'Not downloaded in Ollama' : ollamaStatus.reason,
+            requiresApiKey: false,
+            apiKeyConfigured: true,
+          };
+        } else {
+          return {
+            id: model.id,
+            provider: model.provider,
+            status: model.availability.status,
+            reason: model.availability.reason,
+            requiresApiKey: model.availability.requiresApiKey,
+            apiKeyConfigured: model.availability.apiKeyConfigured,
+          };
+        }
+      });
+
+      const availableCount = modelsWithStatus.filter(m => m.status === 'available').length;
+      const disabledCount = modelsWithStatus.filter(m => m.status !== 'available').length;
+
       return {
         success: true,
-        models: availableModels.map(model => ({
-          id: model.id,
-          provider: model.provider,
-          status: model.provider === 'ollama' ? 'unavailable' : model.availability.status,
-          reason: model.provider === 'ollama' ? 'Ollama service not available' : model.availability.reason,
-          requiresApiKey: model.availability.requiresApiKey,
-          apiKeyConfigured: model.availability.apiKeyConfigured,
-        })),
-        available: availableModels.filter(m => m.provider !== 'ollama' && m.availability.status !== 'disabled').length,
-        disabled: availableModels.filter(m => m.provider === 'ollama' || m.availability.status === 'disabled').length,
+        models: modelsWithStatus,
+        available: availableCount,
+        disabled: disabledCount,
         timestamp: new Date().toISOString(),
-        warning: 'Local LLM services (Ollama) are not available. Only external API models can be used.',
+        warning: ollamaStatus.available ? undefined : 'Local LLM services (Ollama) are not available. Only external API models can be used.',
       };
     }
   }
