@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 
+// Mock bcrypt functions
 jest.mock('bcryptjs');
 
 describe('AuthService', () => {
@@ -60,7 +61,8 @@ describe('AuthService', () => {
     jwtService = module.get<JwtService>(JwtService);
   });
 
-  afterEach(() => {
+  beforeEach(() => {
+    // Reset mocks before each test
     jest.clearAllMocks();
   });
 
@@ -148,7 +150,7 @@ describe('AuthService', () => {
         password: 'password123',
       };
 
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      bcrypt.compare.mockResolvedValue(true);
       mockUserRepository.findOne.mockResolvedValue(mockUser);
       mockUserRepository.update.mockResolvedValue(undefined);
       mockJwtService.sign.mockReturnValue('mock-jwt-token');
@@ -178,7 +180,7 @@ describe('AuthService', () => {
       };
 
       mockUserRepository.findOne.mockResolvedValue(mockUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      bcrypt.compare.mockResolvedValue(false);
 
       await expect(service.login(loginDto)).rejects.toThrow(
         UnauthorizedException
@@ -205,7 +207,7 @@ describe('AuthService', () => {
       const password = 'password123';
 
       mockUserRepository.findOne.mockResolvedValue(mockUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      bcrypt.compare.mockResolvedValue(true);
 
       const result = await service.validateUser(email, password);
 
@@ -221,7 +223,7 @@ describe('AuthService', () => {
       const password = 'wrongpassword';
 
       mockUserRepository.findOne.mockResolvedValue(mockUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      bcrypt.compare.mockResolvedValue(false);
 
       const result = await service.validateUser(email, password);
 
@@ -282,7 +284,7 @@ describe('AuthService', () => {
       const newPassword = 'newpassword123';
       const hashedPassword = 'newhashed';
 
-      (bcrypt.hash as jest.Mock).mockResolvedValue(hashedPassword);
+      bcrypt.hash.mockResolvedValue(hashedPassword);
       mockUserRepository.update.mockResolvedValue(undefined);
 
       await service.updatePassword('1', newPassword);
