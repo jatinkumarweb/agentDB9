@@ -83,7 +83,6 @@ services:
       - ./models:/models
       - /app/node_modules
     depends_on:
-      - ollama
       - redis
 
   qdrant:

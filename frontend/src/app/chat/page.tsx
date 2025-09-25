@@ -68,8 +68,31 @@ export default function ChatPage({}: ChatPageProps) {
         clearInterval(pollingIntervalRef.current);
       }
 
-      // Set new interval based on streaming status
-      const interval = shouldUseFastPolling ? 1000 : 5000;
+      // Set new interval based on streaming status with adaptive polling
+      let interval = 5000; // Default 5 seconds
+      
+      if (shouldUseFastPolling) {
+        // Check how long the message has been streaming
+        const streamingMessage = currentConversation.messages?.find(msg => 
+          msg.role === 'agent' && msg.metadata?.streaming === true
+        );
+        
+        if (streamingMessage) {
+          const streamingTime = Date.now() - new Date(streamingMessage.timestamp).getTime();
+          
+          // Adaptive polling: start fast, then slow down for long streams
+          if (streamingTime < 10000) { // First 10 seconds: 1s polling
+            interval = 1000;
+          } else if (streamingTime < 30000) { // Next 20 seconds: 2s polling  
+            interval = 2000;
+          } else { // After 30 seconds: 3s polling
+            interval = 3000;
+          }
+        } else {
+          interval = 1000; // Default fast polling
+        }
+      }
+      
       console.log(`Polling interval: ${interval}ms (streaming: ${hasStreamingMessage}, completed: ${isLastMessageCompletedAgent})`);
       
       pollingIntervalRef.current = setInterval(() => {

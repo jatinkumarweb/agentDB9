@@ -330,8 +330,13 @@ Would you like help setting up external API access?`;
               if (data.message?.content) {
                 fullContent += data.message.content;
                 
-                // Update the message in database every few tokens to show progress
-                if (fullContent.length % 50 === 0 || data.done) {
+                // Update the message in database less frequently to reduce load
+                // Update every 100 characters or every 2 seconds, whichever comes first
+                const shouldUpdate = fullContent.length % 100 === 0 || 
+                                   data.done || 
+                                   (Date.now() - startTime) % 2000 < 100;
+                
+                if (shouldUpdate) {
                   await this.messagesRepository.update(savedMessage.id, {
                     content: fullContent,
                     metadata: {
