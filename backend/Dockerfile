@@ -1,9 +1,19 @@
-FROM mcr.microsoft.com/devcontainers/typescript-node:20
+FROM node:23.10.0
 
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y python3 make g++ wget && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    wget \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install global npm packages
+RUN npm install -g @nestjs/cli typescript
 
 # Copy shared package first
 COPY shared/ /shared/
