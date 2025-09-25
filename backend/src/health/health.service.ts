@@ -89,7 +89,7 @@ export class HealthService {
       const ollamaStatus = await this.checkOllamaAvailability();
       
       // Fallback to shared package models with actual Ollama status
-      const availableModels = getAvailableModels(true);
+      const availableModels = getAvailableModels();
       const modelsWithStatus = availableModels.map(model => {
         if (model.provider === 'ollama') {
           // Check if this specific model is downloaded in Ollama
@@ -131,7 +131,7 @@ export class HealthService {
 
   async testEnvironment(testData: any) {
     try {
-      const health = await environmentTester.getEnvironmentHealth();
+      const health = await environmentTester(testData);
       return health;
     } catch (error) {
       throw new Error(`Environment test failed: ${error.message}`);

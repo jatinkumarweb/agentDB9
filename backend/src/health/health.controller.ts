@@ -1,10 +1,12 @@
 import { Controller, Get, Post, Body, HttpStatus, HttpException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthService } from './health.service';
+import { Public } from '../auth/decorators/public.decorator';
 import type { APIResponse } from '@agentdb9/shared';
 
 @ApiTags('health')
 @Controller()
+@Public() // Make all health endpoints public
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
