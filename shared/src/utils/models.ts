@@ -255,6 +255,34 @@ export const OLLAMA_MODELS: Record<string, ModelConfig> = {
       apiKeyConfigured: true
     }
   },
+  'phi3:mini': {
+    id: 'phi3:mini',
+    name: 'Phi-3 Mini',
+    provider: 'ollama',
+    description: 'Microsoft\'s compact and efficient model for coding tasks',
+    capabilities: [
+      { type: 'code-generation', quality: 'high', speed: 'very-fast' },
+      { type: 'code-completion', quality: 'high', speed: 'very-fast' },
+      { type: 'chat', quality: 'high', speed: 'very-fast' },
+      { type: 'reasoning', quality: 'medium', speed: 'fast' }
+    ],
+    parameters: {
+      maxTokens: 4096,
+      contextLength: 4096,
+      temperature: { min: 0.0, max: 1.0, default: 0.3 }
+    },
+    performance: {
+      averageResponseTime: 1200,
+      tokensPerSecond: 65,
+      memoryUsage: 2200,
+      gpuRequired: false
+    },
+    availability: {
+      status: 'unknown',
+      requiresApiKey: false,
+      apiKeyConfigured: true
+    }
+  },
   'llama3.1:8b': {
     id: 'llama3.1:8b',
     name: 'Llama 3.1 8B',

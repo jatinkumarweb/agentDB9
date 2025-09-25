@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MessageCircle, Bot, Code, TestTube } from 'lucide-react';
+import { MessageCircle, Bot, Code, TestTube, Settings } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -19,7 +19,7 @@ export default function Home() {
           </p>
           
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <Link 
               href="/chat" 
               className="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group"
@@ -39,6 +39,17 @@ export default function Home() {
               <div>
                 <h3 className="font-semibold text-green-900">Environment Tests</h3>
                 <p className="text-green-700 text-sm">Check system health and APIs</p>
+              </div>
+            </Link>
+            
+            <Link 
+              href="/models" 
+              className="flex items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors group"
+            >
+              <Settings className="w-8 h-8 text-purple-600 mr-4 group-hover:scale-110 transition-transform" />
+              <div>
+                <h3 className="font-semibold text-purple-900">Model Management</h3>
+                <p className="text-purple-700 text-sm">Download models & configure APIs</p>
               </div>
             </Link>
           </div>

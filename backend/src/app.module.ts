@@ -8,6 +8,8 @@ import { ProjectsModule } from './projects/projects.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { HealthModule } from './health/health.module';
 import { WebSocketModule } from './websocket/websocket.module';
+import { ModelsModule } from './models/models.module';
+import { ProvidersModule } from './providers/providers.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { WebSocketModule } from './websocket/websocket.module';
     ConversationsModule,
     HealthModule,
     WebSocketModule,
+    ModelsModule,
+    ProvidersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
