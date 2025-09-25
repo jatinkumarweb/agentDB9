@@ -53,6 +53,8 @@ services:
       - COHERE_API_KEY=${COHERE_API_KEY}
       - REDIS_URL=redis://redis:6379
       - FRONTEND_URL=http://localhost:3000
+      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here_make_it_long_and_secure_for_production_use_at_least_32_chars}
+      - SESSION_SECRET=${SESSION_SECRET:-your_session_secret_key_here_make_it_long_and_secure_for_production_use_at_least_32_chars}
     volumes:
       - ./backend:/app
       - ./shared:/shared
