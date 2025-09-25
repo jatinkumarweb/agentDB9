@@ -117,7 +117,25 @@ npm run lint
 
 # Clean up
 npm run clean
+
+# Database cleanup (resolves migration issues)
+npm run clean:db
+npm run clean:db:deep
 ```
+
+### Database Cleanup
+
+If you encounter database migration errors (e.g., "column contains null values"), use the database cleanup script:
+
+```bash
+# Standard cleanup (recommended)
+npm run clean:db
+
+# Deep cleanup (removes all unused Docker volumes)
+npm run clean:db:deep
+```
+
+See [Database Cleanup Guide](./docs/database-cleanup.md) for detailed information.
 
 ### Development Workflow
 

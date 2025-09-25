@@ -35,6 +35,8 @@
     "validate": "./scripts/validate-environment.sh",
     "lint": "npm run lint --workspaces",
     "clean": "npm run clean --workspaces && ./scripts/docker-setup.sh down -v",
+    "clean:db": "./scripts/clean-db.sh",
+    "clean:db:deep": "./scripts/clean-db.sh --deep",
     "logs": "./scripts/docker-setup.sh logs -f",
     "logs:frontend": "./scripts/docker-setup.sh logs -f frontend",
     "logs:backend": "./scripts/docker-setup.sh logs -f backend",
