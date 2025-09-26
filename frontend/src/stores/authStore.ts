@@ -28,8 +28,12 @@ interface AuthState {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+// Configure axios to include credentials (cookies) in requests
+axios.defaults.withCredentials = true;
+
 // Configure axios defaults
 axios.defaults.baseURL = API_BASE_URL;
+axios.defaults.withCredentials = true;
 
 export const useAuthStore = create<AuthState>()(
   persist(
