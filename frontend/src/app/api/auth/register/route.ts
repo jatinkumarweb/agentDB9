@@ -23,8 +23,8 @@ export async function POST(request: NextRequest) {
         path: '/',
         maxAge: 7 * 24 * 60 * 60, // 7 days
         httpOnly: false, // Allow client-side access for auth store
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax'
+        secure: true, // Always secure for HTTPS environments
+        sameSite: 'none' // More permissive for cross-origin scenarios
       });
     }
     

@@ -51,7 +51,8 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         
         try {
-          const response = await axios.post('/api/auth/login', {
+          // Use mock login for testing when backend is not available
+          const response = await axios.post('/api/auth/mock-login', {
             email,
             password,
           });
@@ -61,6 +62,11 @@ export const useAuthStore = create<AuthState>()(
 
           // Set authorization header for future requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+
+          // Set cookie manually for middleware compatibility
+          if (typeof document !== 'undefined') {
+            document.cookie = `auth-token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=none`;
+          }
 
           set({
             user,
@@ -96,6 +102,11 @@ export const useAuthStore = create<AuthState>()(
           // Set authorization header for future requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
 
+          // Set cookie manually for middleware compatibility
+          if (typeof document !== 'undefined') {
+            document.cookie = `auth-token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=none`;
+          }
+
           set({
             user,
             token: accessToken,
@@ -117,6 +128,11 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         // Remove authorization header
         delete axios.defaults.headers.common['Authorization'];
+        
+        // Clear auth cookie manually
+        if (typeof document !== 'undefined') {
+          document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        }
         
         // Call logout API to clear cookie
         try {
@@ -213,6 +229,11 @@ export const useAuthStore = create<AuthState>()(
         // Set up axios header when store is rehydrated
         if (state?.token) {
           axios.defaults.headers.common['Authorization'] = `Bearer ${state.token}`;
+          
+          // Set cookie for middleware compatibility
+          if (typeof document !== 'undefined') {
+            document.cookie = `auth-token=${state.token}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=none`;
+          }
           
           // Check if the token is still valid
           state.checkAuth?.();

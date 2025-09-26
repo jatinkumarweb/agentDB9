@@ -22,6 +22,7 @@ const publicRoutes = [
   '/auth/forgot-password',
   '/models',
   '/test/env',
+  '/test-login',
   '/api',
 ];
 
