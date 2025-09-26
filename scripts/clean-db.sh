@@ -69,6 +69,21 @@ cleanup_database() {
     print_status "Removing persistent volumes..."
     $compose_cmd down -v
     
+    # Remove bind mount directories (database data)
+    print_status "Removing database bind mount directories..."
+    if [ -d "postgres_data" ]; then
+        rm -rf postgres_data
+        print_status "Removed postgres_data directory"
+    fi
+    if [ -d "redis_data" ]; then
+        rm -rf redis_data
+        print_status "Removed redis_data directory"
+    fi
+    if [ -d "qdrant_data" ]; then
+        rm -rf qdrant_data
+        print_status "Removed qdrant_data directory"
+    fi
+    
     # Clean up Docker system (optional - removes unused volumes)
     if [[ "$1" == "--deep" ]]; then
         print_warning "Performing deep cleanup (removes all unused Docker volumes)..."
@@ -126,8 +141,9 @@ show_usage() {
     echo "This script resolves database migration issues by:"
     echo "  1. Stopping all containers"
     echo "  2. Removing persistent volumes"
-    echo "  3. Starting with a fresh database"
-    echo "  4. Allowing TypeORM to create clean schema"
+    echo "  3. Removing bind mount directories (postgres_data, redis_data, qdrant_data)"
+    echo "  4. Starting with a fresh database"
+    echo "  5. Allowing TypeORM to create clean schema"
 }
 
 # Parse command line arguments

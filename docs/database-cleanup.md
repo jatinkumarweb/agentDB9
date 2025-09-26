@@ -4,12 +4,17 @@ This guide explains how to resolve database migration issues in AgentDB9 using t
 
 ## Problem
 
-When TypeORM tries to modify database schema (especially making columns NOT NULL), it may fail if existing data violates the new constraints. Common errors include:
+When TypeORM tries to modify database schema (especially making columns NOT NULL), it may fail if existing data violates the new constraints. This happens because AgentDB9 uses bind mounts for database persistence, so data survives container restarts. Common errors include:
 
 ```
 ERROR: column "userId" of relation "conversations" contains null values
 QueryFailedError: column "userId" of relation "conversations" contains null values
 ```
+
+The issue occurs because:
+- PostgreSQL data persists in `./postgres_data` directory (bind mount)
+- Previous schema versions may have created data that violates new constraints
+- TypeORM synchronization fails when trying to enforce new NOT NULL constraints
 
 ## Solution
 
@@ -34,10 +39,11 @@ npm run clean:db:deep
 ### What the Script Does
 
 1. **Stops all containers** - Ensures no active connections to database
-2. **Removes persistent volumes** - Clears all existing data including problematic records
-3. **Starts PostgreSQL** - Brings up a fresh database instance
-4. **Starts all services** - Launches the complete application stack
-5. **Waits for initialization** - Allows TypeORM to create clean schema and seed data
+2. **Removes persistent volumes** - Clears Docker volumes
+3. **Removes bind mount directories** - Deletes `postgres_data`, `redis_data`, and `qdrant_data` directories
+4. **Starts PostgreSQL** - Brings up a fresh database instance
+5. **Starts all services** - Launches the complete application stack
+6. **Waits for initialization** - Allows TypeORM to create clean schema and seed data
 
 ### Script Options
 
