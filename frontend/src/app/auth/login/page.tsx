@@ -52,9 +52,9 @@ export default function LoginPage() {
       await login(formData.email, formData.password);
       toast.success('Login successful!');
       
-      // Redirect to dashboard after successful login
+      // Redirect to chat page to select agent and start chatting
       setTimeout(() => {
-        router.push('/dashboard');
+        router.push('/chat');
       }, 100);
     } catch (error: any) {
       toast.error(error.message || 'Invalid credentials. Please try again.');

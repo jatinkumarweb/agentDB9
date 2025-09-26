@@ -38,7 +38,7 @@ export default function AuthGuard({
       if (requireAuth && !isAuthenticated) {
         router.push(redirectTo);
       } else if (!requireAuth && isAuthenticated) {
-        router.push('/dashboard');
+        router.push('/chat');
       }
     }
   }, [isAuthenticated, requireAuth, redirectTo, router, isChecking, isLoading]);

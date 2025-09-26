@@ -70,7 +70,7 @@ export default function SignupPage() {
     try {
       await signup(formData.username, formData.email, formData.password);
       toast.success('Account created successfully!');
-      router.push('/dashboard');
+      router.push('/chat');
     } catch (error: any) {
       toast.error(error.message || 'Signup failed');
     }

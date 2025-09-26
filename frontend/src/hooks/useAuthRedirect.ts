@@ -35,7 +35,7 @@ export function useAuthRedirect({
       router.push(`${loginUrl}?returnUrl=${returnUrl}`);
     } else if (!requireAuth && isAuthenticated) {
       // User is authenticated but shouldn't be (e.g., on login page)
-      router.push('/dashboard');
+      router.push('/chat');
     }
   }, [isAuthenticated, isLoading, pathname, requireAuth, redirectTo, allowedPaths, router]);
 

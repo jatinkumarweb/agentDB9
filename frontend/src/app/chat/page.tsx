@@ -4,10 +4,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Bot, User, Plus, Settings } from 'lucide-react';
 import { CodingAgent, AgentConversation, ConversationMessage } from '@agentdb9/shared';
 import AgentCreator from '@/components/AgentCreator';
+import { useAuthRedirect, authRedirectConfigs } from '@/hooks/useAuthRedirect';
 
 interface ChatPageProps {}
 
 export default function ChatPage({}: ChatPageProps) {
+  // Protect this page - require authentication
+  useAuthRedirect(authRedirectConfigs.protected);
+  
   const [agents, setAgents] = useState<CodingAgent[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<CodingAgent | null>(null);
   const [conversations, setConversations] = useState<AgentConversation[]>([]);
