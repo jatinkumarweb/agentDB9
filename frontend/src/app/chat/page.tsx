@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Bot, User, Plus, Settings } from 'lucide-react';
+import { Send, Bot, User, Plus, Settings, LogOut } from 'lucide-react';
 import { CodingAgent, AgentConversation, ConversationMessage } from '@agentdb9/shared';
 import AgentCreator from '@/components/AgentCreator';
 import { useAuthStore } from '@/stores/authStore';
@@ -11,7 +11,7 @@ interface ChatPageProps {}
 
 export default function ChatPage({}: ChatPageProps) {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, checkAuth } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, checkAuth, logout, user } = useAuthStore();
   
   // Check auth on mount first
   useEffect(() => {
@@ -293,6 +293,15 @@ export default function ChatPage({}: ChatPageProps) {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push('/auth/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
   const formatTimestamp = (timestamp: string) => {
     return new Date(timestamp).toLocaleTimeString([], { 
       hour: '2-digit', 
@@ -379,6 +388,32 @@ export default function ChatPage({}: ChatPageProps) {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* User Info and Logout */}
+        <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {user?.username || 'User'}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {user?.email || 'user@example.com'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
