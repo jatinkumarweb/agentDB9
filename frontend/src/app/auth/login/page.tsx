@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react';
@@ -10,10 +10,17 @@ import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading } = useAuthStore();
+  const { login, isLoading, isAuthenticated } = useAuthStore();
   
-  // Redirect authenticated users to dashboard
+  // Redirect authenticated users to chat page
   useAuthRedirect(authRedirectConfigs.authPages);
+  
+  // Additional check for authentication state
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/chat');
+    }
+  }, [isAuthenticated, router]);
   
   const [formData, setFormData] = useState({
     email: '',
@@ -52,10 +59,8 @@ export default function LoginPage() {
       await login(formData.email, formData.password);
       toast.success('Login successful!');
       
-      // Redirect to chat page to select agent and start chatting
-      setTimeout(() => {
-        router.push('/chat');
-      }, 100);
+      // Redirect will be handled by useEffect when isAuthenticated changes
+      router.push('/chat');
     } catch (error: any) {
       toast.error(error.message || 'Invalid credentials. Please try again.');
       
