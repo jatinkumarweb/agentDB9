@@ -167,7 +167,14 @@ export const useAuthStore = create<AuthState>()(
       checkAuth: async () => {
         const { token } = get();
         
+        console.log('checkAuth: Starting auth check, token present:', !!token);
+        
+        // Set loading state to prevent premature redirects
+        set({ isLoading: true });
+        
         if (!token) {
+          console.log('checkAuth: No token found, setting unauthenticated');
+          set({ isLoading: false, isAuthenticated: false });
           return;
         }
 
@@ -177,14 +184,18 @@ export const useAuthStore = create<AuthState>()(
           
           // Verify the token is still valid
           const response = await axios.get('/api/auth/profile');
-          const { user } = response.data.data;
+          const { data: user } = response.data;
 
+          console.log('checkAuth: Token valid, user authenticated:', user.email);
           set({
             user,
             isAuthenticated: true,
+            isLoading: false,
           });
         } catch (error: any) {
+          console.log('checkAuth: Token invalid, logging out');
           // Token is invalid, logout the user
+          set({ isLoading: false });
           get().logout();
         }
       },

@@ -13,17 +13,19 @@ export default function ChatPage({}: ChatPageProps) {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, checkAuth } = useAuthStore();
   
-  // Protect this page - redirect to login if not authenticated
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/auth/login');
-    }
-  }, [isAuthenticated, authLoading, router]);
-  
-  // Check auth on mount
+  // Check auth on mount first
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+  
+  // Protect this page - redirect to login if not authenticated
+  // Only redirect after auth check is complete
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      console.log('Chat page: redirecting to login - authLoading:', authLoading, 'isAuthenticated:', isAuthenticated);
+      router.push('/auth/login');
+    }
+  }, [isAuthenticated, authLoading, router]);
   
   const [agents, setAgents] = useState<CodingAgent[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<CodingAgent | null>(null);
