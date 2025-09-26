@@ -11,14 +11,14 @@ interface ChatPageProps {}
 
 export default function ChatPage({}: ChatPageProps) {
   const router = useRouter();
-  const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, checkAuth } = useAuthStore();
   
   // Protect this page - redirect to login if not authenticated
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       router.push('/auth/login');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, authLoading, router]);
   
   // Check auth on mount
   useEffect(() => {
@@ -299,7 +299,7 @@ export default function ChatPage({}: ChatPageProps) {
   };
 
   // Show loading while checking authentication
-  if (isLoading || (!isAuthenticated && !isLoading)) {
+  if (authLoading || (!isAuthenticated && !authLoading)) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
