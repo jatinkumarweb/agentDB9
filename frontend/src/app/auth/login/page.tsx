@@ -19,7 +19,27 @@ export default function LoginPage() {
   // Redirect authenticated users to chat page
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/chat');
+      // Add a longer delay to ensure cookie is set before navigation
+      console.log('User authenticated, checking cookie before redirect...');
+      
+      // Check if cookie is actually set
+      const checkCookieAndRedirect = () => {
+        const authCookie = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('auth-token='));
+        
+        console.log('Auth cookie present:', !!authCookie);
+        
+        if (authCookie) {
+          console.log('Cookie found, redirecting to /chat');
+          router.push('/chat');
+        } else {
+          console.log('Cookie not found, waiting longer...');
+          setTimeout(checkCookieAndRedirect, 200);
+        }
+      };
+      
+      setTimeout(checkCookieAndRedirect, 200);
     }
   }, [isAuthenticated, router]);
   
