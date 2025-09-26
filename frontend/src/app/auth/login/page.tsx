@@ -5,17 +5,18 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
-import { useAuthRedirect, authRedirectConfigs } from '@/hooks/useAuthRedirect';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading, isAuthenticated } = useAuthStore();
+  const { login, isLoading, isAuthenticated, checkAuth } = useAuthStore();
+  
+  // Check auth on mount and redirect if already authenticated
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
   
   // Redirect authenticated users to chat page
-  useAuthRedirect(authRedirectConfigs.authPages);
-  
-  // Additional check for authentication state
   useEffect(() => {
     if (isAuthenticated) {
       router.push('/chat');
@@ -60,7 +61,6 @@ export default function LoginPage() {
       toast.success('Login successful!');
       
       // Redirect will be handled by useEffect when isAuthenticated changes
-      router.push('/chat');
     } catch (error: any) {
       toast.error(error.message || 'Invalid credentials. Please try again.');
       

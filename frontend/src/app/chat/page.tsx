@@ -1,16 +1,29 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Send, Bot, User, Plus, Settings } from 'lucide-react';
 import { CodingAgent, AgentConversation, ConversationMessage } from '@agentdb9/shared';
 import AgentCreator from '@/components/AgentCreator';
-import { useAuthRedirect, authRedirectConfigs } from '@/hooks/useAuthRedirect';
+import { useAuthStore } from '@/stores/authStore';
 
 interface ChatPageProps {}
 
 export default function ChatPage({}: ChatPageProps) {
-  // Protect this page - require authentication
-  useAuthRedirect(authRedirectConfigs.protected);
+  const router = useRouter();
+  const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
+  
+  // Protect this page - redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/auth/login');
+    }
+  }, [isAuthenticated, isLoading, router]);
+  
+  // Check auth on mount
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
   
   const [agents, setAgents] = useState<CodingAgent[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<CodingAgent | null>(null);
@@ -284,6 +297,18 @@ export default function ChatPage({}: ChatPageProps) {
       minute: '2-digit' 
     });
   };
+
+  // Show loading while checking authentication
+  if (isLoading || (!isAuthenticated && !isLoading)) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
