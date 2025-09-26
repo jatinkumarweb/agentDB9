@@ -207,7 +207,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         token: state.token,
-        // Don't persist isAuthenticated - always verify on load
+        isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
         // Set up axios header when store is rehydrated

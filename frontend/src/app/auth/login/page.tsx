@@ -18,11 +18,11 @@ export default function LoginPage() {
   
   // Redirect authenticated users to chat page (only after checkAuth completes)
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
+    if (!isLoading && isAuthenticated) {
       console.log('User already authenticated, redirecting to /chat');
       router.push('/chat');
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [isAuthenticated, isLoading, router]);
   
   const [formData, setFormData] = useState({
     email: '',
@@ -61,8 +61,10 @@ export default function LoginPage() {
       await login(formData.email, formData.password);
       toast.success('Login successful!');
       
-      // Redirect immediately after successful login
-      router.push('/chat');
+      // Wait a brief moment for state to update, then redirect
+      setTimeout(() => {
+        router.push('/chat');
+      }, 100);
     } catch (error: any) {
       toast.error(error.message || 'Invalid credentials. Please try again.');
       
