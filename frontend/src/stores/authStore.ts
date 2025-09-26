@@ -58,11 +58,6 @@ export const useAuthStore = create<AuthState>()(
           // Set authorization header for future requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
 
-          // Set cookie for middleware authentication
-          if (typeof window !== 'undefined') {
-            document.cookie = `auth-token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}`; // 7 days
-          }
-
           set({
             user,
             token: accessToken,
@@ -97,11 +92,6 @@ export const useAuthStore = create<AuthState>()(
           // Set authorization header for future requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
 
-          // Set cookie for middleware authentication
-          if (typeof window !== 'undefined') {
-            document.cookie = `auth-token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}`; // 7 days
-          }
-
           set({
             user,
             token: accessToken,
@@ -120,13 +110,15 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () => {
+      logout: async () => {
         // Remove authorization header
         delete axios.defaults.headers.common['Authorization'];
         
-        // Clear auth cookie
-        if (typeof window !== 'undefined') {
-          document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        // Call logout API to clear cookie
+        try {
+          await axios.post('/api/auth/logout');
+        } catch (error) {
+          console.error('Logout API call failed:', error);
         }
         
         set({
@@ -205,11 +197,6 @@ export const useAuthStore = create<AuthState>()(
         // Set up axios header when store is rehydrated
         if (state?.token) {
           axios.defaults.headers.common['Authorization'] = `Bearer ${state.token}`;
-          
-          // Set cookie for middleware authentication
-          if (typeof window !== 'undefined') {
-            document.cookie = `auth-token=${state.token}; path=/; max-age=${7 * 24 * 60 * 60}`; // 7 days
-          }
           
           // Check if the token is still valid
           state.checkAuth?.();
