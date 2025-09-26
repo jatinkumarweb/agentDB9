@@ -32,6 +32,16 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('auth-token')?.value || 
                 request.headers.get('authorization')?.replace('Bearer ', '');
 
+  // Debug logging
+  console.log('Middleware debug:', {
+    pathname,
+    hasAuthTokenCookie: !!request.cookies.get('auth-token'),
+    authTokenValue: request.cookies.get('auth-token')?.value?.substring(0, 20) + '...',
+    hasAuthHeader: !!request.headers.get('authorization'),
+    allCookies: Object.fromEntries(request.cookies.getAll().map(c => [c.name, c.value.substring(0, 20) + '...'])),
+    userAgent: request.headers.get('user-agent')?.substring(0, 50)
+  });
+
   // Check if user is authenticated (simplified check)
   const isAuthenticated = !!token;
 
