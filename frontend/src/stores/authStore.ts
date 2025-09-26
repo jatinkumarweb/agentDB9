@@ -26,7 +26,7 @@ interface AuthState {
   checkAuth: () => Promise<void>;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Configure axios defaults
 axios.defaults.baseURL = API_BASE_URL;
@@ -52,22 +52,25 @@ export const useAuthStore = create<AuthState>()(
             password,
           });
 
-          const { user, token } = response.data.data;
+          // Backend returns { user, accessToken } directly
+          const { user, accessToken } = response.data;
 
           // Set authorization header for future requests
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
 
           set({
             user,
-            token,
+            token: accessToken,
             isAuthenticated: true,
             isLoading: false,
           });
         } catch (error: any) {
           set({ isLoading: false });
           
-          const errorMessage = error.response?.data?.error || 
-                              error.response?.data?.message || 
+          // Handle different error response formats
+          const errorMessage = error.response?.data?.message || 
+                              error.response?.data?.error || 
+                              error.message ||
                               'Login failed. Please try again.';
           throw new Error(errorMessage);
         }
@@ -77,28 +80,31 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         
         try {
-          const response = await axios.post('/api/auth/signup', {
+          const response = await axios.post('/api/auth/register', {
             username,
             email,
             password,
           });
 
-          const { user, token } = response.data.data;
+          // Backend returns { user, accessToken } directly
+          const { user, accessToken } = response.data;
 
           // Set authorization header for future requests
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
 
           set({
             user,
-            token,
+            token: accessToken,
             isAuthenticated: true,
             isLoading: false,
           });
         } catch (error: any) {
           set({ isLoading: false });
           
-          const errorMessage = error.response?.data?.error || 
-                              error.response?.data?.message || 
+          // Handle different error response formats
+          const errorMessage = error.response?.data?.message || 
+                              error.response?.data?.error || 
+                              error.message ||
                               'Signup failed. Please try again.';
           throw new Error(errorMessage);
         }
@@ -159,7 +165,7 @@ export const useAuthStore = create<AuthState>()(
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
           // Verify the token is still valid
-          const response = await axios.get('/api/auth/me');
+          const response = await axios.get('/api/auth/profile');
           const { user } = response.data.data;
 
           set({

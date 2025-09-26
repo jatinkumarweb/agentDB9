@@ -51,9 +51,16 @@ export default function LoginPage() {
     try {
       await login(formData.email, formData.password);
       toast.success('Login successful!');
-      router.push('/dashboard');
+      
+      // Redirect to dashboard after successful login
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 100);
     } catch (error: any) {
-      toast.error(error.message || 'Login failed');
+      toast.error(error.message || 'Invalid credentials. Please try again.');
+      
+      // Clear password field on error
+      setFormData(prev => ({ ...prev, password: '' }));
     }
   };
 
