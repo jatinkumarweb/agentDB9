@@ -11,47 +11,18 @@ export default function LoginPage() {
   const router = useRouter();
   const { login, isLoading, isAuthenticated, checkAuth, token } = useAuthStore();
   
-  // Check auth on mount and redirect if already authenticated
+  // Check auth on mount to see if user is already authenticated
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
   
-  // Redirect authenticated users to chat page
+  // Redirect authenticated users to chat page (only after checkAuth completes)
   useEffect(() => {
-    if (isAuthenticated) {
-      // Add a longer delay to ensure cookie is set before navigation
-      console.log('User authenticated, checking cookie before redirect...');
-      
-      let attempts = 0;
-      const maxAttempts = 10; // Maximum 2 seconds (10 * 200ms)
-      
-      // Check if cookie is actually set
-      const checkCookieAndRedirect = () => {
-        const authCookie = document.cookie
-          .split('; ')
-          .find(row => row.startsWith('auth-token='));
-        
-        console.log('Auth cookie present:', !!authCookie, `(attempt ${attempts + 1}/${maxAttempts})`);
-        console.log('Auth store token present:', !!token);
-        
-        // If we have a token in the store, proceed with redirect
-        // The cookie might take a moment to be accessible via document.cookie
-        if (authCookie || token) {
-          console.log('Authentication confirmed, redirecting to /chat');
-          router.push('/chat');
-        } else if (attempts < maxAttempts) {
-          attempts++;
-          console.log('Authentication not confirmed, waiting longer...');
-          setTimeout(checkCookieAndRedirect, 200);
-        } else {
-          console.log('Authentication not confirmed after maximum attempts, redirecting anyway...');
-          router.push('/chat');
-        }
-      };
-      
-      setTimeout(checkCookieAndRedirect, 200);
+    if (!authLoading && isAuthenticated) {
+      console.log('User already authenticated, redirecting to /chat');
+      router.push('/chat');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, authLoading, router]);
   
   const [formData, setFormData] = useState({
     email: '',
@@ -90,7 +61,8 @@ export default function LoginPage() {
       await login(formData.email, formData.password);
       toast.success('Login successful!');
       
-      // Redirect will be handled by useEffect when isAuthenticated changes
+      // Redirect immediately after successful login
+      router.push('/chat');
     } catch (error: any) {
       toast.error(error.message || 'Invalid credentials. Please try again.');
       

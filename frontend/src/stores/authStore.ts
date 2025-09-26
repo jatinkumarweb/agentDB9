@@ -203,10 +203,11 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage',
       storage: createJSONStorage(() => localStorage),
+      version: 1, // Increment to clear old storage format
       partialize: (state) => ({
         user: state.user,
         token: state.token,
-        isAuthenticated: state.isAuthenticated,
+        // Don't persist isAuthenticated - always verify on load
       }),
       onRehydrateStorage: () => (state) => {
         // Set up axios header when store is rehydrated
