@@ -14,7 +14,7 @@ import { Logger } from '@nestjs/common';
   cors: {
     origin: [
       process.env.FRONTEND_URL || 'http://localhost:3000',
-      'https://3000--01998bbd-b083-7323-b841-cf28c7e00e03.us-east-1-01.gitpod.dev',
+      'https://3000--01997b67-9c66-7e0f-8b47-1c8986ec0f96.us-east-1-01.gitpod.dev',
       /^https:\/\/\d+--[a-f0-9-]+\.us-east-1-01\.gitpod\.dev$/
     ],
     methods: ['GET', 'POST'],

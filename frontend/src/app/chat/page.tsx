@@ -70,6 +70,40 @@ export default function ChatPage({}: ChatPageProps) {
     scrollToBottom();
   }, [currentConversation?.messages]);
 
+  // Helper function to sort messages by timestamp
+  const sortMessagesByTimestamp = useCallback((messages: ConversationMessage[]) => {
+    return [...messages].sort((a, b) => {
+      const timestampA = new Date(a.timestamp).getTime();
+      const timestampB = new Date(b.timestamp).getTime();
+      return timestampA - timestampB;
+    });
+  }, []);
+
+  // Helper function to merge and deduplicate messages
+  const mergeMessages = useCallback((existingMessages: ConversationMessage[], newMessages: ConversationMessage[]) => {
+    const messageMap = new Map<string, ConversationMessage>();
+    
+    // Add existing messages
+    existingMessages.forEach(msg => messageMap.set(msg.id, msg));
+    
+    // Add/update with new messages
+    newMessages.forEach(msg => {
+      const existing = messageMap.get(msg.id);
+      if (existing) {
+        // Update existing message with new data
+        messageMap.set(msg.id, {
+          ...existing,
+          ...msg,
+          metadata: { ...existing.metadata, ...msg.metadata }
+        });
+      } else {
+        messageMap.set(msg.id, msg);
+      }
+    });
+    
+    return sortMessagesByTimestamp(Array.from(messageMap.values()));
+  }, [sortMessagesByTimestamp]);
+
   // WebSocket event handlers for real-time updates
   useEffect(() => {
     if (!wsConnected || !currentConversation) return;
@@ -114,7 +148,7 @@ export default function ChatPage({}: ChatPageProps) {
               : msg
           ) || [];
           
-          return { ...prev, messages: updatedMessages };
+          return { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
         });
         
         // Update cache
@@ -142,34 +176,31 @@ export default function ChatPage({}: ChatPageProps) {
         setCurrentConversation(prev => {
           if (!prev) return prev;
           
-          // Check if message already exists (avoid duplicates)
-          const messageExists = prev.messages?.some(msg => msg.id === data.message.id);
-          if (messageExists) {
-            return prev;
-          }
+          const existingMessages = prev.messages || [];
+          const mergedMessages = mergeMessages(existingMessages, [data.message]);
           
-          const updatedMessages = [...(prev.messages || []), data.message];
-          return { ...prev, messages: updatedMessages };
+          return { ...prev, messages: mergedMessages };
         });
         
-        // Update cache
-        cache.addMessage(currentConversation.id, data.message);
+        // Don't update cache here - let the main state be the source of truth
       }
     };
 
-    // Handle conversation updates
+    // Handle conversation updates (full message list)
     const handleConversationUpdate = (data: {
       conversationId: string;
       messages: ConversationMessage[];
     }) => {
+      console.log('Received conversation update:', data);
       if (data.conversationId === currentConversation.id) {
+        const sortedMessages = sortMessagesByTimestamp(data.messages);
         setCurrentConversation(prev => {
           if (!prev) return prev;
-          return { ...prev, messages: data.messages };
+          return { ...prev, messages: sortedMessages };
         });
         
-        // Update cache
-        cache.setMessages(currentConversation.id, data.messages);
+        // Update cache with sorted messages
+        cache.setMessages(currentConversation.id, sortedMessages);
       }
     };
 
@@ -182,6 +213,25 @@ export default function ChatPage({}: ChatPageProps) {
       if (data.conversationId === currentConversation.id) {
         setIsGenerating(false);
         setGeneratingMessageId(null);
+        
+        // Update the message to mark streaming as false
+        setCurrentConversation(prev => {
+          if (!prev) return prev;
+          
+          const updatedMessages = prev.messages?.map(msg => 
+            msg.id === data.messageId 
+              ? { 
+                  ...msg, 
+                  metadata: { 
+                    ...msg.metadata, 
+                    streaming: false 
+                  } 
+                }
+              : msg
+          ) || [];
+          
+          return { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
+        });
       }
     };
 
@@ -197,7 +247,7 @@ export default function ChatPage({}: ChatPageProps) {
       wsOff('generation_stopped', handleGenerationStopped);
       wsEmit('leave_conversation', { conversationId: currentConversation.id });
     };
-  }, [wsConnected, currentConversation?.id, wsEmit, wsOn, wsOff, cache]);
+  }, [wsConnected, currentConversation?.id, wsEmit, wsOn, wsOff, cache, sortMessagesByTimestamp, mergeMessages]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -303,14 +353,28 @@ export default function ChatPage({}: ChatPageProps) {
 
       const data = await response.json();
       if (data.success) {
-        // Invalidate cache for this conversation to ensure fresh data
-        cache.invalidateMessages(currentConversation.id);
+        // Add the user message immediately to the UI for better UX
+        const userMessage: ConversationMessage = {
+          id: data.data.id,
+          role: 'user',
+          content: messageContent,
+          timestamp: new Date(),
+          conversationId: currentConversation.id,
+          metadata: {}
+        };
         
-        // If WebSocket is connected, we'll get real-time updates
+        setCurrentConversation(prev => {
+          if (!prev) return prev;
+          const existingMessages = prev.messages || [];
+          const mergedMessages = mergeMessages(existingMessages, [userMessage]);
+          return { ...prev, messages: mergedMessages };
+        });
+        
+        // If WebSocket is connected, we'll get real-time updates for the agent response
         // Otherwise, fall back to refreshing
         if (!wsConnected) {
           console.log('WebSocket not connected, falling back to refresh');
-          await refreshConversation();
+          setTimeout(() => refreshConversation(), 1000); // Small delay to allow backend processing
         } else {
           console.log('WebSocket connected, waiting for real-time updates');
         }
@@ -390,15 +454,18 @@ export default function ChatPage({}: ChatPageProps) {
       const messagesData = await messagesResponse.json();
       
       if (messagesData.success) {
+        // Sort messages by timestamp
+        const sortedMessages = sortMessagesByTimestamp(messagesData.data);
+        
         // Update current conversation with new messages
         const updatedConversation = {
           ...currentConversation,
-          messages: messagesData.data
+          messages: sortedMessages
         };
         setCurrentConversation(updatedConversation);
         
-        // Cache the messages
-        cache.setMessages(currentConversation.id, messagesData.data);
+        // Cache the sorted messages
+        cache.setMessages(currentConversation.id, sortedMessages);
         
         // Update in conversations list
         setConversations(prev => 
@@ -433,11 +500,41 @@ export default function ChatPage({}: ChatPageProps) {
     }
   }, [wsConnected, currentConversation, isLoading, isGenerating]);
 
-  // Reset generating state if conversation changes
+  // Load messages when conversation changes
   useEffect(() => {
-    setIsGenerating(false);
-    setGeneratingMessageId(null);
-  }, [currentConversation?.id]);
+    if (currentConversation) {
+      setIsGenerating(false);
+      setGeneratingMessageId(null);
+      
+      // Load messages for the selected conversation
+      const loadConversationMessages = async () => {
+        try {
+          // Check cache first
+          const cachedMessages = cache.getMessages(currentConversation.id);
+          if (cachedMessages && cachedMessages.length > 0) {
+            console.log('Using cached messages for conversation:', currentConversation.id);
+            const sortedMessages = sortMessagesByTimestamp(cachedMessages);
+            setCurrentConversation(prev => prev ? { ...prev, messages: sortedMessages } : null);
+            return;
+          }
+
+          // Fetch from API if not in cache or cache is empty
+          const response = await fetch(`/api/conversations/${currentConversation.id}/messages`);
+          const data = await response.json();
+          
+          if (data.success) {
+            const sortedMessages = sortMessagesByTimestamp(data.data);
+            setCurrentConversation(prev => prev ? { ...prev, messages: sortedMessages } : null);
+            cache.setMessages(currentConversation.id, sortedMessages);
+          }
+        } catch (error) {
+          console.error('Failed to load conversation messages:', error);
+        }
+      };
+
+      loadConversationMessages();
+    }
+  }, [currentConversation?.id, cache, sortMessagesByTimestamp]);
 
   const handleLogout = async () => {
     try {
@@ -515,7 +612,10 @@ export default function ChatPage({}: ChatPageProps) {
               {conversations.map((conversation) => (
                 <div
                   key={conversation.id}
-                  onClick={() => setCurrentConversation(conversation)}
+                  onClick={() => {
+                    // Clear current conversation messages to show loading state
+                    setCurrentConversation({ ...conversation, messages: [] });
+                  }}
                   className={`p-3 rounded-lg cursor-pointer transition-colors ${
                     currentConversation?.id === conversation.id
                       ? 'bg-blue-100 border border-blue-200'
@@ -532,7 +632,8 @@ export default function ChatPage({}: ChatPageProps) {
                     {formatTimestamp(conversation.updatedAt.toString())}
                   </div>
                 </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -602,7 +703,17 @@ export default function ChatPage({}: ChatPageProps) {
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {currentConversation.messages?.map((msg) => (
+              {!currentConversation.messages || currentConversation.messages.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <Bot className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">
+                      {currentConversation.messages === undefined ? 'Loading messages...' : 'No messages yet. Start a conversation!'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                currentConversation.messages.map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex ${isUserRole(msg.role) ? 'justify-end' : 'justify-start'}`}
@@ -656,7 +767,8 @@ export default function ChatPage({}: ChatPageProps) {
                     )}
                   </div>
                 </div>
-              ))}
+                ))
+              )}
               {(isLoading || (isGenerating && !currentConversation.messages?.some(msg => msg.id === generatingMessageId))) && (
                 <div className="flex justify-start">
                   <div className="bg-white border border-gray-200 text-gray-900 max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
