@@ -161,7 +161,12 @@ export class ConversationsService {
     );
 
     // Emit WebSocket event for new message
-    this.websocketGateway.broadcastNewMessage(messageData.conversationId, savedMessage);
+    console.log('About to broadcast new message via WebSocket:', savedMessage.id);
+    if (this.websocketGateway) {
+      this.websocketGateway.broadcastNewMessage(messageData.conversationId, savedMessage);
+    } else {
+      console.error('WebSocket gateway not available!');
+    }
 
     // Generate agent response if this is a user message
     if (this.isUserRole(messageData.role)) {

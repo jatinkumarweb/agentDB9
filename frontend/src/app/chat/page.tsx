@@ -104,150 +104,175 @@ export default function ChatPage({}: ChatPageProps) {
     return sortMessagesByTimestamp(Array.from(messageMap.values()));
   }, [sortMessagesByTimestamp]);
 
-  // WebSocket event handlers for real-time updates
+  // Use refs to avoid stale closures
+  const currentConversationRef = useRef(currentConversation);
+  const cacheRef = useRef(cache);
+  
   useEffect(() => {
-    if (!wsConnected || !currentConversation) return;
+    currentConversationRef.current = currentConversation;
+  }, [currentConversation]);
+  
+  useEffect(() => {
+    cacheRef.current = cache;
+  }, [cache]);
 
-    // Join conversation room for real-time updates
-    wsEmit('join_conversation', { conversationId: currentConversation.id });
+  // Stable event handlers using useCallback
+  const handleMessageUpdate = useCallback((data: { 
+    conversationId: string; 
+    messageId: string; 
+    content: string; 
+    streaming: boolean;
+    metadata?: any;
+  }) => {
+    console.log('Received message update:', data);
+    
+    const currentConv = currentConversationRef.current;
+    if (!currentConv || data.conversationId !== currentConv.id) return;
+    
+    // Update generating state
+    if (data.streaming) {
+      setIsGenerating(true);
+      setGeneratingMessageId(data.messageId);
+    } else {
+      setIsGenerating(false);
+      setGeneratingMessageId(null);
+    }
 
-    // Handle real-time message updates
-    const handleMessageUpdate = (data: { 
-      conversationId: string; 
-      messageId: string; 
-      content: string; 
-      streaming: boolean;
-      metadata?: any;
-    }) => {
-      console.log('Received message update:', data);
+    setCurrentConversation(prev => {
+      if (!prev || prev.id !== data.conversationId) return prev;
       
-      if (data.conversationId === currentConversation.id) {
-        // Update generating state
-        if (data.streaming) {
-          setIsGenerating(true);
-          setGeneratingMessageId(data.messageId);
-        } else {
-          setIsGenerating(false);
-          setGeneratingMessageId(null);
-        }
-
-        setCurrentConversation(prev => {
-          if (!prev) return prev;
-          
-          const updatedMessages = prev.messages?.map(msg => 
-            msg.id === data.messageId 
-              ? { 
-                  ...msg, 
-                  content: data.content, 
-                  metadata: { 
-                    ...msg.metadata, 
-                    ...data.metadata, 
-                    streaming: data.streaming 
-                  } 
-                }
-              : msg
-          ) || [];
-          
-          return { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
-        });
-        
-        // Update cache
-        cache.updateMessage(currentConversation.id, data.messageId, {
-          content: data.content,
-          metadata: { ...data.metadata, streaming: data.streaming }
-        });
-      }
-    };
-
-    // Handle new messages
-    const handleNewMessage = (data: { 
-      conversationId: string; 
-      message: ConversationMessage;
-    }) => {
-      console.log('Received new message:', data);
+      const updatedMessages = prev.messages?.map(msg => 
+        msg.id === data.messageId 
+          ? { 
+              ...msg, 
+              content: data.content, 
+              metadata: { 
+                ...msg.metadata, 
+                ...data.metadata, 
+                streaming: data.streaming 
+              } 
+            }
+          : msg
+      ) || [];
       
-      if (data.conversationId === currentConversation.id) {
-        // Check if this is an agent message starting to generate
-        if (data.message.role === 'agent' && data.message.metadata?.streaming) {
-          setIsGenerating(true);
-          setGeneratingMessageId(data.message.id);
-        }
+      return { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
+    });
+    
+    // Update cache
+    cacheRef.current.updateMessage(data.conversationId, data.messageId, {
+      content: data.content,
+      metadata: { ...data.metadata, streaming: data.streaming }
+    });
+  }, [sortMessagesByTimestamp]);
 
-        setCurrentConversation(prev => {
-          if (!prev) return prev;
-          
-          const existingMessages = prev.messages || [];
-          const mergedMessages = mergeMessages(existingMessages, [data.message]);
-          
-          return { ...prev, messages: mergedMessages };
-        });
-        
-        // Don't update cache here - let the main state be the source of truth
-      }
-    };
+  const handleNewMessage = useCallback((data: { 
+    conversationId: string; 
+    message: ConversationMessage;
+  }) => {
+    console.log('Received new message:', data);
+    
+    const currentConv = currentConversationRef.current;
+    if (!currentConv || data.conversationId !== currentConv.id) return;
+    
+    // Check if this is an agent message starting to generate
+    if (data.message.role === 'agent' && data.message.metadata?.streaming) {
+      setIsGenerating(true);
+      setGeneratingMessageId(data.message.id);
+    }
 
-    // Handle conversation updates (full message list)
-    const handleConversationUpdate = (data: {
-      conversationId: string;
-      messages: ConversationMessage[];
-    }) => {
-      console.log('Received conversation update:', data);
-      if (data.conversationId === currentConversation.id) {
-        const sortedMessages = sortMessagesByTimestamp(data.messages);
-        setCurrentConversation(prev => {
-          if (!prev) return prev;
-          return { ...prev, messages: sortedMessages };
-        });
-        
-        // Update cache with sorted messages
-        cache.setMessages(currentConversation.id, sortedMessages);
-      }
-    };
+    setCurrentConversation(prev => {
+      if (!prev || prev.id !== data.conversationId) return prev;
+      
+      const existingMessages = prev.messages || [];
+      const mergedMessages = mergeMessages(existingMessages, [data.message]);
+      
+      return { ...prev, messages: mergedMessages };
+    });
+  }, [mergeMessages]);
 
-    // Handle generation stopped
-    const handleGenerationStopped = (data: {
-      conversationId: string;
-      messageId: string;
-    }) => {
-      console.log('Generation stopped:', data);
-      if (data.conversationId === currentConversation.id) {
-        setIsGenerating(false);
-        setGeneratingMessageId(null);
-        
-        // Update the message to mark streaming as false
-        setCurrentConversation(prev => {
-          if (!prev) return prev;
-          
-          const updatedMessages = prev.messages?.map(msg => 
-            msg.id === data.messageId 
-              ? { 
-                  ...msg, 
-                  metadata: { 
-                    ...msg.metadata, 
-                    streaming: false 
-                  } 
-                }
-              : msg
-          ) || [];
-          
-          return { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
-        });
-      }
-    };
+  const handleConversationUpdate = useCallback((data: {
+    conversationId: string;
+    messages: ConversationMessage[];
+  }) => {
+    console.log('Received conversation update:', data);
+    
+    const currentConv = currentConversationRef.current;
+    if (!currentConv || data.conversationId !== currentConv.id) return;
+    
+    const sortedMessages = sortMessagesByTimestamp(data.messages);
+    setCurrentConversation(prev => {
+      if (!prev || prev.id !== data.conversationId) return prev;
+      return { ...prev, messages: sortedMessages };
+    });
+    
+    // Update cache with sorted messages
+    cacheRef.current.setMessages(data.conversationId, sortedMessages);
+  }, [sortMessagesByTimestamp]);
 
+  const handleGenerationStopped = useCallback((data: {
+    conversationId: string;
+    messageId: string;
+  }) => {
+    console.log('Generation stopped:', data);
+    
+    const currentConv = currentConversationRef.current;
+    if (!currentConv || data.conversationId !== currentConv.id) return;
+    
+    setIsGenerating(false);
+    setGeneratingMessageId(null);
+    
+    // Update the message to mark streaming as false
+    setCurrentConversation(prev => {
+      if (!prev || prev.id !== data.conversationId) return prev;
+      
+      const updatedMessages = prev.messages?.map(msg => 
+        msg.id === data.messageId 
+          ? { 
+              ...msg, 
+              metadata: { 
+                ...msg.metadata, 
+                streaming: false 
+              } 
+            }
+          : msg
+      ) || [];
+      
+      return { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
+    });
+  }, [sortMessagesByTimestamp]);
+
+  // WebSocket event handlers setup - minimal dependencies
+  useEffect(() => {
+    if (!wsConnected) return;
+
+    console.log('Setting up WebSocket event handlers');
+    
     wsOn('message_update', handleMessageUpdate);
     wsOn('new_message', handleNewMessage);
     wsOn('conversation_update', handleConversationUpdate);
     wsOn('generation_stopped', handleGenerationStopped);
 
     return () => {
+      console.log('Cleaning up WebSocket event handlers');
       wsOff('message_update', handleMessageUpdate);
       wsOff('new_message', handleNewMessage);
       wsOff('conversation_update', handleConversationUpdate);
       wsOff('generation_stopped', handleGenerationStopped);
+    };
+  }, [wsConnected, wsOn, wsOff, handleMessageUpdate, handleNewMessage, handleConversationUpdate, handleGenerationStopped]);
+
+  // Join/leave conversation room
+  useEffect(() => {
+    if (!wsConnected || !currentConversation) return;
+
+    console.log('Joining conversation room:', currentConversation.id);
+    wsEmit('join_conversation', { conversationId: currentConversation.id });
+
+    return () => {
+      console.log('Leaving conversation room:', currentConversation.id);
       wsEmit('leave_conversation', { conversationId: currentConversation.id });
     };
-  }, [wsConnected, currentConversation?.id, wsEmit, wsOn, wsOff, cache, sortMessagesByTimestamp, mergeMessages]);
+  }, [wsConnected, currentConversation?.id, wsEmit]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

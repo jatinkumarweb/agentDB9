@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 interface UseWebSocketOptions {
@@ -33,14 +33,15 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         });
 
         socket.on('connect', () => {
-          console.log('WebSocket connected to:', process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000');
+          console.log('✅ WebSocket connected to:', process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000');
+          console.log('Socket ID:', socket.id);
           setIsConnected(true);
           setError(null);
           reconnectCountRef.current = 0;
         });
 
         socket.on('disconnect', (reason) => {
-          console.log('WebSocket disconnected:', reason);
+          console.log('❌ WebSocket disconnected:', reason);
           setIsConnected(false);
           
           // Auto-reconnect for certain disconnect reasons
@@ -64,6 +65,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           setIsConnected(false);
         });
 
+        // Add debugging for all events
+        socket.onAny((eventName, ...args) => {
+          console.log('🔔 WebSocket event received:', eventName, args);
+        });
+
         socketRef.current = socket;
       } catch (error) {
         console.error('Failed to create WebSocket connection:', error);
@@ -81,25 +87,30 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     };
   }, [enabled, reconnectAttempts, reconnectDelay]);
 
-  const emit = (event: string, data?: any) => {
+  const emit = useCallback((event: string, data?: any) => {
     if (socketRef.current?.connected) {
+      console.log('Emitting WebSocket event:', event, data);
       socketRef.current.emit(event, data);
     } else {
       console.warn('WebSocket not connected, cannot emit event:', event);
     }
-  };
+  }, []);
 
-  const on = (event: string, callback: (...args: any[]) => void) => {
+  const on = useCallback((event: string, callback: (...args: any[]) => void) => {
     if (socketRef.current) {
+      console.log('Adding WebSocket listener for:', event);
       socketRef.current.on(event, callback);
+    } else {
+      console.warn('Cannot add WebSocket listener, socket not available:', event);
     }
-  };
+  }, []);
 
-  const off = (event: string, callback?: (...args: any[]) => void) => {
+  const off = useCallback((event: string, callback?: (...args: any[]) => void) => {
     if (socketRef.current) {
+      console.log('Removing WebSocket listener for:', event);
       socketRef.current.off(event, callback);
     }
-  };
+  }, []);
 
   return {
     socket: socketRef.current,

@@ -6,6 +6,7 @@ import { CustomLoggerService } from './common/logger/logger.service';
 import { AppConfigService } from './config/config.service';
 import helmet from 'helmet';
 import compression from 'compression';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -36,6 +37,9 @@ async function bootstrap() {
       credentials: true,
     });
   }
+
+  // Configure Socket.IO adapter
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   // Global validation pipe (now handled by CommonModule)
   // app.useGlobalPipes(new ValidationPipe({

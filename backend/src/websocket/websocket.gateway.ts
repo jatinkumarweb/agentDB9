@@ -129,6 +129,7 @@ export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnec
   // Method to broadcast message updates during streaming
   broadcastMessageUpdate(conversationId: string, messageId: string, content: string, streaming: boolean, metadata?: any) {
     const room = `conversation_${conversationId}`;
+    this.logger.log(`Broadcasting message update to room ${room}: messageId=${messageId}, streaming=${streaming}`);
     this.server.to(room).emit('message_update', {
       conversationId,
       messageId,
@@ -142,6 +143,7 @@ export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnec
   // Method to broadcast new messages
   broadcastNewMessage(conversationId: string, message: any) {
     const room = `conversation_${conversationId}`;
+    this.logger.log(`Broadcasting new message to room ${room}: messageId=${message.id}, role=${message.role}`);
     this.server.to(room).emit('new_message', {
       conversationId,
       message,
