@@ -153,4 +153,28 @@ export class ConversationsController {
       );
     }
   }
+
+  @Post(':id/messages/:messageId/stop')
+  @ApiOperation({ summary: 'Stop generation for a specific message' })
+  @ApiResponse({ status: 200, description: 'Generation stopped successfully' })
+  async stopGeneration(
+    @Param('id') conversationId: string, 
+    @Param('messageId') messageId: string
+  ): Promise<APIResponse> {
+    try {
+      await this.conversationsService.stopGeneration(conversationId, messageId);
+      return {
+        success: true,
+        data: { message: 'Generation stopped successfully' },
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          error: error.message,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Bot, User, Plus, Settings, LogOut, Wifi, WifiOff } from 'lucide-react';
+import { Send, Bot, User, Plus, Settings, LogOut, Wifi, WifiOff, Square } from 'lucide-react';
 import { CodingAgent, AgentConversation, ConversationMessage } from '@agentdb9/shared';
 import AgentCreator from '@/components/AgentCreator';
 import { useAuthStore } from '@/stores/authStore';
@@ -36,12 +36,22 @@ export default function ChatPage({}: ChatPageProps) {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingMessageId, setGeneratingMessageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // WebSocket and caching hooks
-  const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff } = useWebSocket();
+  const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff, error: wsError } = useWebSocket();
   const cache = useConversationCache();
+
+  // Debug WebSocket connection
+  useEffect(() => {
+    console.log('WebSocket connection status:', wsConnected);
+    if (wsError) {
+      console.error('WebSocket error:', wsError);
+    }
+  }, [wsConnected, wsError]);
 
   // Fetch agents on component mount
   useEffect(() => {
@@ -75,13 +85,32 @@ export default function ChatPage({}: ChatPageProps) {
       streaming: boolean;
       metadata?: any;
     }) => {
+      console.log('Received message update:', data);
+      
       if (data.conversationId === currentConversation.id) {
+        // Update generating state
+        if (data.streaming) {
+          setIsGenerating(true);
+          setGeneratingMessageId(data.messageId);
+        } else {
+          setIsGenerating(false);
+          setGeneratingMessageId(null);
+        }
+
         setCurrentConversation(prev => {
           if (!prev) return prev;
           
           const updatedMessages = prev.messages?.map(msg => 
             msg.id === data.messageId 
-              ? { ...msg, content: data.content, metadata: { ...msg.metadata, ...data.metadata, streaming: data.streaming } }
+              ? { 
+                  ...msg, 
+                  content: data.content, 
+                  metadata: { 
+                    ...msg.metadata, 
+                    ...data.metadata, 
+                    streaming: data.streaming 
+                  } 
+                }
               : msg
           ) || [];
           
@@ -101,9 +130,23 @@ export default function ChatPage({}: ChatPageProps) {
       conversationId: string; 
       message: ConversationMessage;
     }) => {
+      console.log('Received new message:', data);
+      
       if (data.conversationId === currentConversation.id) {
+        // Check if this is an agent message starting to generate
+        if (data.message.role === 'agent' && data.message.metadata?.streaming) {
+          setIsGenerating(true);
+          setGeneratingMessageId(data.message.id);
+        }
+
         setCurrentConversation(prev => {
           if (!prev) return prev;
+          
+          // Check if message already exists (avoid duplicates)
+          const messageExists = prev.messages?.some(msg => msg.id === data.message.id);
+          if (messageExists) {
+            return prev;
+          }
           
           const updatedMessages = [...(prev.messages || []), data.message];
           return { ...prev, messages: updatedMessages };
@@ -130,14 +173,28 @@ export default function ChatPage({}: ChatPageProps) {
       }
     };
 
+    // Handle generation stopped
+    const handleGenerationStopped = (data: {
+      conversationId: string;
+      messageId: string;
+    }) => {
+      console.log('Generation stopped:', data);
+      if (data.conversationId === currentConversation.id) {
+        setIsGenerating(false);
+        setGeneratingMessageId(null);
+      }
+    };
+
     wsOn('message_update', handleMessageUpdate);
     wsOn('new_message', handleNewMessage);
     wsOn('conversation_update', handleConversationUpdate);
+    wsOn('generation_stopped', handleGenerationStopped);
 
     return () => {
       wsOff('message_update', handleMessageUpdate);
       wsOff('new_message', handleNewMessage);
       wsOff('conversation_update', handleConversationUpdate);
+      wsOff('generation_stopped', handleGenerationStopped);
       wsEmit('leave_conversation', { conversationId: currentConversation.id });
     };
   }, [wsConnected, currentConversation?.id, wsEmit, wsOn, wsOff, cache]);
@@ -224,7 +281,7 @@ export default function ChatPage({}: ChatPageProps) {
   };
 
   const sendMessage = async () => {
-    if (!message.trim() || !currentConversation || isLoading) return;
+    if (!message.trim() || !currentConversation || isLoading || isGenerating) return;
 
     const messageContent = message.trim();
     setMessage('');
@@ -252,16 +309,60 @@ export default function ChatPage({}: ChatPageProps) {
         // If WebSocket is connected, we'll get real-time updates
         // Otherwise, fall back to refreshing
         if (!wsConnected) {
+          console.log('WebSocket not connected, falling back to refresh');
           await refreshConversation();
+        } else {
+          console.log('WebSocket connected, waiting for real-time updates');
         }
       } else {
         setError(data.error || 'Failed to send message');
       }
     } catch (error) {
       console.error('Failed to send message:', error);
-      setError('Failed to send message');
+      setError('Failed to send message. Please try again.');
+      // Restore the message in the input for retry
+      setMessage(messageContent);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const retryLastMessage = async () => {
+    if (!currentConversation?.messages?.length) return;
+    
+    const lastMessage = currentConversation.messages[currentConversation.messages.length - 1];
+    if (lastMessage.role === 'user') {
+      setMessage(lastMessage.content);
+      setError(null);
+    }
+  };
+
+  const stopGeneration = async () => {
+    if (!isGenerating || !generatingMessageId) return;
+
+    try {
+      // Emit stop generation event via WebSocket
+      if (wsConnected) {
+        wsEmit('stop_generation', { 
+          conversationId: currentConversation?.id,
+          messageId: generatingMessageId 
+        });
+      }
+
+      // Also try to stop via API call as fallback
+      const response = await fetch(`/api/conversations/${currentConversation?.id}/messages/${generatingMessageId}/stop`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        setIsGenerating(false);
+        setGeneratingMessageId(null);
+      }
+    } catch (error) {
+      console.error('Failed to stop generation:', error);
+      // Force stop the UI state even if the request fails
+      setIsGenerating(false);
+      setGeneratingMessageId(null);
     }
   };
 
@@ -314,9 +415,29 @@ export default function ChatPage({}: ChatPageProps) {
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      if (!isLoading && !isGenerating) {
+        sendMessage();
+      }
     }
   };
+
+  // Auto-refresh fallback when WebSocket is not connected
+  useEffect(() => {
+    if (!wsConnected && currentConversation && (isLoading || isGenerating)) {
+      const fallbackInterval = setInterval(() => {
+        console.log('WebSocket disconnected, using fallback refresh');
+        refreshConversation();
+      }, 2000);
+
+      return () => clearInterval(fallbackInterval);
+    }
+  }, [wsConnected, currentConversation, isLoading, isGenerating]);
+
+  // Reset generating state if conversation changes
+  useEffect(() => {
+    setIsGenerating(false);
+    setGeneratingMessageId(null);
+  }, [currentConversation?.id]);
 
   const handleLogout = async () => {
     try {
@@ -506,15 +627,25 @@ export default function ChatPage({}: ChatPageProps) {
                         {formatTimestamp(msg.timestamp.toString())}
                       </span>
                     </div>
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    <div className="whitespace-pre-wrap">{msg.content || (msg.metadata?.streaming ? '🤖 Thinking...' : '')}</div>
                     {msg.metadata?.streaming && (
-                      <div className="flex items-center mt-2">
-                        <div className="flex space-x-1 mr-2">
-                          <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce"></div>
-                          <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                          <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex items-center">
+                          <div className="flex space-x-1 mr-2">
+                            <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce"></div>
+                            <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          </div>
+                          <span className="text-xs opacity-75">Streaming...</span>
                         </div>
-                        <span className="text-xs opacity-75">Streaming...</span>
+                        {generatingMessageId === msg.id && (
+                          <button
+                            onClick={stopGeneration}
+                            className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                          >
+                            Stop
+                          </button>
+                        )}
                       </div>
                     )}
                     {msg.metadata && !msg.metadata.streaming && (
@@ -526,15 +657,20 @@ export default function ChatPage({}: ChatPageProps) {
                   </div>
                 </div>
               ))}
-              {isLoading && (
+              {(isLoading || (isGenerating && !currentConversation.messages?.some(msg => msg.id === generatingMessageId))) && (
                 <div className="flex justify-start">
                   <div className="bg-white border border-gray-200 text-gray-900 max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
                     <div className="flex items-center">
                       <Bot className="w-4 h-4 mr-2" />
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="flex items-center space-x-2">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
+                        <span className="text-sm text-gray-600">
+                          {isLoading ? 'Sending message...' : 'AI is thinking...'}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -545,8 +681,59 @@ export default function ChatPage({}: ChatPageProps) {
 
             {/* Error Display */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 mx-4">
-                {error}
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 mx-4 rounded-md">
+                <div className="flex items-center justify-between">
+                  <span className="flex-1">{error}</span>
+                  <div className="flex items-center space-x-2 ml-2">
+                    {error.includes('Failed to send message') && (
+                      <button
+                        onClick={retryLastMessage}
+                        className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                      >
+                        Retry
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setError(null)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* WebSocket Connection Issues */}
+            {!wsConnected && (
+              <div className="bg-orange-50 border border-orange-200 text-orange-700 px-4 py-2 mx-4 rounded-md">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm">Real-time connection lost. Using polling fallback for updates.</span>
+                </div>
+              </div>
+            )}
+
+            {/* Generation Status */}
+            {isGenerating && (
+              <div className="bg-yellow-50 border-t border-yellow-200 px-4 py-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                    <span className="text-sm text-yellow-700 font-medium">AI is generating response...</span>
+                  </div>
+                  <button
+                    onClick={stopGeneration}
+                    className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors flex items-center space-x-1"
+                  >
+                    <Square className="w-3 h-3" />
+                    <span>Stop</span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -557,18 +744,48 @@ export default function ChatPage({}: ChatPageProps) {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
+                  placeholder={isGenerating ? "Please wait for the current response to complete..." : "Type your message..."}
                   className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                   rows={1}
-                  disabled={isLoading}
+                  disabled={isLoading || isGenerating}
                 />
-                <button
-                  onClick={sendMessage}
-                  disabled={!message.trim() || isLoading}
-                  className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
+                {isGenerating ? (
+                  <button
+                    onClick={stopGeneration}
+                    className="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+                  >
+                    <Square className="w-4 h-4" />
+                    <span className="hidden sm:inline">Stop</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={sendMessage}
+                    disabled={!message.trim() || isLoading}
+                    className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+              
+              {/* Connection Status */}
+              <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center space-x-2">
+                  {wsConnected ? (
+                    <span className="flex items-center text-green-600">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                      Real-time connected
+                    </span>
+                  ) : (
+                    <span className="flex items-center text-orange-500">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full mr-1"></div>
+                      Using polling fallback
+                    </span>
+                  )}
+                </div>
+                {wsError && (
+                  <span className="text-red-500">WebSocket error: {wsError}</span>
+                )}
               </div>
             </div>
           </>

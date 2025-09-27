@@ -28,6 +28,9 @@ export class ConversationsService {
   private modelCache: { models: string[], timestamp: number } = { models: [], timestamp: 0 };
   private readonly MODEL_CACHE_TTL = 300000; // 5 minutes
 
+  // Generation control
+  private activeGenerations = new Map<string, { abortController: AbortController; messageId: string }>();
+
   constructor(
     @InjectRepository(Conversation)
     private conversationsRepository: Repository<Conversation>,
@@ -169,6 +172,45 @@ export class ConversationsService {
     }
 
     return savedMessage;
+  }
+
+  async stopGeneration(conversationId: string, messageId: string): Promise<void> {
+    console.log(`Stopping generation for message ${messageId} in conversation ${conversationId}`);
+    
+    // Find and abort the active generation
+    const generation = this.activeGenerations.get(messageId);
+    if (generation) {
+      generation.abortController.abort();
+      this.activeGenerations.delete(messageId);
+      
+      // Update the message to mark it as stopped
+      try {
+        await this.messagesRepository.update(messageId, {
+          metadata: {
+            streaming: false,
+            completed: false,
+            stopped: true,
+            stoppedAt: new Date().toISOString()
+          } as Record<string, any>
+        });
+
+        // Emit WebSocket event
+        this.websocketGateway.broadcastMessageUpdate(
+          conversationId,
+          messageId,
+          '', // Keep existing content
+          false, // Not streaming anymore
+          {
+            streaming: false,
+            completed: false,
+            stopped: true,
+            stoppedAt: new Date().toISOString()
+          }
+        );
+      } catch (error) {
+        console.error('Failed to update stopped message:', error);
+      }
+    }
   }
 
   private isUserRole(role: string): boolean {
@@ -429,6 +471,12 @@ Would you like help setting up external API access?`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 minute timeout for streaming
       
+      // Register this generation for potential stopping
+      this.activeGenerations.set(savedMessage.id, {
+        abortController: controller,
+        messageId: savedMessage.id
+      });
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -615,6 +663,8 @@ Would you like help setting up external API access?`;
         }
       } finally {
         reader.releaseLock();
+        // Clean up the active generation
+        this.activeGenerations.delete(savedMessage.id);
       }
 
       return fullContent || 'I apologize, but I was unable to generate a response at this time.';

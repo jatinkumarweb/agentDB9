@@ -33,7 +33,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         });
 
         socket.on('connect', () => {
-          console.log('WebSocket connected');
+          console.log('WebSocket connected to:', process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000');
           setIsConnected(true);
           setError(null);
           reconnectCountRef.current = 0;

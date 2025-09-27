@@ -12,8 +12,13 @@ import { Logger } from '@nestjs/common';
 
 @WSGateway({
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: [
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+      'https://3000--01998bbd-b083-7323-b841-cf28c7e00e03.us-east-1-01.gitpod.dev',
+      /^https:\/\/\d+--[a-f0-9-]+\.us-east-1-01\.gitpod\.dev$/
+    ],
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 })
 export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -24,7 +29,8 @@ export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnec
   private monitoringClients = new Set<string>();
 
   handleConnection(client: Socket) {
-    this.logger.log(`Client connected: ${client.id}`);
+    this.logger.log(`Client connected: ${client.id} from origin: ${client.handshake.headers.origin}`);
+    this.logger.log(`Client headers:`, client.handshake.headers);
   }
 
   handleDisconnect(client: Socket) {
@@ -83,6 +89,22 @@ export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnec
     const room = `conversation_${data.conversationId}`;
     client.leave(room);
     this.logger.log(`Client ${client.id} left conversation room: ${room}`);
+  }
+
+  @SubscribeMessage('stop_generation')
+  handleStopGeneration(
+    @MessageBody() data: { conversationId: string; messageId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.logger.log(`Stop generation requested for message ${data.messageId} in conversation ${data.conversationId}`);
+    
+    // Broadcast stop generation to the conversation room
+    const room = `conversation_${data.conversationId}`;
+    this.server.to(room).emit('generation_stopped', {
+      conversationId: data.conversationId,
+      messageId: data.messageId,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   // Method to broadcast environment health updates
