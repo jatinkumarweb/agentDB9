@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { Send, Bot, User, Plus, Settings, LogOut, Wifi, WifiOff, Square } from 'lucide-react';
 import { CodingAgent, AgentConversation, ConversationMessage } from '@agentdb9/shared';
@@ -126,17 +127,20 @@ export default function ChatPage({}: ChatPageProps) {
     console.log('🔄 Received message update:', data);
 
     // Update generating state immediately, outside of setCurrentConversation
-    if (data.streaming) {
-      console.log('🟡 Setting generating state to true');
-      setIsGenerating(true);
-      setGeneratingMessageId(data.messageId);
-    } else {
-      console.log('🟢 Setting generating state to false');
-      setIsGenerating(false);
-      setGeneratingMessageId(null);
-    }
+    flushSync(() => {
+      if (data.streaming) {
+        console.log('🟡 Setting generating state to true');
+        setIsGenerating(true);
+        setGeneratingMessageId(data.messageId);
+      } else {
+        console.log('🟢 Setting generating state to false');
+        setIsGenerating(false);
+        setGeneratingMessageId(null);
+      }
+    });
 
-    setCurrentConversation((prev) => {
+    flushSync(() => {
+      setCurrentConversation((prev) => {
       if (!prev) {
         console.log('❌ No current conversation');
         return prev;
@@ -154,13 +158,20 @@ export default function ChatPage({}: ChatPageProps) {
               ...msg,
               content: data.content,
               metadata: { ...msg.metadata, ...data.metadata, streaming: data.streaming },
+              // Force new object reference by adding timestamp
+              _lastUpdated: Date.now()
             }
           : msg
       );
 
-      const newConversation = { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
-      console.log('📝 Updated conversation with', updatedMessages.length, 'messages');
+      const sortedMessages = sortMessagesByTimestamp(updatedMessages);
+      const newConversation = { 
+        ...prev, 
+        messages: sortedMessages
+      };
+      console.log('📝 Updated conversation with', sortedMessages.length, 'messages');
       return newConversation;
+      });
     });
 
     try {
@@ -181,13 +192,16 @@ export default function ChatPage({}: ChatPageProps) {
     console.log('📨 Received new message:', data);
 
     // If agent started streaming, mark generating immediately
-    if (data.message.role === 'agent' && data.message.metadata?.streaming) {
-      console.log('🤖 Agent message started streaming');
-      setIsGenerating(true);
-      setGeneratingMessageId(data.message.id);
-    }
+    flushSync(() => {
+      if (data.message.role === 'agent' && data.message.metadata?.streaming) {
+        console.log('🤖 Agent message started streaming');
+        setIsGenerating(true);
+        setGeneratingMessageId(data.message.id);
+      }
+    });
 
-    setCurrentConversation((prev) => {
+    flushSync(() => {
+      setCurrentConversation((prev) => {
       if (!prev) {
         console.log('❌ No current conversation for new message');
         return prev;
@@ -201,7 +215,11 @@ export default function ChatPage({}: ChatPageProps) {
       const mergedMessages = mergeMessages(existingMessages, [data.message]);
       console.log('✅ Added new message to conversation:', data.message.id, 'Total messages:', mergedMessages.length);
 
-      return { ...prev, messages: mergedMessages };
+      return { 
+        ...prev, 
+        messages: mergedMessages
+      };
+      });
     });
 
     try {
