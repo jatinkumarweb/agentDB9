@@ -18,9 +18,11 @@ export class ConversationsService {
     content: string;
     metadata: any;
     timestamp: number;
+    retryCount: number;
   }>();
   private updateBatchTimer: NodeJS.Timeout | null = null;
   private readonly BATCH_UPDATE_INTERVAL = 2000; // Batch updates every 2 seconds
+  private readonly MAX_RETRY_COUNT = 3;
   
   // Model cache optimization
   private modelCache: { models: string[], timestamp: number } = { models: [], timestamp: 0 };
@@ -44,7 +46,11 @@ export class ConversationsService {
     }
     
     this.updateBatchTimer = setInterval(async () => {
-      await this.processPendingUpdates();
+      try {
+        await this.processPendingUpdates();
+      } catch (error) {
+        console.error('Batch update timer error:', error);
+      }
     }, this.BATCH_UPDATE_INTERVAL);
   }
 
@@ -55,27 +61,36 @@ export class ConversationsService {
     this.pendingUpdates.clear();
 
     try {
-      // Process all pending updates in a single transaction
-      await this.messagesRepository.manager.transaction(async (transactionalEntityManager) => {
-        for (const [messageId, update] of updates) {
-          await transactionalEntityManager.update(
-            'message',
-            { id: messageId },
-            {
-              content: update.content,
-              metadata: update.metadata
-            }
-          );
-        }
-      });
+      // Process updates using the repository directly (simpler and more reliable)
+      const updatePromises = updates.map(([messageId, update]) => 
+        this.messagesRepository.update(messageId, {
+          content: update.content,
+          metadata: update.metadata
+        })
+      );
 
+      await Promise.all(updatePromises);
       console.log(`Batch updated ${updates.length} messages`);
     } catch (error) {
       console.error('Failed to process batch updates:', error);
       
-      // Re-add failed updates to be retried
+      // Re-add failed updates with retry count, or use direct update if max retries reached
       for (const [messageId, update] of updates) {
-        this.pendingUpdates.set(messageId, update);
+        if (update.retryCount < this.MAX_RETRY_COUNT) {
+          this.pendingUpdates.set(messageId, {
+            ...update,
+            retryCount: update.retryCount + 1
+          });
+        } else {
+          // Fallback to direct update if batch updates keep failing
+          console.log(`Falling back to direct update for message ${messageId}`);
+          this.messagesRepository.update(messageId, {
+            content: update.content,
+            metadata: update.metadata
+          }).catch(directError => {
+            console.error(`Direct update also failed for message ${messageId}:`, directError);
+          });
+        }
       }
     }
   }
@@ -84,7 +99,8 @@ export class ConversationsService {
     this.pendingUpdates.set(messageId, {
       content,
       metadata,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      retryCount: 0
     });
   }
 
@@ -495,15 +511,28 @@ Would you like help setting up external API access?`;
                 const shouldQueueUpdate = fullContent.length % 1000 === 0 || data.done;
                 
                 if (shouldQueueUpdate) {
-                  this.queueMessageUpdate(
-                    savedMessage.id,
-                    fullContent,
-                    {
-                      ...agentMessageData.metadata,
-                      streaming: !data.done,
-                      lastUpdate: new Date().toISOString()
-                    }
-                  );
+                  // Try direct update first, fallback to queue if needed
+                  try {
+                    await this.messagesRepository.update(savedMessage.id, {
+                      content: fullContent,
+                      metadata: {
+                        ...agentMessageData.metadata,
+                        streaming: !data.done,
+                        lastUpdate: new Date().toISOString()
+                      } as Record<string, any>
+                    });
+                  } catch (updateError) {
+                    console.log('Direct update failed, queuing for batch:', updateError.message);
+                    this.queueMessageUpdate(
+                      savedMessage.id,
+                      fullContent,
+                      {
+                        ...agentMessageData.metadata,
+                        streaming: !data.done,
+                        lastUpdate: new Date().toISOString()
+                      }
+                    );
+                  }
                 }
               }
               
@@ -527,15 +556,17 @@ Would you like help setting up external API access?`;
                   finalMetadata
                 );
                 
-                // Queue final database update (will be processed in batch)
-                this.queueMessageUpdate(
-                  savedMessage.id,
-                  finalContent,
-                  finalMetadata
-                );
-                
-                // Force process pending updates for this final message
-                await this.processPendingUpdates();
+                // Direct final database update for immediate completion
+                try {
+                  await this.messagesRepository.update(savedMessage.id, {
+                    content: finalContent,
+                    metadata: finalMetadata as Record<string, any>
+                  });
+                } catch (updateError) {
+                  console.log('Final direct update failed, queuing:', updateError.message);
+                  this.queueMessageUpdate(savedMessage.id, finalContent, finalMetadata);
+                  await this.processPendingUpdates();
+                }
                 
                 return finalContent;
               }
@@ -570,9 +601,17 @@ Would you like help setting up external API access?`;
             finalMetadata
           );
           
-          // Queue final database update
-          this.queueMessageUpdate(savedMessage.id, fullContent, finalMetadata);
-          await this.processPendingUpdates();
+          // Direct final database update
+          try {
+            await this.messagesRepository.update(savedMessage.id, {
+              content: fullContent,
+              metadata: finalMetadata as Record<string, any>
+            });
+          } catch (updateError) {
+            console.log('Final fallback update failed, queuing:', updateError.message);
+            this.queueMessageUpdate(savedMessage.id, fullContent, finalMetadata);
+            await this.processPendingUpdates();
+          }
         }
       } finally {
         reader.releaseLock();

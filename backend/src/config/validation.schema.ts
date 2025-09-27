@@ -31,20 +31,35 @@ export const validationSchema = Joi.object({
   JWT_REFRESH_SECRET: Joi.string().min(32).optional(),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
 
-  // External APIs
-  OPENAI_API_KEY: Joi.string().pattern(/^sk-/).allow('').optional(),
+  // External APIs - allow empty strings and skip pattern validation for empty values
+  OPENAI_API_KEY: Joi.string().allow('').optional().custom((value, helpers) => {
+    if (value && value !== '' && !value.startsWith('sk-')) {
+      return helpers.error('string.pattern.base');
+    }
+    return value;
+  }),
   OPENAI_ORGANIZATION: Joi.string().allow('').optional(),
   OPENAI_TIMEOUT: Joi.number().default(60000),
   OPENAI_MAX_RETRIES: Joi.number().default(3),
 
-  ANTHROPIC_API_KEY: Joi.string().pattern(/^sk-ant-/).allow('').optional(),
+  ANTHROPIC_API_KEY: Joi.string().allow('').optional().custom((value, helpers) => {
+    if (value && value !== '' && !value.startsWith('sk-ant-')) {
+      return helpers.error('string.pattern.base');
+    }
+    return value;
+  }),
   ANTHROPIC_TIMEOUT: Joi.number().default(60000),
   ANTHROPIC_MAX_RETRIES: Joi.number().default(3),
 
   COHERE_API_KEY: Joi.string().allow('').optional(),
   COHERE_TIMEOUT: Joi.number().default(60000),
 
-  HUGGINGFACE_API_KEY: Joi.string().pattern(/^hf_/).allow('').optional(),
+  HUGGINGFACE_API_KEY: Joi.string().allow('').optional().custom((value, helpers) => {
+    if (value && value !== '' && !value.startsWith('hf_')) {
+      return helpers.error('string.pattern.base');
+    }
+    return value;
+  }),
   HUGGINGFACE_TIMEOUT: Joi.number().default(60000),
 
   // Ollama
