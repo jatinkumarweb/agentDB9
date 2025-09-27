@@ -91,21 +91,42 @@ export class ConversationsService {
   private async generateAgentResponse(conversation: any, userMessage: string): Promise<void> {
     try {
       const startTime = Date.now();
+      
+      // Debug logging
+      console.log('=== AGENT RESPONSE DEBUG ===');
+      console.log('Conversation ID:', conversation.id);
+      console.log('Agent loaded:', !!conversation.agent);
+      console.log('Agent ID:', conversation.agent?.id);
+      console.log('Agent configuration:', conversation.agent?.configuration);
+      
       const model = conversation.agent?.configuration?.model || 'qwen2.5-coder:7b';
+      console.log('Using model:', model);
       
       // Check if this is an Ollama model and if we should attempt to use it
       const isOllamaModel = this.isOllamaModel(model);
+      console.log('Is Ollama model:', isOllamaModel);
       let agentResponse: string;
+      let actualModel = model; // Track the actual model used
       
       if (isOllamaModel) {
         // Check if Ollama is available before making the call
         const isOllamaHealthy = await this.checkOllamaHealth();
         console.log(`Ollama health check result: ${isOllamaHealthy} for model: ${model}`);
         
-        if (isOllamaHealthy) {
+        // Check what models are actually available
+        const availableModels = await this.getAvailableOllamaModels();
+        console.log('Available Ollama models:', availableModels);
+        
+        // If the configured model isn't available, try to use an available one
+        if (!availableModels.includes(model) && availableModels.length > 0) {
+          actualModel = availableModels[0];
+          console.log(`Model ${model} not available, using ${actualModel} instead`);
+        }
+        
+        if (isOllamaHealthy && availableModels.length > 0) {
           try {
             // Use streaming API which handles message creation internally
-            await this.callOllamaAPIStreaming(userMessage, model, conversation);
+            await this.callOllamaAPIStreaming(userMessage, actualModel, conversation);
             return; // Exit early since streaming handles message creation
           } catch (error) {
             console.log('Ollama streaming API call failed despite health check passing, using fallback');
@@ -145,6 +166,7 @@ This agent is configured to use "${model}" which requires external API access.
         metadata: {
           generatedAt: new Date().toISOString(),
           model: model,
+          actualModel: actualModel,
           responseTime: responseTime,
           provider: isOllamaModel ? 'ollama' : 'external'
         }
@@ -176,6 +198,23 @@ This agent is configured to use "${model}" which requires external API access.
     return ollamaModels.some(ollamaModel => 
       model.toLowerCase().includes(ollamaModel.toLowerCase())
     );
+  }
+
+  private async getAvailableOllamaModels(): Promise<string[]> {
+    try {
+      const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
+      const response = await fetch(`${ollamaUrl}/api/tags`);
+      
+      if (!response.ok) {
+        return [];
+      }
+      
+      const data = await response.json();
+      return data.models?.map((model: any) => model.name) || [];
+    } catch (error) {
+      console.log('Failed to get available Ollama models:', error.message);
+      return [];
+    }
   }
 
   private async checkOllamaHealth(): Promise<boolean> {

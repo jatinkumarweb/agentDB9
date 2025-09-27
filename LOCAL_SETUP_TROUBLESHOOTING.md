@@ -58,13 +58,23 @@ docker-compose exec ollama ollama --version
 **Symptoms:** `curl http://localhost:11434/api/tags` returns empty models array
 **Solution:**
 ```bash
-# Download a model directly
+# Download a model directly (any of these will work)
 docker-compose exec ollama ollama pull qwen2.5-coder:7b
+docker-compose exec ollama ollama pull starcoder2:7b
+docker-compose exec ollama ollama pull codellama:7b
 
 # Or use the web interface
 # 1. Go to http://localhost:3000/models
 # 2. Login with demo credentials
-# 3. Download qwen2.5-coder:7b model
+# 3. Download any available model
+```
+
+#### Issue 3b: Wrong Model Configured
+**Symptoms:** Chat shows "Local Development Mode" but models are downloaded
+**Solution:**
+The system now automatically uses any available model if the configured one isn't found. Check backend logs for model fallback messages:
+```bash
+docker-compose logs backend | grep -i "model.*not available"
 ```
 
 #### Issue 4: Backend Can't Reach Ollama

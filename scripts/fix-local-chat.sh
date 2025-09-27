@@ -88,23 +88,27 @@ else
     docker-compose logs llm-service | tail -10
 fi
 
-# Test a simple chat request
+# Test a simple chat request with available model
 echo ""
 echo "🔍 Testing Ollama chat functionality..."
+# Get the first available model
+AVAILABLE_MODEL=$(curl -s http://localhost:11434/api/tags | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4)
+echo "   Testing with model: $AVAILABLE_MODEL"
+
 CHAT_TEST=$(curl -s -X POST http://localhost:11434/api/chat \
   -H "Content-Type: application/json" \
-  -d '{
-    "model": "qwen2.5-coder:7b",
-    "messages": [{"role": "user", "content": "Hello"}],
-    "stream": false
-  }' | grep -o '"content":"[^"]*"' | head -1)
+  -d "{
+    \"model\": \"$AVAILABLE_MODEL\",
+    \"messages\": [{\"role\": \"user\", \"content\": \"Hello\"}],
+    \"stream\": false
+  }" | grep -o '"content":"[^"]*"' | head -1)
 
 if [ -n "$CHAT_TEST" ]; then
     echo "✅ Ollama chat is working"
     echo "   Response: $CHAT_TEST"
 else
     echo "❌ Ollama chat test failed"
-    echo "   Make sure qwen2.5-coder:7b model is downloaded"
+    echo "   Make sure at least one model is downloaded and working"
 fi
 
 echo ""
@@ -114,7 +118,7 @@ echo "1. Open http://localhost:3000/chat"
 echo "2. Login with demo credentials:"
 echo "   Email: demo@agentdb9.com"
 echo "   Password: demo123"
-echo "3. Create a new agent with qwen2.5-coder:7b model"
+echo "3. Create a new agent with an available model (e.g., starcoder2:7b)"
 echo "4. Start a conversation and send a message"
 echo ""
 echo "If you still see 'Local Development Mode', check the backend logs:"
