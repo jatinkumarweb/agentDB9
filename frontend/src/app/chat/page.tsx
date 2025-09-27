@@ -123,20 +123,30 @@ export default function ChatPage({}: ChatPageProps) {
     streaming: boolean;
     metadata?: any;
   }) => {
-    console.log('Received message update:', data);
+    console.log('🔄 Received message update:', data);
+
+    // Update generating state immediately, outside of setCurrentConversation
+    if (data.streaming) {
+      console.log('🟡 Setting generating state to true');
+      setIsGenerating(true);
+      setGeneratingMessageId(data.messageId);
+    } else {
+      console.log('🟢 Setting generating state to false');
+      setIsGenerating(false);
+      setGeneratingMessageId(null);
+    }
 
     setCurrentConversation((prev) => {
-      if (!prev) return prev;
-      if (prev.id !== data.conversationId) return prev;
-
-      if (data.streaming) {
-        setIsGenerating(true);
-        setGeneratingMessageId(data.messageId);
-      } else {
-        setIsGenerating(false);
-        setGeneratingMessageId(null);
+      if (!prev) {
+        console.log('❌ No current conversation');
+        return prev;
+      }
+      if (prev.id !== data.conversationId) {
+        console.log('❌ Conversation ID mismatch:', prev.id, 'vs', data.conversationId);
+        return prev;
       }
 
+      console.log('✅ Updating conversation messages');
       const existingMessages = prev.messages || [];
       const updatedMessages = existingMessages.map((msg) =>
         msg.id === data.messageId
@@ -148,7 +158,9 @@ export default function ChatPage({}: ChatPageProps) {
           : msg
       );
 
-      return { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
+      const newConversation = { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
+      console.log('📝 Updated conversation with', updatedMessages.length, 'messages');
+      return newConversation;
     });
 
     try {
@@ -166,21 +178,28 @@ export default function ChatPage({}: ChatPageProps) {
     conversationId: string;
     message: ConversationMessage;
   }) => {
-    console.log('Received new message:', data);
+    console.log('📨 Received new message:', data);
+
+    // If agent started streaming, mark generating immediately
+    if (data.message.role === 'agent' && data.message.metadata?.streaming) {
+      console.log('🤖 Agent message started streaming');
+      setIsGenerating(true);
+      setGeneratingMessageId(data.message.id);
+    }
 
     setCurrentConversation((prev) => {
-      if (!prev) return prev;
-      if (prev.id !== data.conversationId) return prev;
-
-      // If agent started streaming, mark generating
-      if (data.message.role === 'agent' && data.message.metadata?.streaming) {
-        setIsGenerating(true);
-        setGeneratingMessageId(data.message.id);
+      if (!prev) {
+        console.log('❌ No current conversation for new message');
+        return prev;
+      }
+      if (prev.id !== data.conversationId) {
+        console.log('❌ Conversation ID mismatch for new message:', prev.id, 'vs', data.conversationId);
+        return prev;
       }
 
       const existingMessages = prev.messages || [];
       const mergedMessages = mergeMessages(existingMessages, [data.message]);
-      console.log('Added new message to conversation:', data.message.id);
+      console.log('✅ Added new message to conversation:', data.message.id, 'Total messages:', mergedMessages.length);
 
       return { ...prev, messages: mergedMessages };
     });
