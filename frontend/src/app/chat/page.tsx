@@ -26,7 +26,6 @@ export default function ChatPage({}: ChatPageProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingMessageId, setGeneratingMessageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [forceUpdate, setForceUpdate] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // WebSocket and caching hooks
@@ -80,7 +79,7 @@ export default function ChatPage({}: ChatPageProps) {
     });
 
     return sortMessagesByTimestamp(Array.from(messageMap.values()));
-  }, [sortMessagesByTimestamp, cache]);
+  }, [sortMessagesByTimestamp]);
 
   const isUserRole = useCallback((role: string) => {
     const userRoles = ['user', 'human', 'person'];
@@ -126,18 +125,17 @@ export default function ChatPage({}: ChatPageProps) {
   }) => {
     console.log('Received message update:', data);
 
-    // Update generating state
-    if (data.streaming) {
-      setIsGenerating(true);
-      setGeneratingMessageId(data.messageId);
-    } else {
-      setIsGenerating(false);
-      setGeneratingMessageId(null);
-    }
-
     setCurrentConversation((prev) => {
       if (!prev) return prev;
       if (prev.id !== data.conversationId) return prev;
+
+      if (data.streaming) {
+        setIsGenerating(true);
+        setGeneratingMessageId(data.messageId);
+      } else {
+        setIsGenerating(false);
+        setGeneratingMessageId(null);
+      }
 
       const existingMessages = prev.messages || [];
       const updatedMessages = existingMessages.map((msg) =>
@@ -150,20 +148,18 @@ export default function ChatPage({}: ChatPageProps) {
           : msg
       );
 
-      const newConversation = { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
-      
-      // Force re-render to ensure UI updates
-      setForceUpdate(prev => prev + 1);
-      
-      return newConversation;
+      return { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
     });
 
-    // Update cache
-    cache.updateMessage(data.conversationId, data.messageId, {
-      content: data.content,
-      metadata: { ...data.metadata, streaming: data.streaming },
-    });
-  }, [sortMessagesByTimestamp, cache]);
+    try {
+      cacheRef.current?.updateMessage?.(data.conversationId, data.messageId, {
+        content: data.content,
+        metadata: { ...data.metadata, streaming: data.streaming },
+      });
+    } catch (err) {
+      console.error('Cache update error:', err);
+    }
+  }, [sortMessagesByTimestamp]);
 
 
   const handleNewMessage = useCallback((data: {
@@ -172,29 +168,29 @@ export default function ChatPage({}: ChatPageProps) {
   }) => {
     console.log('Received new message:', data);
 
-    // Check if this is an agent message starting to generate
-    if (data.message.role === 'agent' && data.message.metadata?.streaming) {
-      setIsGenerating(true);
-      setGeneratingMessageId(data.message.id);
-    }
-
     setCurrentConversation((prev) => {
       if (!prev) return prev;
       if (prev.id !== data.conversationId) return prev;
+
+      // If agent started streaming, mark generating
+      if (data.message.role === 'agent' && data.message.metadata?.streaming) {
+        setIsGenerating(true);
+        setGeneratingMessageId(data.message.id);
+      }
 
       const existingMessages = prev.messages || [];
       const mergedMessages = mergeMessages(existingMessages, [data.message]);
       console.log('Added new message to conversation:', data.message.id);
 
-      // Force re-render to ensure UI updates
-      setForceUpdate(prev => prev + 1);
-
       return { ...prev, messages: mergedMessages };
     });
 
-    // Update cache
-    cache.addMessage(data.conversationId, data.message);
-  }, [mergeMessages, cache]);
+    try {
+      cacheRef.current?.addMessage?.(data.conversationId, data.message);
+    } catch (err) {
+      console.error('Cache add error:', err);
+    }
+  }, [mergeMessages]);
 
 
   const handleConversationUpdate = useCallback((data: { conversationId: string; messages: ConversationMessage[] }) => {
@@ -213,7 +209,7 @@ export default function ChatPage({}: ChatPageProps) {
     } catch (err) {
       console.error('Cache error:', err);
     }
-  }, [sortMessagesByTimestamp, cache]);
+  }, [sortMessagesByTimestamp]);
 
 
   const handleGenerationStopped = useCallback((data: { conversationId: string; messageId: string }) => {
@@ -232,7 +228,7 @@ export default function ChatPage({}: ChatPageProps) {
 
       return { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
     });
-  }, [sortMessagesByTimestamp, cache]);
+  }, [sortMessagesByTimestamp]);
 
   // Memoize WebSocket handlers
   const wsHandlers = useMemo(() => ({
