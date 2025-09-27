@@ -99,6 +99,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const on = useCallback((event: string, callback: (...args: any[]) => void) => {
     if (socketRef.current) {
       console.log('Adding WebSocket listener for:', event);
+      // Remove any existing listeners for this event first to prevent duplicates
+      socketRef.current.off(event);
       socketRef.current.on(event, callback);
     } else {
       console.warn('Cannot add WebSocket listener, socket not available:', event);
@@ -108,7 +110,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const off = useCallback((event: string, callback?: (...args: any[]) => void) => {
     if (socketRef.current) {
       console.log('Removing WebSocket listener for:', event);
-      socketRef.current.off(event, callback);
+      if (callback) {
+        socketRef.current.off(event, callback);
+      } else {
+        socketRef.current.off(event);
+      }
     }
   }, []);
 
