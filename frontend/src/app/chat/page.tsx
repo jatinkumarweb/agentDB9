@@ -79,7 +79,9 @@ export default function ChatPage({}: ChatPageProps) {
       }
     });
 
-    return sortMessagesByTimestamp(Array.from(messageMap.values()));
+    return sortMessagesByTimestamp(
+  Array.from(messageMap.values()).map((msg) => ({ ...msg }))
+);
   }, [sortMessagesByTimestamp]);
 
   const isUserRole = useCallback((role: string) => {
@@ -153,16 +155,15 @@ export default function ChatPage({}: ChatPageProps) {
       console.log('✅ Updating conversation messages');
       const existingMessages = prev.messages || [];
       const updatedMessages = existingMessages.map((msg) =>
-        msg.id === data.messageId
-          ? {
-              ...msg,
-              content: data.content,
-              metadata: { ...msg.metadata, ...data.metadata, streaming: data.streaming },
-              // Force new object reference by adding timestamp
-              _lastUpdated: Date.now()
-            }
-          : msg
-      );
+  msg.id === data.messageId
+    ? {
+        ...msg,
+        content: data.content && data.content.length > 0 ? data.content : msg.content,
+        metadata: { ...msg.metadata, ...data.metadata, streaming: data.streaming },
+        _lastUpdated: Date.now(),
+      }
+    : { ...msg }   // <-- clone here
+);
 
       const sortedMessages = sortMessagesByTimestamp(updatedMessages);
       const newConversation = { 
@@ -395,12 +396,11 @@ export default function ChatPage({}: ChatPageProps) {
 
       const currentCache = cacheRef.current;
       const cachedMessages = currentCache?.getMessages?.(currentConversation.id);
-      if (cachedMessages) {
-        console.log('Using cached messages for conversation:', currentConversation.id);
-        const updatedConversation = { ...currentConversation, messages: sortMessagesByTimestamp(cachedMessages) };
-        setCurrentConversation(updatedConversation);
-        return;
-      }
+if (cachedMessages) {
+  const cloned = cachedMessages.map((m) => ({ ...m }));
+  const updatedConversation = { ...currentConversation, messages: sortMessagesByTimestamp(cloned) };
+  setCurrentConversation(updatedConversation);
+}
 
       const messagesResponse = await fetch(`/api/conversations/${currentConversation.id}/messages`);
       const messagesData = await messagesResponse.json();

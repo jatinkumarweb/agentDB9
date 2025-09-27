@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
         
         try {
           // Use mock login for testing when backend is not available
-          const response = await axios.post('/api/auth/mock-login', {
+          const response = await axios.post('/api/auth/login', {
             email,
             password,
           });
