@@ -90,7 +90,7 @@ export default function ChatPage({}: ChatPageProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  // Use refs to avoid stale closures - but memoize to prevent constant re-creation
+  // Use refs to avoid stale closures
   const currentConversationRef = useRef(currentConversation);
   const cacheRef = useRef(cache);
 
@@ -102,10 +102,10 @@ export default function ChatPage({}: ChatPageProps) {
     cacheRef.current = cache;
   }, [cache]);
 
-  // Ensure checkAuth runs once on mount - FIXED: Removed dependency array completely
+  // Auth check - run only once on mount
   useEffect(() => {
     checkAuth();
-  }, []); // Empty dependency array - run only once
+  }, []); // Empty dependency array
 
   // Redirect to login after auth check completes if unauthenticated
   useEffect(() => {
@@ -115,15 +115,7 @@ export default function ChatPage({}: ChatPageProps) {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // Debug WebSocket connection
-  useEffect(() => {
-    console.log('WebSocket connection status:', wsConnected);
-    if (wsError) {
-      console.error('WebSocket error:', wsError);
-    }
-  }, [wsConnected, wsError]);
-
-  // Memoize WebSocket event handlers to prevent recreation
+  // WebSocket event handlers with enhanced debugging
   const handleMessageUpdate = useCallback((data: {
     conversationId: string;
     messageId: string;
@@ -133,21 +125,20 @@ export default function ChatPage({}: ChatPageProps) {
   }) => {
     console.log('Received message update:', data);
 
-    const currentConv = currentConversationRef.current;
-    if (!currentConv || data.conversationId !== currentConv.id) return;
-
-    if (data.streaming) {
-      setIsGenerating(true);
-      setGeneratingMessageId(data.messageId);
-    } else {
-      setIsGenerating(false);
-      setGeneratingMessageId(null);
-    }
-
     setCurrentConversation((prev) => {
-      if (!prev || prev.id !== data.conversationId) return prev;
+      if (!prev) return prev;
+      if (prev.id !== data.conversationId) return prev;
 
-      const updatedMessages = (prev.messages || []).map((msg) =>
+      if (data.streaming) {
+        setIsGenerating(true);
+        setGeneratingMessageId(data.messageId);
+      } else {
+        setIsGenerating(false);
+        setGeneratingMessageId(null);
+      }
+
+      const existingMessages = prev.messages || [];
+      const updatedMessages = existingMessages.map((msg) =>
         msg.id === data.messageId
           ? {
               ...msg,
@@ -166,9 +157,10 @@ export default function ChatPage({}: ChatPageProps) {
         metadata: { ...data.metadata, streaming: data.streaming },
       });
     } catch (err) {
-      // ignore cache errors
+      console.error('Cache update error:', err);
     }
   }, [sortMessagesByTimestamp]);
+
 
   const handleNewMessage = useCallback((data: {
     conversationId: string;
@@ -176,59 +168,59 @@ export default function ChatPage({}: ChatPageProps) {
   }) => {
     console.log('Received new message:', data);
 
-    const currentConv = currentConversationRef.current;
-    if (!currentConv || data.conversationId !== currentConv.id) return;
-
-    if (data.message.role === 'agent' && data.message.metadata?.streaming) {
-      setIsGenerating(true);
-      setGeneratingMessageId(data.message.id);
-    }
-
     setCurrentConversation((prev) => {
-      if (!prev || prev.id !== data.conversationId) return prev;
+      if (!prev) return prev;
+      if (prev.id !== data.conversationId) return prev;
+
+      // If agent started streaming, mark generating
+      if (data.message.role === 'agent' && data.message.metadata?.streaming) {
+        setIsGenerating(true);
+        setGeneratingMessageId(data.message.id);
+      }
 
       const existingMessages = prev.messages || [];
       const mergedMessages = mergeMessages(existingMessages, [data.message]);
+      console.log('Added new message to conversation:', data.message.id);
+
       return { ...prev, messages: mergedMessages };
     });
 
     try {
       cacheRef.current?.addMessage?.(data.conversationId, data.message);
     } catch (err) {
-      // ignore cache errors
+      console.error('Cache add error:', err);
     }
   }, [mergeMessages]);
+
 
   const handleConversationUpdate = useCallback((data: { conversationId: string; messages: ConversationMessage[] }) => {
     console.log('Received conversation update:', data);
 
-    const currentConv = currentConversationRef.current;
-    if (!currentConv || data.conversationId !== currentConv.id) return;
-
-    const sortedMessages = sortMessagesByTimestamp(data.messages);
     setCurrentConversation((prev) => {
-      if (!prev || prev.id !== data.conversationId) return prev;
+      if (!prev) return prev;
+      if (prev.id !== data.conversationId) return prev;
+
+      const sortedMessages = sortMessagesByTimestamp(data.messages);
       return { ...prev, messages: sortedMessages };
     });
 
     try {
-      cacheRef.current?.setMessages?.(data.conversationId, sortedMessages);
+      cacheRef.current?.setMessages?.(data.conversationId, sortMessagesByTimestamp(data.messages));
     } catch (err) {
-      // ignore cache errors
+      console.error('Cache error:', err);
     }
   }, [sortMessagesByTimestamp]);
 
+
   const handleGenerationStopped = useCallback((data: { conversationId: string; messageId: string }) => {
     console.log('Generation stopped:', data);
-
-    const currentConv = currentConversationRef.current;
-    if (!currentConv || data.conversationId !== currentConv.id) return;
 
     setIsGenerating(false);
     setGeneratingMessageId(null);
 
     setCurrentConversation((prev) => {
-      if (!prev || prev.id !== data.conversationId) return prev;
+      if (!prev) return prev;
+      if (prev.id !== data.conversationId) return prev;
 
       const updatedMessages = (prev.messages || []).map((msg) =>
         msg.id === data.messageId ? { ...msg, metadata: { ...msg.metadata, streaming: false } } : msg
@@ -238,7 +230,7 @@ export default function ChatPage({}: ChatPageProps) {
     });
   }, [sortMessagesByTimestamp]);
 
-  // FIXED: Memoize the handlers array to prevent useEffect from running constantly
+  // Memoize WebSocket handlers
   const wsHandlers = useMemo(() => ({
     message_update: handleMessageUpdate,
     new_message: handleNewMessage,
@@ -246,7 +238,7 @@ export default function ChatPage({}: ChatPageProps) {
     generation_stopped: handleGenerationStopped,
   }), [handleMessageUpdate, handleNewMessage, handleConversationUpdate, handleGenerationStopped]);
 
-  // Register/unregister WebSocket listeners when connected
+  // Set up WebSocket handlers BEFORE joining rooms
   useEffect(() => {
     if (!wsConnected) return;
 
@@ -254,6 +246,7 @@ export default function ChatPage({}: ChatPageProps) {
 
     Object.entries(wsHandlers).forEach(([event, handler]) => {
       wsOn(event, handler);
+      console.log(`Registered handler for: ${event}`);
     });
 
     return () => {
@@ -263,28 +256,31 @@ export default function ChatPage({}: ChatPageProps) {
           wsOff(event, handler);
         });
       } catch (err) {
-        // ignore cleanup errors from ws implementation
+        console.error('Error cleaning up WebSocket handlers:', err);
       }
     };
   }, [wsConnected, wsOn, wsOff, wsHandlers]);
 
-  // FIXED: Use currentConversation.id instead of the full object to prevent infinite loops
+  // Join conversation room AFTER handlers are set up
   const currentConversationId = currentConversation?.id;
   
-  // Join/leave conversation room
   useEffect(() => {
     if (!wsConnected || !currentConversationId) return;
 
-    console.log('Joining conversation room:', currentConversationId);
-    wsEmit('join_conversation', { conversationId: currentConversationId });
+    // Small delay to ensure handlers are registered
+    const timer = setTimeout(() => {
+      console.log('Joining conversation room:', currentConversationId);
+      wsEmit('join_conversation', { conversationId: currentConversationId });
+    }, 100);
 
     return () => {
+      clearTimeout(timer);
       console.log('Leaving conversation room:', currentConversationId);
       wsEmit('leave_conversation', { conversationId: currentConversationId });
     };
   }, [wsConnected, currentConversationId, wsEmit]);
 
-  // FIXED: Memoize fetchAgents to prevent recreation on every render
+  // Fetch agents - stable function
   const fetchAgents = useCallback(async () => {
     try {
       const response = await fetch('/api/agents');
@@ -301,10 +297,9 @@ export default function ChatPage({}: ChatPageProps) {
     }
   }, []);
 
-  // FIXED: Remove cache from dependencies to prevent infinite loops
+  // Fetch conversations - use cache ref to avoid dependencies
   const fetchConversations = useCallback(async (agentId: string) => {
     try {
-      // Get current cache instance to avoid stale closures
       const currentCache = cacheRef.current;
       const cachedConversations = currentCache?.getConversation?.(agentId);
       if (cachedConversations) {
@@ -317,7 +312,6 @@ export default function ChatPage({}: ChatPageProps) {
       const data = await response.json();
       if (data.success) {
         setConversations(data.data);
-        // Use current cache instance for setting
         currentCache?.setConversation?.(agentId, data.data);
       } else {
         console.error('Failed to fetch conversations response:', data);
@@ -325,7 +319,7 @@ export default function ChatPage({}: ChatPageProps) {
     } catch (err) {
       console.error('Failed to fetch conversations:', err);
     }
-  }, []); // No dependencies - use refs for cache access
+  }, []);
 
   const createNewConversation = useCallback(async () => {
     if (!selectedAgent) return;
@@ -355,6 +349,39 @@ export default function ChatPage({}: ChatPageProps) {
     }
   }, [selectedAgent]);
 
+  // Refresh conversation - use cache ref
+  const refreshConversation = useCallback(async () => {
+    if (!currentConversation || isRefreshing) return;
+
+    try {
+      setIsRefreshing(true);
+
+      const currentCache = cacheRef.current;
+      const cachedMessages = currentCache?.getMessages?.(currentConversation.id);
+      if (cachedMessages) {
+        console.log('Using cached messages for conversation:', currentConversation.id);
+        const updatedConversation = { ...currentConversation, messages: sortMessagesByTimestamp(cachedMessages) };
+        setCurrentConversation(updatedConversation);
+        return;
+      }
+
+      const messagesResponse = await fetch(`/api/conversations/${currentConversation.id}/messages`);
+      const messagesData = await messagesResponse.json();
+
+      if (messagesData.success) {
+        const sortedMessages = sortMessagesByTimestamp(messagesData.data);
+        const updatedConversation = { ...currentConversation, messages: sortedMessages };
+        setCurrentConversation(updatedConversation);
+        currentCache?.setMessages?.(currentConversation.id, sortedMessages);
+        setConversations((prev) => prev.map((c) => (c.id === currentConversation.id ? updatedConversation : c)));
+      }
+    } catch (err) {
+      console.error('Failed to refresh conversation:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [currentConversation, isRefreshing, sortMessagesByTimestamp]);
+
   const sendMessage = useCallback(async () => {
     if (!message.trim() || !currentConversation || isLoading || isGenerating) return;
 
@@ -381,6 +408,7 @@ export default function ChatPage({}: ChatPageProps) {
           metadata: {},
         };
 
+        // Add user message immediately
         setCurrentConversation((prev) => {
           if (!prev) return prev;
           const existingMessages = prev.messages || [];
@@ -388,11 +416,22 @@ export default function ChatPage({}: ChatPageProps) {
           return { ...prev, messages: mergedMessages };
         });
 
+        // Add fallback refresh for WebSocket issues
         if (!wsConnected) {
-          console.log('WebSocket not connected, falling back to refresh');
-          setTimeout(() => refreshConversation(), 1000);
+          console.log('WebSocket not connected, using polling fallback');
+          const pollForUpdates = () => {
+            setTimeout(() => refreshConversation(), 1000);
+            setTimeout(() => refreshConversation(), 3000);
+            setTimeout(() => refreshConversation(), 5000);
+          };
+          pollForUpdates();
         } else {
           console.log('WebSocket connected, waiting for real-time updates');
+          // Safety net - if no WebSocket update received in 10 seconds, force refresh
+          setTimeout(() => {
+            console.log('Safety net: Checking if response was received via WebSocket');
+            refreshConversation();
+          }, 10000);
         }
       } else {
         setError(data.error || 'Failed to send message');
@@ -404,7 +443,7 @@ export default function ChatPage({}: ChatPageProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [message, currentConversation, isLoading, isGenerating, mergeMessages, wsConnected]);
+  }, [message, currentConversation, isLoading, isGenerating, mergeMessages, wsConnected, refreshConversation]);
 
   const retryLastMessage = useCallback(() => {
     if (!currentConversation?.messages?.length) return;
@@ -438,41 +477,6 @@ export default function ChatPage({}: ChatPageProps) {
     }
   }, [isGenerating, generatingMessageId, wsConnected, wsEmit, currentConversation?.id]);
 
-  // FIXED: Remove circular dependency by not including itself in deps and use cache ref
-  const refreshConversation = useCallback(async () => {
-    if (!currentConversation || isRefreshing) return;
-
-    try {
-      setIsRefreshing(true);
-
-      // Use current cache instance to avoid stale closures
-      const currentCache = cacheRef.current;
-      const cachedMessages = currentCache?.getMessages?.(currentConversation.id);
-      if (cachedMessages) {
-        console.log('Using cached messages for conversation:', currentConversation.id);
-        const updatedConversation = { ...currentConversation, messages: sortMessagesByTimestamp(cachedMessages) };
-        setCurrentConversation(updatedConversation);
-        return;
-      }
-
-      const messagesResponse = await fetch(`/api/conversations/${currentConversation.id}/messages`);
-      const messagesData = await messagesResponse.json();
-
-      if (messagesData.success) {
-        const sortedMessages = sortMessagesByTimestamp(messagesData.data);
-        const updatedConversation = { ...currentConversation, messages: sortedMessages };
-        setCurrentConversation(updatedConversation);
-        // Use current cache instance for setting
-        currentCache?.setMessages?.(currentConversation.id, sortedMessages);
-        setConversations((prev) => prev.map((c) => (c.id === currentConversation.id ? updatedConversation : c)));
-      }
-    } catch (err) {
-      console.error('Failed to refresh conversation:', err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [currentConversation, isRefreshing, sortMessagesByTimestamp]); // Removed cache dependency
-
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -503,7 +507,7 @@ export default function ChatPage({}: ChatPageProps) {
     }
   }, [wsConnected, currentConversation, isLoading, isGenerating, refreshConversation]);
 
-  // Load messages when conversation changes (cache-aware) - FIXED: Use ID only and cache ref
+  // Load messages when conversation changes - use cache ref
   useEffect(() => {
     if (!currentConversationId) return;
 
@@ -512,7 +516,6 @@ export default function ChatPage({}: ChatPageProps) {
 
     const loadConversationMessages = async () => {
       try {
-        // Use current cache instance to avoid stale closures
         const currentCache = cacheRef.current;
         const cachedMessages = currentCache?.getMessages?.(currentConversationId);
         if (cachedMessages && cachedMessages.length > 0) {
@@ -528,7 +531,6 @@ export default function ChatPage({}: ChatPageProps) {
         if (data.success) {
           const sortedMessages = sortMessagesByTimestamp(data.data);
           setCurrentConversation((prev) => (prev ? { ...prev, messages: sortedMessages } : null));
-          // Use current cache instance for setting
           currentCache?.setMessages?.(currentConversationId, sortedMessages);
         }
       } catch (err) {
@@ -537,17 +539,15 @@ export default function ChatPage({}: ChatPageProps) {
     };
 
     loadConversationMessages();
-  }, [currentConversationId, sortMessagesByTimestamp]); // Removed cache dependency
+  }, [currentConversationId, sortMessagesByTimestamp]);
 
-  // Fetch agents on mount - FIXED: Run only once
+  // Fetch agents on mount
   useEffect(() => {
     fetchAgents();
   }, [fetchAgents]);
 
-  // FIXED: Use selectedAgent.id instead of full object to prevent circular deps
-  const selectedAgentId = selectedAgent?.id;
-
   // Fetch conversations when agent is selected
+  const selectedAgentId = selectedAgent?.id;
   useEffect(() => {
     if (selectedAgentId) {
       fetchConversations(selectedAgentId);
@@ -558,7 +558,7 @@ export default function ChatPage({}: ChatPageProps) {
     }
   }, [selectedAgentId, fetchConversations]);
 
-  // Scroll to bottom when messages change - FIXED: Use length to prevent excessive scrolling
+  // Scroll to bottom when messages change
   const messagesLength = currentConversation?.messages?.length;
   useEffect(() => {
     if (messagesLength) {
@@ -724,7 +724,7 @@ export default function ChatPage({}: ChatPageProps) {
                         <span className="text-xs font-medium opacity-75 mr-2">{msg.role}</span>
                         <span className="text-xs opacity-75">{formatTimestamp(msg.timestamp as any)}</span>
                       </div>
-                      <div className="whitespace-pre-wrap">{msg.content || (msg.metadata?.streaming ? '🤖 Thinking...' : '')}</div>
+                      <div className="whitespace-pre-wrap">{msg.content || (msg.metadata?.streaming ? 'Thinking...' : '')}</div>
 
                       {msg.metadata?.streaming && (
                         <div className="flex items-center justify-between mt-2">
