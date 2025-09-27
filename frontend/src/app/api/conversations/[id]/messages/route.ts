@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createBackendHeaders } from '@/utils/api-helpers';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
@@ -7,7 +8,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/conversations/${params.id}/messages`);
+    const response = await fetch(`${BACKEND_URL}/api/conversations/${params.id}/messages`, {
+      headers: createBackendHeaders(request),
+    });
     const data = await response.json();
     
     return NextResponse.json(data, { status: response.status });
@@ -29,9 +32,7 @@ export async function POST(
     
     const response = await fetch(`${BACKEND_URL}/api/conversations/${params.id}/messages`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: createBackendHeaders(request),
       body: JSON.stringify(body),
     });
     

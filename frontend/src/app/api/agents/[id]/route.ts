@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createBackendHeaders } from '@/utils/api-helpers';
 
 export async function GET(
   request: NextRequest,
@@ -12,9 +13,7 @@ export async function GET(
     }
     
     const response = await fetch(`${backendUrl}/api/agents/${params.id}`, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: createBackendHeaders(request),
     });
     
     if (!response.ok) {
@@ -39,11 +38,10 @@ export async function PUT(
   try {
     const body = await request.json();
     
-    const response = await fetch(`${BACKEND_URL}/api/agents/${params.id}`, {
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+    const response = await fetch(`${backendUrl}/api/agents/${params.id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: createBackendHeaders(request),
       body: JSON.stringify(body),
     });
     
@@ -63,8 +61,10 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/agents/${params.id}`, {
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+    const response = await fetch(`${backendUrl}/api/agents/${params.id}`, {
       method: 'DELETE',
+      headers: createBackendHeaders(request),
     });
     
     const data = await response.json();
