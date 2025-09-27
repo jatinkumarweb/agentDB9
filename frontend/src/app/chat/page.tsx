@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Send, Bot, User, Plus, Settings, LogOut, Wifi, WifiOff, Square } from 'lucide-react';
 import { CodingAgent, AgentConversation, ConversationMessage } from '@agentdb9/shared';
@@ -14,21 +14,8 @@ interface ChatPageProps {}
 export default function ChatPage({}: ChatPageProps) {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, checkAuth, logout, user } = useAuthStore();
-  
-  // Check auth on mount first
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
-  
-  // Protect this page - redirect to login if not authenticated
-  // Only redirect after auth check is complete
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      console.log('Chat page: redirecting to login - authLoading:', authLoading, 'isAuthenticated:', isAuthenticated);
-      router.push('/auth/login');
-    }
-  }, [isAuthenticated, authLoading, router]);
-  
+
+  // Local state
   const [agents, setAgents] = useState<CodingAgent[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<CodingAgent | null>(null);
   const [conversations, setConversations] = useState<AgentConversation[]>([]);
@@ -40,10 +27,93 @@ export default function ChatPage({}: ChatPageProps) {
   const [generatingMessageId, setGeneratingMessageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   // WebSocket and caching hooks
   const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff, error: wsError } = useWebSocket();
   const cache = useConversationCache();
+
+  // Memoize stable functions to prevent useEffect dependency issues
+  const formatTimestamp = useCallback((ts?: string | Date | number) => {
+    if (!ts) return '';
+    const d = ts instanceof Date ? ts : new Date(ts);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, []);
+
+  const sortMessagesByTimestamp = useCallback((messages: ConversationMessage[]) => {
+    return [...messages].sort((a, b) => {
+      const timestampA = new Date(a.timestamp as any).getTime();
+      const timestampB = new Date(b.timestamp as any).getTime();
+      return timestampA - timestampB;
+    });
+  }, []);
+
+  const mergeMessages = useCallback((existingMessages: ConversationMessage[], newMessages: ConversationMessage[]) => {
+    const messageMap = new Map<string, ConversationMessage>();
+
+    existingMessages.forEach((msg) => {
+      if (msg.id) messageMap.set(msg.id, msg);
+    });
+
+    newMessages.forEach((msg) => {
+      const id = msg.id;
+      if (!id) {
+        const fallbackId = `no-id-${msg.role}-${msg.timestamp ?? Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        messageMap.set(fallbackId, { ...msg, id: fallbackId });
+        return;
+      }
+
+      const existing = messageMap.get(id);
+      if (existing) {
+        messageMap.set(id, {
+          ...existing,
+          ...msg,
+          metadata: { ...existing.metadata, ...msg.metadata },
+        });
+      } else {
+        messageMap.set(id, msg);
+      }
+    });
+
+    return sortMessagesByTimestamp(Array.from(messageMap.values()));
+  }, [sortMessagesByTimestamp]);
+
+  const isUserRole = useCallback((role: string) => {
+    const userRoles = ['user', 'human', 'person'];
+    return userRoles.includes((role || '').toLowerCase());
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  // Use refs to avoid stale closures - but memoize to prevent constant re-creation
+  const currentConversationRef = useRef(currentConversation);
+  const cacheRef = useRef(cache);
+
+  useEffect(() => {
+    currentConversationRef.current = currentConversation;
+  }, [currentConversation]);
+
+  useEffect(() => {
+    cacheRef.current = cache;
+  }, [cache]);
+
+  // Ensure checkAuth runs once on mount - FIXED: Removed dependency array completely
+  useEffect(() => {
+    checkAuth();
+  }, []); // Empty dependency array - run only once
+
+  // Redirect to login after auth check completes if unauthenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      console.log('Chat page: redirecting to login - authLoading:', authLoading, 'isAuthenticated:', isAuthenticated);
+      router.push('/auth/login');
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   // Debug WebSocket connection
   useEffect(() => {
@@ -53,83 +123,19 @@ export default function ChatPage({}: ChatPageProps) {
     }
   }, [wsConnected, wsError]);
 
-  // Fetch agents on component mount
-  useEffect(() => {
-    fetchAgents();
-  }, []);
-
-  // Fetch conversations when agent is selected
-  useEffect(() => {
-    if (selectedAgent) {
-      fetchConversations(selectedAgent.id);
-    }
-  }, [selectedAgent]);
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    scrollToBottom();
-  }, [currentConversation?.messages]);
-
-  // Helper function to sort messages by timestamp
-  const sortMessagesByTimestamp = useCallback((messages: ConversationMessage[]) => {
-    return [...messages].sort((a, b) => {
-      const timestampA = new Date(a.timestamp).getTime();
-      const timestampB = new Date(b.timestamp).getTime();
-      return timestampA - timestampB;
-    });
-  }, []);
-
-  // Helper function to merge and deduplicate messages
-  const mergeMessages = useCallback((existingMessages: ConversationMessage[], newMessages: ConversationMessage[]) => {
-    const messageMap = new Map<string, ConversationMessage>();
-    
-    // Add existing messages
-    existingMessages.forEach(msg => messageMap.set(msg.id, msg));
-    
-    // Add/update with new messages
-    newMessages.forEach(msg => {
-      const existing = messageMap.get(msg.id);
-      if (existing) {
-        // Update existing message with new data
-        messageMap.set(msg.id, {
-          ...existing,
-          ...msg,
-          metadata: { ...existing.metadata, ...msg.metadata }
-        });
-      } else {
-        messageMap.set(msg.id, msg);
-      }
-    });
-    
-    return sortMessagesByTimestamp(Array.from(messageMap.values()));
-  }, [sortMessagesByTimestamp]);
-
-  // Use refs to avoid stale closures
-  const currentConversationRef = useRef(currentConversation);
-  const cacheRef = useRef(cache);
-  
-  useEffect(() => {
-    currentConversationRef.current = currentConversation;
-  }, [currentConversation]);
-  
-  useEffect(() => {
-    cacheRef.current = cache;
-  }, [cache]);
-
-  // Stable event handlers using useCallback
-  const handleMessageUpdate = useCallback((data: { 
-    conversationId: string; 
-    messageId: string; 
-    content: string; 
+  // Memoize WebSocket event handlers to prevent recreation
+  const handleMessageUpdate = useCallback((data: {
+    conversationId: string;
+    messageId: string;
+    content: string;
     streaming: boolean;
     metadata?: any;
   }) => {
     console.log('Received message update:', data);
-    
+
     const currentConv = currentConversationRef.current;
     if (!currentConv || data.conversationId !== currentConv.id) return;
-    
-    // Update generating state
+
     if (data.streaming) {
       setIsGenerating(true);
       setGeneratingMessageId(data.messageId);
@@ -138,172 +144,169 @@ export default function ChatPage({}: ChatPageProps) {
       setGeneratingMessageId(null);
     }
 
-    setCurrentConversation(prev => {
+    setCurrentConversation((prev) => {
       if (!prev || prev.id !== data.conversationId) return prev;
-      
-      const updatedMessages = prev.messages?.map(msg => 
-        msg.id === data.messageId 
-          ? { 
-              ...msg, 
-              content: data.content, 
-              metadata: { 
-                ...msg.metadata, 
-                ...data.metadata, 
-                streaming: data.streaming 
-              } 
+
+      const updatedMessages = (prev.messages || []).map((msg) =>
+        msg.id === data.messageId
+          ? {
+              ...msg,
+              content: data.content,
+              metadata: { ...msg.metadata, ...data.metadata, streaming: data.streaming },
             }
           : msg
-      ) || [];
-      
+      );
+
       return { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
     });
-    
-    // Update cache
-    cacheRef.current.updateMessage(data.conversationId, data.messageId, {
-      content: data.content,
-      metadata: { ...data.metadata, streaming: data.streaming }
-    });
+
+    try {
+      cacheRef.current?.updateMessage?.(data.conversationId, data.messageId, {
+        content: data.content,
+        metadata: { ...data.metadata, streaming: data.streaming },
+      });
+    } catch (err) {
+      // ignore cache errors
+    }
   }, [sortMessagesByTimestamp]);
 
-  const handleNewMessage = useCallback((data: { 
-    conversationId: string; 
+  const handleNewMessage = useCallback((data: {
+    conversationId: string;
     message: ConversationMessage;
   }) => {
     console.log('Received new message:', data);
-    
+
     const currentConv = currentConversationRef.current;
     if (!currentConv || data.conversationId !== currentConv.id) return;
-    
-    // Check if this is an agent message starting to generate
+
     if (data.message.role === 'agent' && data.message.metadata?.streaming) {
       setIsGenerating(true);
       setGeneratingMessageId(data.message.id);
     }
 
-    setCurrentConversation(prev => {
+    setCurrentConversation((prev) => {
       if (!prev || prev.id !== data.conversationId) return prev;
-      
+
       const existingMessages = prev.messages || [];
       const mergedMessages = mergeMessages(existingMessages, [data.message]);
-      
       return { ...prev, messages: mergedMessages };
     });
+
+    try {
+      cacheRef.current?.addMessage?.(data.conversationId, data.message);
+    } catch (err) {
+      // ignore cache errors
+    }
   }, [mergeMessages]);
 
-  const handleConversationUpdate = useCallback((data: {
-    conversationId: string;
-    messages: ConversationMessage[];
-  }) => {
+  const handleConversationUpdate = useCallback((data: { conversationId: string; messages: ConversationMessage[] }) => {
     console.log('Received conversation update:', data);
-    
+
     const currentConv = currentConversationRef.current;
     if (!currentConv || data.conversationId !== currentConv.id) return;
-    
+
     const sortedMessages = sortMessagesByTimestamp(data.messages);
-    setCurrentConversation(prev => {
+    setCurrentConversation((prev) => {
       if (!prev || prev.id !== data.conversationId) return prev;
       return { ...prev, messages: sortedMessages };
     });
-    
-    // Update cache with sorted messages
-    cacheRef.current.setMessages(data.conversationId, sortedMessages);
+
+    try {
+      cacheRef.current?.setMessages?.(data.conversationId, sortedMessages);
+    } catch (err) {
+      // ignore cache errors
+    }
   }, [sortMessagesByTimestamp]);
 
-  const handleGenerationStopped = useCallback((data: {
-    conversationId: string;
-    messageId: string;
-  }) => {
+  const handleGenerationStopped = useCallback((data: { conversationId: string; messageId: string }) => {
     console.log('Generation stopped:', data);
-    
+
     const currentConv = currentConversationRef.current;
     if (!currentConv || data.conversationId !== currentConv.id) return;
-    
+
     setIsGenerating(false);
     setGeneratingMessageId(null);
-    
-    // Update the message to mark streaming as false
-    setCurrentConversation(prev => {
+
+    setCurrentConversation((prev) => {
       if (!prev || prev.id !== data.conversationId) return prev;
-      
-      const updatedMessages = prev.messages?.map(msg => 
-        msg.id === data.messageId 
-          ? { 
-              ...msg, 
-              metadata: { 
-                ...msg.metadata, 
-                streaming: false 
-              } 
-            }
-          : msg
-      ) || [];
-      
+
+      const updatedMessages = (prev.messages || []).map((msg) =>
+        msg.id === data.messageId ? { ...msg, metadata: { ...msg.metadata, streaming: false } } : msg
+      );
+
       return { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
     });
   }, [sortMessagesByTimestamp]);
 
-  // WebSocket event handlers setup - minimal dependencies
+  // FIXED: Memoize the handlers array to prevent useEffect from running constantly
+  const wsHandlers = useMemo(() => ({
+    message_update: handleMessageUpdate,
+    new_message: handleNewMessage,
+    conversation_update: handleConversationUpdate,
+    generation_stopped: handleGenerationStopped,
+  }), [handleMessageUpdate, handleNewMessage, handleConversationUpdate, handleGenerationStopped]);
+
+  // Register/unregister WebSocket listeners when connected
   useEffect(() => {
     if (!wsConnected) return;
 
     console.log('Setting up WebSocket event handlers');
-    
-    wsOn('message_update', handleMessageUpdate);
-    wsOn('new_message', handleNewMessage);
-    wsOn('conversation_update', handleConversationUpdate);
-    wsOn('generation_stopped', handleGenerationStopped);
+
+    Object.entries(wsHandlers).forEach(([event, handler]) => {
+      wsOn(event, handler);
+    });
 
     return () => {
       console.log('Cleaning up WebSocket event handlers');
-      wsOff('message_update', handleMessageUpdate);
-      wsOff('new_message', handleNewMessage);
-      wsOff('conversation_update', handleConversationUpdate);
-      wsOff('generation_stopped', handleGenerationStopped);
+      try {
+        Object.entries(wsHandlers).forEach(([event, handler]) => {
+          wsOff(event, handler);
+        });
+      } catch (err) {
+        // ignore cleanup errors from ws implementation
+      }
     };
-  }, [wsConnected, wsOn, wsOff, handleMessageUpdate, handleNewMessage, handleConversationUpdate, handleGenerationStopped]);
+  }, [wsConnected, wsOn, wsOff, wsHandlers]);
 
+  // FIXED: Use currentConversation.id instead of the full object to prevent infinite loops
+  const currentConversationId = currentConversation?.id;
+  
   // Join/leave conversation room
   useEffect(() => {
-    if (!wsConnected || !currentConversation) return;
+    if (!wsConnected || !currentConversationId) return;
 
-    console.log('Joining conversation room:', currentConversation.id);
-    wsEmit('join_conversation', { conversationId: currentConversation.id });
+    console.log('Joining conversation room:', currentConversationId);
+    wsEmit('join_conversation', { conversationId: currentConversationId });
 
     return () => {
-      console.log('Leaving conversation room:', currentConversation.id);
-      wsEmit('leave_conversation', { conversationId: currentConversation.id });
+      console.log('Leaving conversation room:', currentConversationId);
+      wsEmit('leave_conversation', { conversationId: currentConversationId });
     };
-  }, [wsConnected, currentConversation?.id, wsEmit]);
+  }, [wsConnected, currentConversationId, wsEmit]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  // Helper function to determine if a role is user-like
-  const isUserRole = (role: string) => {
-    const userRoles = ['user', 'human', 'person'];
-    return userRoles.includes(role.toLowerCase());
-  };
-
-  const fetchAgents = async () => {
+  // FIXED: Memoize fetchAgents to prevent recreation on every render
+  const fetchAgents = useCallback(async () => {
     try {
       const response = await fetch('/api/agents');
       const data = await response.json();
       if (data.success) {
         setAgents(data.data);
-        if (data.data.length > 0 && !selectedAgent) {
-          setSelectedAgent(data.data[0]);
-        }
+        setSelectedAgent((prev) => prev ?? (data.data.length > 0 ? data.data[0] : null));
+      } else {
+        console.error('Failed to fetch agents response:', data);
       }
-    } catch (error) {
-      console.error('Failed to fetch agents:', error);
+    } catch (err) {
+      console.error('Failed to fetch agents:', err);
       setError('Failed to load agents');
     }
-  };
+  }, []);
 
-  const fetchConversations = async (agentId: string) => {
+  // FIXED: Remove cache from dependencies to prevent infinite loops
+  const fetchConversations = useCallback(async (agentId: string) => {
     try {
-      // Check cache first
-      const cachedConversations = cache.getConversation(agentId);
+      // Get current cache instance to avoid stale closures
+      const currentCache = cacheRef.current;
+      const cachedConversations = currentCache?.getConversation?.(agentId);
       if (cachedConversations) {
         console.log('Using cached conversations for agent:', agentId);
         setConversations(cachedConversations);
@@ -314,48 +317,45 @@ export default function ChatPage({}: ChatPageProps) {
       const data = await response.json();
       if (data.success) {
         setConversations(data.data);
-        // Cache the result
-        cache.setConversation(agentId, data.data);
+        // Use current cache instance for setting
+        currentCache?.setConversation?.(agentId, data.data);
+      } else {
+        console.error('Failed to fetch conversations response:', data);
       }
-    } catch (error) {
-      console.error('Failed to fetch conversations:', error);
+    } catch (err) {
+      console.error('Failed to fetch conversations:', err);
     }
-  };
+  }, []); // No dependencies - use refs for cache access
 
-  const createNewConversation = async () => {
+  const createNewConversation = useCallback(async () => {
     if (!selectedAgent) return;
 
     try {
       setIsLoading(true);
       const response = await fetch('/api/conversations', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          agentId: selectedAgent.id,
-          title: 'New Conversation',
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId: selectedAgent.id, title: 'New Conversation' }),
       });
 
       const data = await response.json();
       if (data.success) {
         const newConversation = data.data;
-        setConversations(prev => [newConversation, ...prev]);
+        setConversations((prev) => [newConversation, ...prev]);
         setCurrentConversation(newConversation);
         setError(null);
       } else {
         setError(data.error || 'Failed to create conversation');
       }
-    } catch (error) {
-      console.error('Failed to create conversation:', error);
+    } catch (err) {
+      console.error('Failed to create conversation:', err);
       setError('Failed to create conversation');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedAgent]);
 
-  const sendMessage = async () => {
+  const sendMessage = useCallback(async () => {
     if (!message.trim() || !currentConversation || isLoading || isGenerating) return;
 
     const messageContent = message.trim();
@@ -364,81 +364,65 @@ export default function ChatPage({}: ChatPageProps) {
     setError(null);
 
     try {
-      // Send user message
       const response = await fetch(`/api/conversations/${currentConversation.id}/messages`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          role: 'user',
-          content: messageContent,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'user', content: messageContent }),
       });
 
       const data = await response.json();
       if (data.success) {
-        // Add the user message immediately to the UI for better UX
         const userMessage: ConversationMessage = {
-          id: data.data.id,
+          id: data.data.id ?? `temp-user-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           role: 'user',
           content: messageContent,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           conversationId: currentConversation.id,
-          metadata: {}
+          metadata: {},
         };
-        
-        setCurrentConversation(prev => {
+
+        setCurrentConversation((prev) => {
           if (!prev) return prev;
           const existingMessages = prev.messages || [];
           const mergedMessages = mergeMessages(existingMessages, [userMessage]);
           return { ...prev, messages: mergedMessages };
         });
-        
-        // If WebSocket is connected, we'll get real-time updates for the agent response
-        // Otherwise, fall back to refreshing
+
         if (!wsConnected) {
           console.log('WebSocket not connected, falling back to refresh');
-          setTimeout(() => refreshConversation(), 1000); // Small delay to allow backend processing
+          setTimeout(() => refreshConversation(), 1000);
         } else {
           console.log('WebSocket connected, waiting for real-time updates');
         }
       } else {
         setError(data.error || 'Failed to send message');
       }
-    } catch (error) {
-      console.error('Failed to send message:', error);
+    } catch (err) {
+      console.error('Failed to send message:', err);
       setError('Failed to send message. Please try again.');
-      // Restore the message in the input for retry
       setMessage(messageContent);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [message, currentConversation, isLoading, isGenerating, mergeMessages, wsConnected]);
 
-  const retryLastMessage = async () => {
+  const retryLastMessage = useCallback(() => {
     if (!currentConversation?.messages?.length) return;
-    
     const lastMessage = currentConversation.messages[currentConversation.messages.length - 1];
     if (lastMessage.role === 'user') {
       setMessage(lastMessage.content);
       setError(null);
     }
-  };
+  }, [currentConversation]);
 
-  const stopGeneration = async () => {
+  const stopGeneration = useCallback(async () => {
     if (!isGenerating || !generatingMessageId) return;
 
     try {
-      // Emit stop generation event via WebSocket
       if (wsConnected) {
-        wsEmit('stop_generation', { 
-          conversationId: currentConversation?.id,
-          messageId: generatingMessageId 
-        });
+        wsEmit('stop_generation', { conversationId: currentConversation?.id, messageId: generatingMessageId });
       }
 
-      // Also try to stop via API call as fallback
       const response = await fetch(`/api/conversations/${currentConversation?.id}/messages/${generatingMessageId}/stop`, {
         method: 'POST',
       });
@@ -447,73 +431,67 @@ export default function ChatPage({}: ChatPageProps) {
         setIsGenerating(false);
         setGeneratingMessageId(null);
       }
-    } catch (error) {
-      console.error('Failed to stop generation:', error);
-      // Force stop the UI state even if the request fails
+    } catch (err) {
+      console.error('Failed to stop generation:', err);
       setIsGenerating(false);
       setGeneratingMessageId(null);
     }
-  };
+  }, [isGenerating, generatingMessageId, wsConnected, wsEmit, currentConversation?.id]);
 
-  const refreshConversation = async () => {
+  // FIXED: Remove circular dependency by not including itself in deps and use cache ref
+  const refreshConversation = useCallback(async () => {
     if (!currentConversation || isRefreshing) return;
 
     try {
       setIsRefreshing(true);
-      
-      // Check cache first
-      const cachedMessages = cache.getMessages(currentConversation.id);
+
+      // Use current cache instance to avoid stale closures
+      const currentCache = cacheRef.current;
+      const cachedMessages = currentCache?.getMessages?.(currentConversation.id);
       if (cachedMessages) {
         console.log('Using cached messages for conversation:', currentConversation.id);
-        const updatedConversation = {
-          ...currentConversation,
-          messages: cachedMessages
-        };
+        const updatedConversation = { ...currentConversation, messages: sortMessagesByTimestamp(cachedMessages) };
         setCurrentConversation(updatedConversation);
-        setIsRefreshing(false);
         return;
       }
 
-      // Fetch messages from API
       const messagesResponse = await fetch(`/api/conversations/${currentConversation.id}/messages`);
       const messagesData = await messagesResponse.json();
-      
+
       if (messagesData.success) {
-        // Sort messages by timestamp
         const sortedMessages = sortMessagesByTimestamp(messagesData.data);
-        
-        // Update current conversation with new messages
-        const updatedConversation = {
-          ...currentConversation,
-          messages: sortedMessages
-        };
+        const updatedConversation = { ...currentConversation, messages: sortedMessages };
         setCurrentConversation(updatedConversation);
-        
-        // Cache the sorted messages
-        cache.setMessages(currentConversation.id, sortedMessages);
-        
-        // Update in conversations list
-        setConversations(prev => 
-          prev.map(conv => conv.id === currentConversation.id ? updatedConversation : conv)
-        );
+        // Use current cache instance for setting
+        currentCache?.setMessages?.(currentConversation.id, sortedMessages);
+        setConversations((prev) => prev.map((c) => (c.id === currentConversation.id ? updatedConversation : c)));
       }
-    } catch (error) {
-      console.error('Failed to refresh conversation:', error);
+    } catch (err) {
+      console.error('Failed to refresh conversation:', err);
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [currentConversation, isRefreshing, sortMessagesByTimestamp]); // Removed cache dependency
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (!isLoading && !isGenerating) {
         sendMessage();
       }
     }
-  };
+  }, [isLoading, isGenerating, sendMessage]);
 
-  // Auto-refresh fallback when WebSocket is not connected
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+      router.push('/auth/login');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  }, [logout, router]);
+
+  // Auto-refresh fallback when WebSocket is disconnected and generation is happening
   useEffect(() => {
     if (!wsConnected && currentConversation && (isLoading || isGenerating)) {
       const fallbackInterval = setInterval(() => {
@@ -523,62 +501,73 @@ export default function ChatPage({}: ChatPageProps) {
 
       return () => clearInterval(fallbackInterval);
     }
-  }, [wsConnected, currentConversation, isLoading, isGenerating]);
+  }, [wsConnected, currentConversation, isLoading, isGenerating, refreshConversation]);
 
-  // Load messages when conversation changes
+  // Load messages when conversation changes (cache-aware) - FIXED: Use ID only and cache ref
   useEffect(() => {
-    if (currentConversation) {
-      setIsGenerating(false);
-      setGeneratingMessageId(null);
-      
-      // Load messages for the selected conversation
-      const loadConversationMessages = async () => {
-        try {
-          // Check cache first
-          const cachedMessages = cache.getMessages(currentConversation.id);
-          if (cachedMessages && cachedMessages.length > 0) {
-            console.log('Using cached messages for conversation:', currentConversation.id);
-            const sortedMessages = sortMessagesByTimestamp(cachedMessages);
-            setCurrentConversation(prev => prev ? { ...prev, messages: sortedMessages } : null);
-            return;
-          }
+    if (!currentConversationId) return;
 
-          // Fetch from API if not in cache or cache is empty
-          const response = await fetch(`/api/conversations/${currentConversation.id}/messages`);
-          const data = await response.json();
-          
-          if (data.success) {
-            const sortedMessages = sortMessagesByTimestamp(data.data);
-            setCurrentConversation(prev => prev ? { ...prev, messages: sortedMessages } : null);
-            cache.setMessages(currentConversation.id, sortedMessages);
-          }
-        } catch (error) {
-          console.error('Failed to load conversation messages:', error);
+    setIsGenerating(false);
+    setGeneratingMessageId(null);
+
+    const loadConversationMessages = async () => {
+      try {
+        // Use current cache instance to avoid stale closures
+        const currentCache = cacheRef.current;
+        const cachedMessages = currentCache?.getMessages?.(currentConversationId);
+        if (cachedMessages && cachedMessages.length > 0) {
+          console.log('Using cached messages for conversation:', currentConversationId);
+          const sortedMessages = sortMessagesByTimestamp(cachedMessages);
+          setCurrentConversation((prev) => (prev ? { ...prev, messages: sortedMessages } : null));
+          return;
         }
-      };
 
-      loadConversationMessages();
+        const response = await fetch(`/api/conversations/${currentConversationId}/messages`);
+        const data = await response.json();
+
+        if (data.success) {
+          const sortedMessages = sortMessagesByTimestamp(data.data);
+          setCurrentConversation((prev) => (prev ? { ...prev, messages: sortedMessages } : null));
+          // Use current cache instance for setting
+          currentCache?.setMessages?.(currentConversationId, sortedMessages);
+        }
+      } catch (err) {
+        console.error('Failed to load conversation messages:', err);
+      }
+    };
+
+    loadConversationMessages();
+  }, [currentConversationId, sortMessagesByTimestamp]); // Removed cache dependency
+
+  // Fetch agents on mount - FIXED: Run only once
+  useEffect(() => {
+    fetchAgents();
+  }, [fetchAgents]);
+
+  // FIXED: Use selectedAgent.id instead of full object to prevent circular deps
+  const selectedAgentId = selectedAgent?.id;
+
+  // Fetch conversations when agent is selected
+  useEffect(() => {
+    if (selectedAgentId) {
+      fetchConversations(selectedAgentId);
+      setCurrentConversation(null);
+    } else {
+      setConversations([]);
+      setCurrentConversation(null);
     }
-  }, [currentConversation?.id, cache, sortMessagesByTimestamp]);
+  }, [selectedAgentId, fetchConversations]);
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      router.push('/auth/login');
-    } catch (error) {
-      console.error('Logout failed:', error);
+  // Scroll to bottom when messages change - FIXED: Use length to prevent excessive scrolling
+  const messagesLength = currentConversation?.messages?.length;
+  useEffect(() => {
+    if (messagesLength) {
+      scrollToBottom();
     }
-  };
-
-  const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
+  }, [messagesLength, scrollToBottom]);
 
   // Show loading while checking authentication
-  if (authLoading || (!isAuthenticated && !authLoading)) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -589,11 +578,11 @@ export default function ChatPage({}: ChatPageProps) {
     );
   }
 
+  if (!isAuthenticated) return null;
+
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        {/* Agent Selection */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-900">Coding Agents</h2>
@@ -605,9 +594,8 @@ export default function ChatPage({}: ChatPageProps) {
           <select
             value={selectedAgent?.id || ''}
             onChange={(e) => {
-              const agent = agents.find(a => a.id === e.target.value);
-              setSelectedAgent(agent || null);
-              setCurrentConversation(null);
+              const agent = agents.find((a) => a.id === e.target.value) || null;
+              setSelectedAgent(agent);
             }}
             className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
@@ -638,8 +626,9 @@ export default function ChatPage({}: ChatPageProps) {
                 <div
                   key={conversation.id}
                   onClick={() => {
-                    // Clear current conversation messages to show loading state
-                    setCurrentConversation({ ...conversation, messages: [] });
+                    if (currentConversation?.id !== conversation.id) {
+                      setCurrentConversation({ ...conversation, messages: [] });
+                    }
                   }}
                   className={`p-3 rounded-lg cursor-pointer transition-colors ${
                     currentConversation?.id === conversation.id
@@ -647,18 +636,13 @@ export default function ChatPage({}: ChatPageProps) {
                       : 'bg-gray-50 hover:bg-gray-100'
                   }`}
                 >
-                  <div className="text-sm font-medium text-gray-900 truncate">
-                    {conversation.title}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {conversation.messages?.length} messages
-                  </div>
+                  <div className="text-sm font-medium text-gray-900 truncate">{conversation.title}</div>
+                  <div className="text-xs text-gray-500 mt-1">{conversation.messages?.length ?? 0} messages</div>
                   <div className="text-xs text-gray-400 mt-1">
-                    {formatTimestamp(conversation.updatedAt.toString())}
+                    {formatTimestamp((conversation as any).updatedAt)}
                   </div>
                 </div>
-                ))
-              )}
+              ))}
             </div>
           </div>
         </div>
@@ -671,12 +655,8 @@ export default function ChatPage({}: ChatPageProps) {
                 <User className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {user?.username || 'User'}
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  {user?.email || 'user@example.com'}
-                </p>
+                <p className="text-sm font-medium text-gray-900 truncate">{user?.username || 'User'}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.email || 'user@example.com'}</p>
               </div>
             </div>
             <button
@@ -700,15 +680,13 @@ export default function ChatPage({}: ChatPageProps) {
                 <div className="flex items-center">
                   <Bot className="w-6 h-6 text-blue-600 mr-3" />
                   <div>
-                    <h1 className="text-lg font-semibold text-gray-900">
-                      {selectedAgent?.name}
-                    </h1>
+                    <h1 className="text-lg font-semibold text-gray-900">{selectedAgent?.name}</h1>
                     <p className="text-sm text-gray-500">
                       {selectedAgent?.configuration.model} • {selectedAgent?.status}
                     </p>
                   </div>
                 </div>
-                
+
                 {/* WebSocket Connection Status */}
                 <div className="flex items-center space-x-2">
                   {wsConnected ? (
@@ -739,80 +717,62 @@ export default function ChatPage({}: ChatPageProps) {
                 </div>
               ) : (
                 currentConversation.messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${isUserRole(msg.role) ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      isUserRole(msg.role)
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white border border-gray-200 text-gray-900'
-                    }`}
-                  >
-                    <div className="flex items-center mb-1">
-                      {isUserRole(msg.role) ? (
-                        <User className="w-4 h-4 mr-2" />
-                      ) : (
-                        <Bot className="w-4 h-4 mr-2" />
-                      )}
-                      <span className="text-xs font-medium opacity-75 mr-2">
-                        {msg.role}
-                      </span>
-                      <span className="text-xs opacity-75">
-                        {formatTimestamp(msg.timestamp.toString())}
-                      </span>
-                    </div>
-                    <div className="whitespace-pre-wrap">{msg.content || (msg.metadata?.streaming ? '🤖 Thinking...' : '')}</div>
-                    {msg.metadata?.streaming && (
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center">
-                          <div className="flex space-x-1 mr-2">
-                            <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce"></div>
-                            <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div key={msg.id} className={`flex ${isUserRole(msg.role) ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${isUserRole(msg.role) ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                      <div className="flex items-center mb-1">
+                        {isUserRole(msg.role) ? <User className="w-4 h-4 mr-2" /> : <Bot className="w-4 h-4 mr-2" />}
+                        <span className="text-xs font-medium opacity-75 mr-2">{msg.role}</span>
+                        <span className="text-xs opacity-75">{formatTimestamp(msg.timestamp as any)}</span>
+                      </div>
+                      <div className="whitespace-pre-wrap">{msg.content || (msg.metadata?.streaming ? '🤖 Thinking...' : '')}</div>
+
+                      {msg.metadata?.streaming && (
+                        <div className="flex items-center justify-between mt-2">
+                          <div className="flex items-center">
+                            <div className="flex space-x-1 mr-2">
+                              <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" />
+                              <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                              <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                            </div>
+                            <span className="text-xs opacity-75">Streaming...</span>
                           </div>
-                          <span className="text-xs opacity-75">Streaming...</span>
+                          {generatingMessageId === msg.id && (
+                            <button onClick={stopGeneration} className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors">
+                              Stop
+                            </button>
+                          )}
                         </div>
-                        {generatingMessageId === msg.id && (
-                          <button
-                            onClick={stopGeneration}
-                            className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
-                          >
-                            Stop
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {msg.metadata && !msg.metadata.streaming && (
-                      <div className="text-xs opacity-75 mt-2">
-                        {msg.metadata.responseTime && `Response time: ${msg.metadata.responseTime}ms`}
-                        {msg.metadata.executionTime && `Execution time: ${msg.metadata.executionTime}ms`}
-                      </div>
-                    )}
+                      )}
+
+                      {msg.metadata && !msg.metadata.streaming && (
+                        <div className="text-xs opacity-75 mt-2">
+                          {msg.metadata.responseTime && `Response time: ${msg.metadata.responseTime}ms`}
+                          {msg.metadata.executionTime && `Execution time: ${msg.metadata.executionTime}ms`}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
                 ))
               )}
-              {(isLoading || (isGenerating && !currentConversation.messages?.some(msg => msg.id === generatingMessageId))) && (
+
+              {(isLoading || (isGenerating && !currentConversation.messages?.some((msg) => msg.id === generatingMessageId))) && (
                 <div className="flex justify-start">
                   <div className="bg-white border border-gray-200 text-gray-900 max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
                     <div className="flex items-center">
                       <Bot className="w-4 h-4 mr-2" />
                       <div className="flex items-center space-x-2">
                         <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" />
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                         </div>
-                        <span className="text-sm text-gray-600">
-                          {isLoading ? 'Sending message...' : 'AI is thinking...'}
-                        </span>
+                        <span className="text-sm text-gray-600">{isLoading ? 'Sending message...' : 'AI is thinking...'}</span>
                       </div>
                     </div>
                   </div>
                 </div>
               )}
+
               <div ref={messagesEndRef} />
             </div>
 
@@ -823,19 +783,9 @@ export default function ChatPage({}: ChatPageProps) {
                   <span className="flex-1">{error}</span>
                   <div className="flex items-center space-x-2 ml-2">
                     {error.includes('Failed to send message') && (
-                      <button
-                        onClick={retryLastMessage}
-                        className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
-                      >
-                        Retry
-                      </button>
+                      <button onClick={retryLastMessage} className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors">Retry</button>
                     )}
-                    <button
-                      onClick={() => setError(null)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      ×
-                    </button>
+                    <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">×</button>
                   </div>
                 </div>
               </div>
@@ -845,7 +795,7 @@ export default function ChatPage({}: ChatPageProps) {
             {!wsConnected && (
               <div className="bg-orange-50 border border-orange-200 text-orange-700 px-4 py-2 mx-4 rounded-md">
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
                   <span className="text-sm">Real-time connection lost. Using polling fallback for updates.</span>
                 </div>
               </div>
@@ -857,16 +807,13 @@ export default function ChatPage({}: ChatPageProps) {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" />
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                     </div>
                     <span className="text-sm text-yellow-700 font-medium">AI is generating response...</span>
                   </div>
-                  <button
-                    onClick={stopGeneration}
-                    className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors flex items-center space-x-1"
-                  >
+                  <button onClick={stopGeneration} className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors flex items-center space-x-1">
                     <Square className="w-3 h-3" />
                     <span>Stop</span>
                   </button>
@@ -880,49 +827,40 @@ export default function ChatPage({}: ChatPageProps) {
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder={isGenerating ? "Please wait for the current response to complete..." : "Type your message..."}
+                  onKeyDown={handleKeyDown}
+                  placeholder={isGenerating ? 'Please wait for the current response to complete...' : 'Type your message...'}
                   className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                   rows={1}
                   disabled={isLoading || isGenerating}
                 />
                 {isGenerating ? (
-                  <button
-                    onClick={stopGeneration}
-                    className="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
-                  >
+                  <button onClick={stopGeneration} className="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2">
                     <Square className="w-4 h-4" />
                     <span className="hidden sm:inline">Stop</span>
                   </button>
                 ) : (
-                  <button
-                    onClick={sendMessage}
-                    disabled={!message.trim() || isLoading}
-                    className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                  >
+                  <button onClick={sendMessage} disabled={!message.trim() || isLoading} className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors">
                     <Send className="w-5 h-5" />
                   </button>
                 )}
               </div>
-              
+
               {/* Connection Status */}
               <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
                 <div className="flex items-center space-x-2">
                   {wsConnected ? (
                     <span className="flex items-center text-green-600">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1" />
                       Real-time connected
                     </span>
                   ) : (
                     <span className="flex items-center text-orange-500">
-                      <div className="w-2 h-2 bg-orange-500 rounded-full mr-1"></div>
+                      <div className="w-2 h-2 bg-orange-500 rounded-full mr-1" />
                       Using polling fallback
                     </span>
                   )}
                 </div>
-                {wsError && (
-                  <span className="text-red-500">WebSocket error: {wsError}</span>
-                )}
+                {wsError && <span className="text-red-500">WebSocket error: {wsError}</span>}
               </div>
             </div>
           </>
@@ -931,21 +869,12 @@ export default function ChatPage({}: ChatPageProps) {
           <div className="flex-1 flex items-center justify-center bg-gray-50">
             <div className="text-center">
               <Bot className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-gray-600 mb-2">
-                Welcome to AgentDB9 Chat
-              </h2>
+              <h2 className="text-xl font-semibold text-gray-600 mb-2">Welcome to AgentDB9 Chat</h2>
               <p className="text-gray-500 mb-4">
-                {selectedAgent 
-                  ? 'Select a conversation or create a new one to start chatting'
-                  : 'Select an agent to begin'
-                }
+                {selectedAgent ? 'Select a conversation or create a new one to start chatting' : 'Select an agent to begin'}
               </p>
               {selectedAgent && (
-                <button
-                  onClick={createNewConversation}
-                  disabled={isLoading}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-                >
+                <button onClick={createNewConversation} disabled={isLoading} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors">
                   Start New Conversation
                 </button>
               )}
