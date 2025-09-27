@@ -1,9 +1,10 @@
 import { Controller, Get, Post, Body, HttpStatus, HttpException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ProvidersService } from './providers.service';
 import type { APIResponse } from '@agentdb9/shared';
 
 @ApiTags('providers')
+@ApiBearerAuth()
 @Controller('api/providers')
 export class ProvidersController {
   constructor(private readonly providersService: ProvidersService) {}

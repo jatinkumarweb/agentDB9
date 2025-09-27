@@ -7,6 +7,7 @@ const protectedRoutes = [
   '/chat',
   '/agents',
   '/projects',
+  '/models',
   '/settings',
 ];
 
@@ -20,7 +21,6 @@ const authRoutes = [
 const publicRoutes = [
   '/',
   '/auth/forgot-password',
-  '/models',
   '/test/env',
   '/test-login',
   '/api',

@@ -1,11 +1,12 @@
 import { Controller, Get, Post, Body, Param, Query, HttpStatus, HttpException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ConversationsService } from './conversations.service';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
 import { AddMessageDto } from '../dto/add-message.dto';
 import { APIResponse } from '@agentdb9/shared';
 
 @ApiTags('conversations')
+@ApiBearerAuth()
 @Controller('api/conversations')
 export class ConversationsController {
   constructor(private readonly conversationsService: ConversationsService) {}

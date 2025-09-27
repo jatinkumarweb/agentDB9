@@ -1,10 +1,11 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpStatus, HttpException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AgentsService } from './agents.service';
 import { CreateAgentDto } from '../dto/create-agent.dto';
 import { APIResponse } from '@agentdb9/shared';
 
 @ApiTags('agents')
+@ApiBearerAuth()
 @Controller('api/agents')
 export class AgentsController {
   constructor(private readonly agentsService: AgentsService) {}

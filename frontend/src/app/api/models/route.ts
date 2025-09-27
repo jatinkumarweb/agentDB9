@@ -1,12 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { createBackendHeaders } from '@/utils/api-helpers';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const response = await fetch(`${BACKEND_URL}/api/models`, {
       cache: 'no-store',
       headers: {
+        ...createBackendHeaders(request),
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     });
