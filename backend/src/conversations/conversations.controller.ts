@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { ConversationsService } from './conversations.service';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
 import { AddMessageDto } from '../dto/add-message.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { APIResponse } from '@agentdb9/shared';
 
 @ApiTags('conversations')
@@ -14,7 +15,7 @@ export class ConversationsController {
   @Get()
   @ApiOperation({ summary: 'Get conversations by agent ID' })
   @ApiResponse({ status: 200, description: 'Conversations retrieved successfully' })
-  async findByAgent(@Query('agentId') agentId: string): Promise<APIResponse> {
+  async findByAgent(@Query('agentId') agentId: string, @CurrentUser() user: any): Promise<APIResponse> {
     if (!agentId) {
       throw new HttpException(
         {
@@ -26,7 +27,7 @@ export class ConversationsController {
     }
 
     try {
-      const conversations = await this.conversationsService.findByAgent(agentId);
+      const conversations = await this.conversationsService.findByAgent(agentId, user.id);
       return {
         success: true,
         data: conversations,
@@ -45,9 +46,9 @@ export class ConversationsController {
   @Get('agent/:agentId')
   @ApiOperation({ summary: 'Get conversations for a specific agent' })
   @ApiResponse({ status: 200, description: 'Conversations retrieved successfully' })
-  async findConversationsByAgent(@Param('agentId') agentId: string): Promise<APIResponse> {
+  async findConversationsByAgent(@Param('agentId') agentId: string, @CurrentUser() user: any): Promise<APIResponse> {
     try {
-      const conversations = await this.conversationsService.findByAgent(agentId);
+      const conversations = await this.conversationsService.findByAgent(agentId, user.id);
       return {
         success: true,
         data: conversations,
@@ -88,9 +89,9 @@ export class ConversationsController {
   @Post()
   @ApiOperation({ summary: 'Create a new conversation' })
   @ApiResponse({ status: 201, description: 'Conversation created successfully' })
-  async create(@Body() createConversationDto: CreateConversationDto): Promise<APIResponse> {
+  async create(@Body() createConversationDto: CreateConversationDto, @CurrentUser() user: any): Promise<APIResponse> {
     try {
-      const conversation = await this.conversationsService.create(createConversationDto);
+      const conversation = await this.conversationsService.create(createConversationDto, user.id);
       return {
         success: true,
         data: conversation,

@@ -10,8 +10,10 @@ export class ProjectsService {
     private projectsRepository: Repository<Project>,
   ) {}
 
-  async findAll(): Promise<Project[]> {
+  async findAll(userId?: string): Promise<Project[]> {
+    const whereCondition = userId ? { userId } : {};
     return this.projectsRepository.find({
+      where: whereCondition,
       order: { createdAt: 'DESC' },
     });
   }
@@ -24,10 +26,10 @@ export class ProjectsService {
     return project;
   }
 
-  async create(createProjectData: any): Promise<Project> {
+  async create(createProjectData: any, userId: string): Promise<Project> {
     const project = this.projectsRepository.create({
       ...createProjectData,
-      userId: 'default-user', // TODO: Get from authentication
+      userId: userId,
       status: 'active',
       language: createProjectData.language || 'typescript',
       agents: [],

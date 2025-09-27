@@ -12,8 +12,10 @@ export class AgentsService {
     private agentsRepository: Repository<Agent>,
   ) {}
 
-  async findAll(): Promise<Agent[]> {
+  async findAll(userId?: string): Promise<Agent[]> {
+    const whereCondition = userId ? { userId } : {};
     return this.agentsRepository.find({
+      where: whereCondition,
       order: { createdAt: 'DESC' },
     });
   }
@@ -26,7 +28,7 @@ export class AgentsService {
     return agent;
   }
 
-  async create(createAgentDto: CreateAgentDto): Promise<Agent> {
+  async create(createAgentDto: CreateAgentDto, userId: string): Promise<Agent> {
     // Generate default capabilities based on model
     const defaultCapabilities = [
       { type: 'code-generation' as const, enabled: true, confidence: 0.8 },
@@ -39,7 +41,7 @@ export class AgentsService {
 
     const agent = this.agentsRepository.create({
       ...createAgentDto,
-      userId: 'default-user', // TODO: Get from authentication
+      userId: userId,
       status: 'idle',
       capabilities: defaultCapabilities,
     });

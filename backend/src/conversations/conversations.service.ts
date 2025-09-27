@@ -19,9 +19,10 @@ export class ConversationsService {
     private messagesRepository: Repository<Message>,
   ) {}
 
-  async findByAgent(agentId: string): Promise<Conversation[]> {
+  async findByAgent(agentId: string, userId?: string): Promise<Conversation[]> {
+    const whereCondition = userId ? { agentId, userId } : { agentId };
     return this.conversationsRepository.find({
-      where: { agentId },
+      where: whereCondition,
       order: { updatedAt: 'DESC' },
       relations: ['messages'],
     });
@@ -40,11 +41,10 @@ export class ConversationsService {
     return conversation;
   }
 
-  async create(createConversationDto: CreateConversationDto): Promise<Conversation> {
+  async create(createConversationDto: CreateConversationDto, userId: string): Promise<Conversation> {
     const conversation = this.conversationsRepository.create({
       ...createConversationDto,
-      // TODO: Replace with actual userId when user management is implemented
-      userId: 'default-user',
+      userId: userId,
     });
     return this.conversationsRepository.save(conversation);
   }

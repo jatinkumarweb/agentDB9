@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpStatus, Htt
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AgentsService } from './agents.service';
 import { CreateAgentDto } from '../dto/create-agent.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { APIResponse } from '@agentdb9/shared';
 
 @ApiTags('agents')
@@ -13,9 +14,9 @@ export class AgentsController {
   @Get()
   @ApiOperation({ summary: 'Get all agents' })
   @ApiResponse({ status: 200, description: 'List of agents retrieved successfully' })
-  async findAll(): Promise<APIResponse> {
+  async findAll(@CurrentUser() user: any): Promise<APIResponse> {
     try {
-      const agents = await this.agentsService.findAll();
+      const agents = await this.agentsService.findAll(user.id);
       return {
         success: true,
         data: agents,
@@ -69,9 +70,9 @@ export class AgentsController {
   @ApiOperation({ summary: 'Create a new agent' })
   @ApiResponse({ status: 201, description: 'Agent created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
-  async create(@Body() createAgentDto: CreateAgentDto): Promise<APIResponse> {
+  async create(@Body() createAgentDto: CreateAgentDto, @CurrentUser() user: any): Promise<APIResponse> {
     try {
-      const agent = await this.agentsService.create(createAgentDto);
+      const agent = await this.agentsService.create(createAgentDto, user.id);
       return {
         success: true,
         data: agent,

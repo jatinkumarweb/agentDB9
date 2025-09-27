@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, HttpStatus, HttpException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { APIResponse } from '@agentdb9/shared';
 
 @ApiTags('projects')
@@ -12,9 +13,9 @@ export class ProjectsController {
   @Get()
   @ApiOperation({ summary: 'Get all projects' })
   @ApiResponse({ status: 200, description: 'Projects retrieved successfully' })
-  async findAll(): Promise<APIResponse> {
+  async findAll(@CurrentUser() user: any): Promise<APIResponse> {
     try {
-      const projects = await this.projectsService.findAll();
+      const projects = await this.projectsService.findAll(user.id);
       return {
         success: true,
         data: projects,
@@ -55,9 +56,9 @@ export class ProjectsController {
   @Post()
   @ApiOperation({ summary: 'Create a new project' })
   @ApiResponse({ status: 201, description: 'Project created successfully' })
-  async create(@Body() createProjectData: any): Promise<APIResponse> {
+  async create(@Body() createProjectData: any, @CurrentUser() user: any): Promise<APIResponse> {
     try {
-      const project = await this.projectsService.create(createProjectData);
+      const project = await this.projectsService.create(createProjectData, user.id);
       return {
         success: true,
         data: project,
