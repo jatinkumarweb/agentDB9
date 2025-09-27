@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ModelConfig } from '@agentdb9/shared';
+import { useModelCache } from '@/hooks/useModelCache';
 
 interface ModelSelectorProps {
   selectedModel?: string;
@@ -33,33 +34,29 @@ export default function ModelSelector({
   showProviderSelector = true
 }: ModelSelectorProps) {
   const [models, setModels] = useState<ModelOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [internalProvider, setInternalProvider] = useState<string>('');
+  
+  // Use model cache hook
+  const { getModels, refreshModels, isLoading: loading, error } = useModelCache({
+    ttl: 300000, // 5 minutes
+    maxRetries: 3,
+    retryDelay: 1000
+  });
 
   useEffect(() => {
-    fetchModels();
+    loadModels();
   }, []);
 
-  const fetchModels = async () => {
+  const loadModels = async () => {
     try {
-      setLoading(true);
-      const response = await fetch('/api/models');
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.success && data.data && data.data.models) {
-        setModels(data.data.models);
+      const cachedModels = await getModels();
+      setModels(cachedModels);
         
         // Auto-select first provider if none selected
         if (!selectedProvider && !internalProvider) {
-          const providers = [...new Set(data.data.models.map((m: ModelOption) => m.provider))];
+          const providers = [...new Set(cachedModels.map((m: ModelOption) => m.provider))];
           const firstProvider = providers.find(p => 
-            data.data.models.some((m: ModelOption) => 
+            cachedModels.some((m: ModelOption) => 
               m.provider === p && (
                 m.status === 'available' || 
                 (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured))
@@ -78,7 +75,7 @@ export default function ModelSelector({
         // Auto-select first available model if none selected
         if (!selectedModel) {
           const currentProvider = selectedProvider || internalProvider;
-          const providerModels = data.data.models.filter((m: ModelOption) => 
+          const providerModels = cachedModels.filter((m: ModelOption) => 
             !currentProvider || m.provider === currentProvider
           );
           const firstAvailable = providerModels.find((m: ModelOption) => 
@@ -89,13 +86,8 @@ export default function ModelSelector({
             onModelChange(firstAvailable.id);
           }
         }
-      } else {
-        throw new Error(data.error || 'Failed to fetch models');
-      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
+      console.error('Failed to load models:', err);
     }
   };
 
@@ -159,6 +151,15 @@ export default function ModelSelector({
   
   // Get unique providers
   const providers = [...new Set(models.map(m => m.provider))].sort();
+
+  const handleRefreshModels = async () => {
+    try {
+      const freshModels = await refreshModels();
+      setModels(freshModels);
+    } catch (err) {
+      console.error('Failed to refresh models:', err);
+    }
+  };
 
   if (loading) {
     return (
@@ -224,9 +225,19 @@ export default function ModelSelector({
       {/* Model Selector */}
       <div>
         {showProviderSelector && (
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Model
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-gray-700">
+              Model
+            </label>
+            <button
+              onClick={handleRefreshModels}
+              disabled={loading}
+              className="text-xs text-blue-600 hover:text-blue-800 disabled:text-gray-400"
+              title="Refresh models"
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
         )}
         <select
         value={selectedModel || ''}

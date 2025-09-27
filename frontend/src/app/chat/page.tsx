@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Bot, User, Plus, Settings, LogOut } from 'lucide-react';
+import { Send, Bot, User, Plus, Settings, LogOut, Wifi, WifiOff } from 'lucide-react';
 import { CodingAgent, AgentConversation, ConversationMessage } from '@agentdb9/shared';
 import AgentCreator from '@/components/AgentCreator';
 import { useAuthStore } from '@/stores/authStore';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { useConversationCache } from '@/hooks/useConversationCache';
 
 interface ChatPageProps {}
 
@@ -36,8 +38,10 @@ export default function ChatPage({}: ChatPageProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastStreamingStateRef = useRef<boolean>(false);
+  
+  // WebSocket and caching hooks
+  const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff } = useWebSocket();
+  const cache = useConversationCache();
 
   // Fetch agents on component mount
   useEffect(() => {
@@ -56,99 +60,87 @@ export default function ChatPage({}: ChatPageProps) {
     scrollToBottom();
   }, [currentConversation?.messages]);
 
-  // Smart polling that adjusts based on streaming status
-  const updatePollingInterval = useCallback(() => {
-    if (!currentConversation) return;
+  // WebSocket event handlers for real-time updates
+  useEffect(() => {
+    if (!wsConnected || !currentConversation) return;
 
-    const hasStreamingMessage = currentConversation.messages?.some(msg => 
-      msg.role === 'agent' && 
-      msg.metadata?.streaming === true
-    );
+    // Join conversation room for real-time updates
+    wsEmit('join_conversation', { conversationId: currentConversation.id });
 
-    // Check if the last message is a completed agent response (within last 10 seconds)
-    const lastMessage = currentConversation.messages?.[currentConversation.messages.length - 1];
-    const isLastMessageCompletedAgent = lastMessage?.role === 'agent' && 
-      lastMessage?.metadata?.streaming === false && 
-      lastMessage?.metadata?.completed === true;
-
-    const now = Date.now();
-    const lastMessageTime = lastMessage ? new Date(lastMessage.timestamp).getTime() : 0;
-    const isRecentlyCompleted = isLastMessageCompletedAgent && (now - lastMessageTime) < 10000; // 10 seconds
-
-    // Use fast polling only if actively streaming, not if recently completed
-    const shouldUseFastPolling = hasStreamingMessage && !isRecentlyCompleted;
-
-    // Only change interval if streaming status changed
-    if (shouldUseFastPolling !== lastStreamingStateRef.current) {
-      lastStreamingStateRef.current = shouldUseFastPolling;
-      
-      // Clear existing interval
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-
-      // Set new interval based on streaming status with adaptive polling
-      let interval = 5000; // Default 5 seconds
-      
-      if (shouldUseFastPolling) {
-        // Check how long the message has been streaming
-        const streamingMessage = currentConversation.messages?.find(msg => 
-          msg.role === 'agent' && msg.metadata?.streaming === true
-        );
-        
-        if (streamingMessage) {
-          const streamingTime = Date.now() - new Date(streamingMessage.timestamp).getTime();
+    // Handle real-time message updates
+    const handleMessageUpdate = (data: { 
+      conversationId: string; 
+      messageId: string; 
+      content: string; 
+      streaming: boolean;
+      metadata?: any;
+    }) => {
+      if (data.conversationId === currentConversation.id) {
+        setCurrentConversation(prev => {
+          if (!prev) return prev;
           
-          // Adaptive polling: start fast, then slow down for long streams
-          if (streamingTime < 10000) { // First 10 seconds: 1s polling
-            interval = 1000;
-          } else if (streamingTime < 30000) { // Next 20 seconds: 2s polling  
-            interval = 2000;
-          } else { // After 30 seconds: 3s polling
-            interval = 3000;
-          }
-        } else {
-          interval = 1000; // Default fast polling
-        }
-      }
-      
-      console.log(`Polling interval: ${interval}ms (streaming: ${hasStreamingMessage}, completed: ${isLastMessageCompletedAgent})`);
-      
-      pollingIntervalRef.current = setInterval(() => {
-        if (!isLoading && !isRefreshing) {
-          refreshConversation();
-        }
-      }, interval);
-    }
-  }, [currentConversation, isLoading, isRefreshing]);
-
-  // Update polling when conversation or messages change
-  useEffect(() => {
-    updatePollingInterval();
-  }, [currentConversation?.messages, updatePollingInterval]);
-
-  // Initialize polling when conversation changes
-  useEffect(() => {
-    if (!currentConversation) {
-      // Clear polling when no conversation
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-      return;
-    }
-
-    // Reset streaming state for new conversation
-    lastStreamingStateRef.current = false;
-    updatePollingInterval();
-
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
+          const updatedMessages = prev.messages?.map(msg => 
+            msg.id === data.messageId 
+              ? { ...msg, content: data.content, metadata: { ...msg.metadata, ...data.metadata, streaming: data.streaming } }
+              : msg
+          ) || [];
+          
+          return { ...prev, messages: updatedMessages };
+        });
+        
+        // Update cache
+        cache.updateMessage(currentConversation.id, data.messageId, {
+          content: data.content,
+          metadata: { ...data.metadata, streaming: data.streaming }
+        });
       }
     };
-  }, [currentConversation?.id, updatePollingInterval]);
+
+    // Handle new messages
+    const handleNewMessage = (data: { 
+      conversationId: string; 
+      message: ConversationMessage;
+    }) => {
+      if (data.conversationId === currentConversation.id) {
+        setCurrentConversation(prev => {
+          if (!prev) return prev;
+          
+          const updatedMessages = [...(prev.messages || []), data.message];
+          return { ...prev, messages: updatedMessages };
+        });
+        
+        // Update cache
+        cache.addMessage(currentConversation.id, data.message);
+      }
+    };
+
+    // Handle conversation updates
+    const handleConversationUpdate = (data: {
+      conversationId: string;
+      messages: ConversationMessage[];
+    }) => {
+      if (data.conversationId === currentConversation.id) {
+        setCurrentConversation(prev => {
+          if (!prev) return prev;
+          return { ...prev, messages: data.messages };
+        });
+        
+        // Update cache
+        cache.setMessages(currentConversation.id, data.messages);
+      }
+    };
+
+    wsOn('message_update', handleMessageUpdate);
+    wsOn('new_message', handleNewMessage);
+    wsOn('conversation_update', handleConversationUpdate);
+
+    return () => {
+      wsOff('message_update', handleMessageUpdate);
+      wsOff('new_message', handleNewMessage);
+      wsOff('conversation_update', handleConversationUpdate);
+      wsEmit('leave_conversation', { conversationId: currentConversation.id });
+    };
+  }, [wsConnected, currentConversation?.id, wsEmit, wsOn, wsOff, cache]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -178,10 +170,20 @@ export default function ChatPage({}: ChatPageProps) {
 
   const fetchConversations = async (agentId: string) => {
     try {
+      // Check cache first
+      const cachedConversations = cache.getConversation(agentId);
+      if (cachedConversations) {
+        console.log('Using cached conversations for agent:', agentId);
+        setConversations(cachedConversations);
+        return;
+      }
+
       const response = await fetch(`/api/conversations/agent/${agentId}`);
       const data = await response.json();
       if (data.success) {
         setConversations(data.data);
+        // Cache the result
+        cache.setConversation(agentId, data.data);
       }
     } catch (error) {
       console.error('Failed to fetch conversations:', error);
@@ -244,8 +246,14 @@ export default function ChatPage({}: ChatPageProps) {
 
       const data = await response.json();
       if (data.success) {
-        // Refresh conversation to get updated messages including agent response
-        await refreshConversation();
+        // Invalidate cache for this conversation to ensure fresh data
+        cache.invalidateMessages(currentConversation.id);
+        
+        // If WebSocket is connected, we'll get real-time updates
+        // Otherwise, fall back to refreshing
+        if (!wsConnected) {
+          await refreshConversation();
+        }
       } else {
         setError(data.error || 'Failed to send message');
       }
@@ -262,7 +270,21 @@ export default function ChatPage({}: ChatPageProps) {
 
     try {
       setIsRefreshing(true);
-      // Fetch messages separately since the conversation endpoint has issues
+      
+      // Check cache first
+      const cachedMessages = cache.getMessages(currentConversation.id);
+      if (cachedMessages) {
+        console.log('Using cached messages for conversation:', currentConversation.id);
+        const updatedConversation = {
+          ...currentConversation,
+          messages: cachedMessages
+        };
+        setCurrentConversation(updatedConversation);
+        setIsRefreshing(false);
+        return;
+      }
+
+      // Fetch messages from API
       const messagesResponse = await fetch(`/api/conversations/${currentConversation.id}/messages`);
       const messagesData = await messagesResponse.json();
       
@@ -273,6 +295,9 @@ export default function ChatPage({}: ChatPageProps) {
           messages: messagesData.data
         };
         setCurrentConversation(updatedConversation);
+        
+        // Cache the messages
+        cache.setMessages(currentConversation.id, messagesData.data);
         
         // Update in conversations list
         setConversations(prev => 
@@ -424,15 +449,32 @@ export default function ChatPage({}: ChatPageProps) {
           <>
             {/* Chat Header */}
             <div className="bg-white border-b border-gray-200 p-4">
-              <div className="flex items-center">
-                <Bot className="w-6 h-6 text-blue-600 mr-3" />
-                <div>
-                  <h1 className="text-lg font-semibold text-gray-900">
-                    {selectedAgent?.name}
-                  </h1>
-                  <p className="text-sm text-gray-500">
-                    {selectedAgent?.configuration.model} • {selectedAgent?.status}
-                  </p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Bot className="w-6 h-6 text-blue-600 mr-3" />
+                  <div>
+                    <h1 className="text-lg font-semibold text-gray-900">
+                      {selectedAgent?.name}
+                    </h1>
+                    <p className="text-sm text-gray-500">
+                      {selectedAgent?.configuration.model} • {selectedAgent?.status}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* WebSocket Connection Status */}
+                <div className="flex items-center space-x-2">
+                  {wsConnected ? (
+                    <div className="flex items-center text-green-600" title="Real-time connection active">
+                      <Wifi className="w-4 h-4 mr-1" />
+                      <span className="text-xs font-medium">Live</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-orange-500" title="Using polling fallback">
+                      <WifiOff className="w-4 h-4 mr-1" />
+                      <span className="text-xs font-medium">Polling</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

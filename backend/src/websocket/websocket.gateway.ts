@@ -65,6 +65,26 @@ export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnec
     });
   }
 
+  @SubscribeMessage('join_conversation')
+  handleJoinConversation(
+    @MessageBody() data: { conversationId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const room = `conversation_${data.conversationId}`;
+    client.join(room);
+    this.logger.log(`Client ${client.id} joined conversation room: ${room}`);
+  }
+
+  @SubscribeMessage('leave_conversation')
+  handleLeaveConversation(
+    @MessageBody() data: { conversationId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const room = `conversation_${data.conversationId}`;
+    client.leave(room);
+    this.logger.log(`Client ${client.id} left conversation room: ${room}`);
+  }
+
   // Method to broadcast environment health updates
   broadcastEnvironmentHealth(health: any) {
     this.monitoringClients.forEach(clientId => {
@@ -80,6 +100,39 @@ export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.server.emit('agent_status_update', {
       agentId,
       status,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Method to broadcast message updates during streaming
+  broadcastMessageUpdate(conversationId: string, messageId: string, content: string, streaming: boolean, metadata?: any) {
+    const room = `conversation_${conversationId}`;
+    this.server.to(room).emit('message_update', {
+      conversationId,
+      messageId,
+      content,
+      streaming,
+      metadata,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Method to broadcast new messages
+  broadcastNewMessage(conversationId: string, message: any) {
+    const room = `conversation_${conversationId}`;
+    this.server.to(room).emit('new_message', {
+      conversationId,
+      message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Method to broadcast conversation updates
+  broadcastConversationUpdate(conversationId: string, messages: any[]) {
+    const room = `conversation_${conversationId}`;
+    this.server.to(room).emit('conversation_update', {
+      conversationId,
+      messages,
       timestamp: new Date().toISOString(),
     });
   }

@@ -1,23 +1,92 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Conversation } from '../entities/conversation.entity';
 import { Message } from '../entities/message.entity';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
+import { WebSocketGateway } from '../websocket/websocket.gateway';
 // CreateMessageDto import removed - using plain object type instead
 
 @Injectable()
 export class ConversationsService {
   private ollamaAvailable: boolean | null = null;
   private lastOllamaCheck: number = 0;
-  private readonly OLLAMA_CHECK_INTERVAL = 60000; // Check every minute
+  private readonly OLLAMA_CHECK_INTERVAL = 300000; // Check every 5 minutes (optimized)
+  
+  // Batch update optimization
+  private pendingUpdates = new Map<string, {
+    content: string;
+    metadata: any;
+    timestamp: number;
+  }>();
+  private updateBatchTimer: NodeJS.Timeout | null = null;
+  private readonly BATCH_UPDATE_INTERVAL = 2000; // Batch updates every 2 seconds
+  
+  // Model cache optimization
+  private modelCache: { models: string[], timestamp: number } = { models: [], timestamp: 0 };
+  private readonly MODEL_CACHE_TTL = 300000; // 5 minutes
 
   constructor(
     @InjectRepository(Conversation)
     private conversationsRepository: Repository<Conversation>,
     @InjectRepository(Message)
     private messagesRepository: Repository<Message>,
-  ) {}
+    @Inject(forwardRef(() => WebSocketGateway))
+    private websocketGateway: WebSocketGateway,
+  ) {
+    // Initialize batch update timer
+    this.startBatchUpdateTimer();
+  }
+
+  private startBatchUpdateTimer() {
+    if (this.updateBatchTimer) {
+      clearInterval(this.updateBatchTimer);
+    }
+    
+    this.updateBatchTimer = setInterval(async () => {
+      await this.processPendingUpdates();
+    }, this.BATCH_UPDATE_INTERVAL);
+  }
+
+  private async processPendingUpdates() {
+    if (this.pendingUpdates.size === 0) return;
+
+    const updates = Array.from(this.pendingUpdates.entries());
+    this.pendingUpdates.clear();
+
+    try {
+      // Process all pending updates in a single transaction
+      await this.messagesRepository.manager.transaction(async (transactionalEntityManager) => {
+        for (const [messageId, update] of updates) {
+          await transactionalEntityManager.update(
+            'message',
+            { id: messageId },
+            {
+              content: update.content,
+              metadata: update.metadata
+            }
+          );
+        }
+      });
+
+      console.log(`Batch updated ${updates.length} messages`);
+    } catch (error) {
+      console.error('Failed to process batch updates:', error);
+      
+      // Re-add failed updates to be retried
+      for (const [messageId, update] of updates) {
+        this.pendingUpdates.set(messageId, update);
+      }
+    }
+  }
+
+  private queueMessageUpdate(messageId: string, content: string, metadata: any) {
+    this.pendingUpdates.set(messageId, {
+      content,
+      metadata,
+      timestamp: Date.now()
+    });
+  }
 
   async findByAgent(agentId: string, userId?: string): Promise<Conversation[]> {
     const whereCondition = userId ? { agentId, userId } : { agentId };
@@ -71,6 +140,9 @@ export class ConversationsService {
       messageData.conversationId,
       { updatedAt: new Date() }
     );
+
+    // Emit WebSocket event for new message
+    this.websocketGateway.broadcastNewMessage(messageData.conversationId, savedMessage);
 
     // Generate agent response if this is a user message
     if (this.isUserRole(messageData.role)) {
@@ -201,57 +273,93 @@ This agent is configured to use "${model}" which requires external API access.
   }
 
   private async getAvailableOllamaModels(): Promise<string[]> {
+    const now = Date.now();
+    
+    // Return cached models if still valid
+    if (this.modelCache.models.length > 0 && (now - this.modelCache.timestamp) < this.MODEL_CACHE_TTL) {
+      console.log('Using cached Ollama models');
+      return this.modelCache.models;
+    }
+    
     try {
       const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
-      const response = await fetch(`${ollamaUrl}/api/tags`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      const response = await fetch(`${ollamaUrl}/api/tags`, {
+        signal: controller.signal,
+        headers: {
+          'Connection': 'keep-alive',
+        },
+      });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
-        return [];
+        // Return cached models if available, even if expired
+        return this.modelCache.models;
       }
       
       const data = await response.json();
-      return data.models?.map((model: any) => model.name) || [];
+      const models = data.models?.map((model: any) => model.name) || [];
+      
+      // Update cache
+      this.modelCache = {
+        models,
+        timestamp: now
+      };
+      
+      console.log(`Cached ${models.length} Ollama models`);
+      return models;
     } catch (error) {
       console.log('Failed to get available Ollama models:', error.message);
-      return [];
+      // Return cached models if available, even if expired
+      return this.modelCache.models;
     }
   }
 
   private async checkOllamaHealth(): Promise<boolean> {
     const now = Date.now();
     
-    // Use cached result if recent, but only if it was false (failed)
-    // If it was true (success), recheck more frequently to catch failures
-    if (this.ollamaAvailable !== null && (now - this.lastOllamaCheck) < this.OLLAMA_CHECK_INTERVAL) {
-      if (!this.ollamaAvailable) {
-        return this.ollamaAvailable; // Keep using cached false result
-      }
-      // For true results, recheck more frequently (every 10 seconds)
-      if ((now - this.lastOllamaCheck) < 10000) {
-        return this.ollamaAvailable;
-      }
+    // Optimized caching strategy:
+    // - Cache successful results for 5 minutes
+    // - Cache failed results for 2 minutes (shorter to retry sooner)
+    const cacheInterval = this.ollamaAvailable ? this.OLLAMA_CHECK_INTERVAL : 120000; // 2 minutes for failures
+    
+    if (this.ollamaAvailable !== null && (now - this.lastOllamaCheck) < cacheInterval) {
+      return this.ollamaAvailable;
     }
 
     try {
       const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000); // Quick health check
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // Slightly longer timeout for reliability
       
       console.log(`Checking Ollama health at: ${ollamaUrl}/api/version`);
       
       const response = await fetch(`${ollamaUrl}/api/version`, {
         signal: controller.signal,
+        // Add keep-alive to reuse connections
+        headers: {
+          'Connection': 'keep-alive',
+        },
       });
       
       clearTimeout(timeoutId);
       this.ollamaAvailable = response.ok;
       this.lastOllamaCheck = now;
       
-      console.log(`Ollama health check: ${response.ok ? 'HEALTHY' : 'UNHEALTHY'} (status: ${response.status})`);
+      // Only log status changes to reduce noise
+      if (this.ollamaAvailable !== (response.ok)) {
+        console.log(`Ollama health status changed: ${response.ok ? 'HEALTHY' : 'UNHEALTHY'} (status: ${response.status})`);
+      }
       
       return this.ollamaAvailable;
     } catch (error) {
-      console.log(`Ollama health check failed: ${error.message}`);
+      // Only log if status changed from healthy to unhealthy
+      if (this.ollamaAvailable !== false) {
+        console.log(`Ollama health check failed: ${error.message}`);
+      }
       this.ollamaAvailable = false;
       this.lastOllamaCheck = now;
       return false;
@@ -369,38 +477,67 @@ Would you like help setting up external API access?`;
               if (data.message?.content) {
                 fullContent += data.message.content;
                 
-                // Update the message in database less frequently to reduce load
-                // Update every 100 characters or every 2 seconds, whichever comes first
-                const shouldUpdate = fullContent.length % 100 === 0 || 
-                                   data.done || 
-                                   (Date.now() - startTime) % 2000 < 100;
+                // Always emit WebSocket updates for real-time streaming (no delay)
+                this.websocketGateway.broadcastMessageUpdate(
+                  conversation.id,
+                  savedMessage.id,
+                  fullContent,
+                  !data.done,
+                  {
+                    ...agentMessageData.metadata,
+                    streaming: !data.done,
+                    lastUpdate: new Date().toISOString()
+                  }
+                );
                 
-                if (shouldUpdate) {
-                  await this.messagesRepository.update(savedMessage.id, {
-                    content: fullContent,
-                    metadata: {
+                // Queue database updates for batch processing (much less frequent)
+                // Only update every 1000 characters or when done to reduce DB load
+                const shouldQueueUpdate = fullContent.length % 1000 === 0 || data.done;
+                
+                if (shouldQueueUpdate) {
+                  this.queueMessageUpdate(
+                    savedMessage.id,
+                    fullContent,
+                    {
                       ...agentMessageData.metadata,
                       streaming: !data.done,
                       lastUpdate: new Date().toISOString()
-                    } as Record<string, any>
-                  });
+                    }
+                  );
                 }
               }
               
               if (data.done) {
                 console.log('Received done signal, finalizing response');
-                // Final update with complete response
-                await this.messagesRepository.update(savedMessage.id, {
-                  content: fullContent || 'I apologize, but I was unable to generate a response at this time.',
-                  metadata: {
-                    ...agentMessageData.metadata,
-                    streaming: false,
-                    completed: true,
-                    responseTime: Date.now() - startTime,
-                    finalUpdate: new Date().toISOString()
-                  } as Record<string, any>
-                });
-                return fullContent;
+                const finalContent = fullContent || 'I apologize, but I was unable to generate a response at this time.';
+                const finalMetadata = {
+                  ...agentMessageData.metadata,
+                  streaming: false,
+                  completed: true,
+                  responseTime: Date.now() - startTime,
+                  finalUpdate: new Date().toISOString()
+                };
+                
+                // Emit final WebSocket update immediately
+                this.websocketGateway.broadcastMessageUpdate(
+                  conversation.id,
+                  savedMessage.id,
+                  finalContent,
+                  false,
+                  finalMetadata
+                );
+                
+                // Queue final database update (will be processed in batch)
+                this.queueMessageUpdate(
+                  savedMessage.id,
+                  finalContent,
+                  finalMetadata
+                );
+                
+                // Force process pending updates for this final message
+                await this.processPendingUpdates();
+                
+                return finalContent;
               }
             } catch (parseError) {
               console.log('Failed to parse streaming chunk:', line);
@@ -416,16 +553,26 @@ Would you like help setting up external API access?`;
         
         // If we exit the loop without done=true, finalize anyway
         if (fullContent) {
-          await this.messagesRepository.update(savedMessage.id, {
-            content: fullContent,
-            metadata: {
-              ...agentMessageData.metadata,
-              streaming: false,
-              completed: true,
-              responseTime: Date.now() - startTime,
-              finalUpdate: new Date().toISOString()
-            } as Record<string, any>
-          });
+          const finalMetadata = {
+            ...agentMessageData.metadata,
+            streaming: false,
+            completed: true,
+            responseTime: Date.now() - startTime,
+            finalUpdate: new Date().toISOString()
+          };
+          
+          // Emit final WebSocket update
+          this.websocketGateway.broadcastMessageUpdate(
+            conversation.id,
+            savedMessage.id,
+            fullContent,
+            false,
+            finalMetadata
+          );
+          
+          // Queue final database update
+          this.queueMessageUpdate(savedMessage.id, fullContent, finalMetadata);
+          await this.processPendingUpdates();
         }
       } finally {
         reader.releaseLock();

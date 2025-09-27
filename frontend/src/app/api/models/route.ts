@@ -5,22 +5,31 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
 export async function GET(request: NextRequest) {
   try {
+    // Check if client requests fresh data
+    const forceRefresh = request.nextUrl.searchParams.get('refresh') === 'true';
+    
     const response = await fetch(`${BACKEND_URL}/api/models`, {
-      cache: 'no-store',
+      cache: forceRefresh ? 'no-store' : 'default',
       headers: {
         ...createBackendHeaders(request),
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        ...(forceRefresh && { 'Cache-Control': 'no-cache' }),
       },
     });
     const data = await response.json();
     
+    // Allow client-side caching for 5 minutes unless refresh is requested
+    const cacheHeaders: Record<string, string> = forceRefresh ? {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    } : {
+      'Cache-Control': 'public, max-age=300', // 5 minutes
+      'ETag': `"models-${Date.now()}"`,
+    };
+    
     return NextResponse.json(data, { 
       status: response.status,
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      },
+      headers: cacheHeaders,
     });
   } catch (error) {
     console.error('Failed to fetch models:', error);

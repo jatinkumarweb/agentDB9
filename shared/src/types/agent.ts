@@ -146,6 +146,17 @@ export interface MessageMetadata {
     completion: number;
     total: number;
   };
+  // Streaming and response metadata
+  streaming?: boolean;
+  completed?: boolean;
+  responseTime?: number;
+  model?: string;
+  actualModel?: string;
+  provider?: string;
+  generatedAt?: string;
+  lastUpdate?: string;
+  finalUpdate?: string;
+  [key: string]: any; // Allow additional metadata
 }
 
 export interface CodeBlock {
