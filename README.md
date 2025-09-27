@@ -73,6 +73,23 @@ If you're running locally and seeing "Local Development Mode" instead of AI resp
 
 Or follow the [Local Setup Troubleshooting Guide](./LOCAL_SETUP_TROUBLESHOOTING.md).
 
+### 💾 Docker Storage Issues?
+
+Docker consuming too much space? Use our storage management tools:
+
+```bash
+# Quick storage check and cleanup
+./scripts/docker-cleanup.sh
+
+# Monitor storage usage
+./scripts/docker-storage-monitor.sh
+
+# Setup automated cleanup
+./scripts/setup-auto-cleanup.sh
+```
+
+See the [Docker Storage Management Guide](./DOCKER_STORAGE_MANAGEMENT.md) for comprehensive storage optimization.
+
 ## Quick Start
 
 1. **Clone the repository**:
