@@ -18,7 +18,7 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
     description: '',
     configuration: {
       llmProvider: 'ollama',
-      model: 'qwen2.5-coder:7b',
+      model: '',
       temperature: 0.7,
       maxTokens: 2048,
     },
@@ -28,6 +28,13 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+
+    // Validate that a model is selected
+    if (!formData.configuration.model) {
+      setError('Please select a model');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch('/api/agents', {
@@ -46,7 +53,7 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
           description: '',
           configuration: {
             llmProvider: 'ollama',
-            model: 'qwen2.5-coder:7b',
+            model: '',
             temperature: 0.7,
             maxTokens: 2048,
           },
@@ -136,7 +143,7 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
 
           <div>
             <ModelSelector
-              selectedModel={formData.configuration.model}
+              selectedModel={formData.configuration.model || undefined}
               selectedProvider={formData.configuration.llmProvider}
               onModelChange={(modelId) => handleInputChange('configuration.model', modelId)}
               onProviderChange={(provider) => handleInputChange('configuration.llmProvider', provider)}
