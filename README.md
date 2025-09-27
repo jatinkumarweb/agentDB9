@@ -62,6 +62,19 @@ agentdb9/
 
 ### Quick Start
 
+### 🚨 Local Chat Not Working?
+
+If you're running locally and seeing "Local Development Mode" instead of AI responses:
+
+```bash
+# Quick fix - run this script
+./scripts/fix-local-chat.sh
+```
+
+Or follow the [Local Setup Troubleshooting Guide](./LOCAL_SETUP_TROUBLESHOOTING.md).
+
+## Quick Start
+
 1. **Clone the repository**:
    ```bash
    git clone <your-repo-url>

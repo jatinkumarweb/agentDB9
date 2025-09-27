@@ -93,4 +93,46 @@ export class HealthController {
   async setupVSCodeExtensions(): Promise<APIResponse> {
     return this.healthService.setupVSCodeExtensions();
   }
+
+  @Get('api/debug/ollama')
+  @ApiOperation({ summary: 'Debug Ollama connection' })
+  @ApiResponse({ status: 200, description: 'Ollama debug information' })
+  async debugOllama(): Promise<APIResponse> {
+    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
+    
+    try {
+      // Test connection
+      const response = await fetch(`${ollamaHost}/api/version`);
+      const version = response.ok ? await response.json() : null;
+      
+      // Test models
+      const modelsResponse = await fetch(`${ollamaHost}/api/tags`);
+      const models = modelsResponse.ok ? await modelsResponse.json() : null;
+      
+      return {
+        success: true,
+        data: {
+          ollamaHost,
+          environmentVariable: process.env.OLLAMA_HOST,
+          connection: {
+            accessible: response.ok,
+            status: response.status,
+            version: version
+          },
+          models: models,
+          timestamp: new Date().toISOString()
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        data: {
+          ollamaHost,
+          environmentVariable: process.env.OLLAMA_HOST,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        }
+      };
+    }
+  }
 }
