@@ -440,7 +440,7 @@ if (cachedMessages) {
           id: data.data.id ?? `temp-user-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           role: 'user',
           content: messageContent,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
           conversationId: currentConversation.id,
           metadata: {},
         };

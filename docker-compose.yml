@@ -121,13 +121,18 @@ services:
       - "8080:8080"
     environment:
       - PASSWORD=${VSCODE_PASSWORD:-codeserver123}
+      - SHELL=/bin/bash
+    user: "1000:1000"
     volumes:
       - .:/home/coder/workspace
-      - ./vscode-config:/home/coder/.local/share/code-server
+      - ./vscode-config:/home/coder/.local/share/code-server/User
+      - vscode-extensions:/home/coder/.local/share/code-server/extensions
+      - vscode-data:/home/coder/.local/share/code-server
     command: >
       --bind-addr 0.0.0.0:8080
       --auth password
       --disable-telemetry
+      --disable-update-check
       /home/coder/workspace
 
   postgres:
@@ -152,6 +157,8 @@ services:
 
 volumes:
   backend_node_modules:
+  vscode-extensions:
+  vscode-data:
 
 networks:
   default:

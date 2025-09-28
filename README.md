@@ -6,11 +6,12 @@ A multi-container TypeScript development environment for building AI-powered cod
 
 This project implements a comprehensive microservices architecture with the following components:
 
-- **Frontend**: Next.js 14+ with TypeScript, Tailwind CSS, and Monaco Editor
+- **Frontend**: Next.js 14+ with TypeScript, Tailwind CSS, and VS Code integration
 - **Backend**: Node.js with Express, Socket.IO, and Redis for real-time communication
 - **LLM Service**: Multi-provider AI service (Ollama, OpenAI, Anthropic, Cohere)
+- **MCP Server**: Model Context Protocol server for VS Code tool integration
+- **VS Code Container**: Full code-server IDE experience in the browser
 - **Ollama**: Local LLM inference server with GPU acceleration
-- **VS Code Server**: Full IDE experience in the browser
 - **Vector Database**: Qdrant for code embeddings and semantic search
 - **Database**: PostgreSQL for metadata and user data
 - **Redis**: Caching and session management
@@ -46,6 +47,14 @@ agentdb9/
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── src/
+├── mcp-server/                    # Model Context Protocol server
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── src/
+├── vscode-config/                 # VS Code container configuration
+│   ├── settings.json
+│   ├── keybindings.json
+│   └── extensions.json
 └── shared/                        # Shared types and utilities
     ├── package.json
     ├── tsconfig.json
@@ -104,14 +113,16 @@ See the [Docker Storage Management Guide](./DOCKER_STORAGE_MANAGEMENT.md) for co
    ```
 
 3. **Access the services**:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000
-   - LLM Service: http://localhost:9000
-   - VS Code Server: http://localhost:8080
-   - Ollama: http://localhost:11434
-   - Qdrant Vector DB: http://localhost:6333
-   - PostgreSQL: localhost:5432
-   - Redis: localhost:6379
+   - **Frontend**: http://localhost:3000
+   - **VS Code Workspace**: http://localhost:3000/workspace
+   - **VS Code Server**: http://localhost:8080 (password: `codeserver123`)
+   - **Backend API**: http://localhost:8000
+   - **LLM Service**: http://localhost:9000
+   - **MCP Server**: http://localhost:9001
+   - **Ollama**: http://localhost:11434
+   - **Qdrant Vector DB**: http://localhost:6333
+   - **PostgreSQL**: localhost:5432
+   - **Redis**: localhost:6379
 
 ### Development Commands
 
@@ -132,6 +143,7 @@ npm run setup:vscode
 npm run dev:frontend
 npm run dev:backend
 npm run dev:llm
+npm run dev:mcp
 
 # View logs
 npm run logs
@@ -203,11 +215,20 @@ See [Database Cleanup Guide](./docs/database-cleanup.md) for detailed informatio
 - **Model Library**: CodeLlama, DeepSeek-Coder, Mistral, Llama3, Qwen2.5-Coder
 - **Streaming Support**: Real-time token generation for better UX
 
-### VS Code Server (Port 8080)
-- **Full IDE Experience**: Complete VS Code environment in browser
+### VS Code Container (Port 8080)
+- **Full IDE Experience**: Complete code-server environment in browser
 - **Extension Ecosystem**: Auto-install project-specific extensions
 - **Terminal Integration**: Direct command execution in containers
 - **Git Integration**: Version control with GitLens and conventional commits
+- **Real-time Collaboration**: Multi-user workspace sharing
+- **Agent Monitoring**: Live agent activity overlay and tracking
+
+### MCP Server (Port 9001)
+- **Tool Execution**: 67+ tools for file, git, terminal, editor, testing operations
+- **VS Code Bridge**: Direct integration with code-server for agent actions
+- **WebSocket Events**: Real-time agent activity broadcasting
+- **Security Layer**: Sandboxed operations with input validation
+- **Protocol Compliance**: Full Model Context Protocol implementation
 
 ## Environment Variables
 
@@ -279,25 +300,77 @@ If a model fails or is unavailable, the system automatically falls back:
 - `gpt-4` → `claude-3-sonnet` → `codellama:13b` → `codellama:7b`
 - `codellama:13b` → `codellama:7b` → `deepseek-coder:6.7b` → `mistral:7b`
 
-## VS Code Integration
+## VS Code Workspace Integration
 
-### 🎨 **Extension Profiles**
+### 🖥️ **Full IDE Experience**
 
-Automatically installs relevant extensions based on project type:
+Access a complete VS Code environment at `/workspace` with:
+- **File Explorer**: Navigate project structure
+- **Editor**: Syntax highlighting for 20+ languages
+- **Terminal**: Integrated bash shell with full access
+- **Git Panel**: Visual diff, commit, and branch management
+- **Debug Panel**: Multi-language debugging support
+- **Extensions**: Pre-installed development tools
 
-- **TypeScript**: TypeScript Next, ESLint, Prettier
-- **React**: React snippets, React refactor tools
-- **Full-stack**: Docker, PostgreSQL, REST client
-- **AI Coding**: GitHub Copilot, TabNine, IntelliCode
-- **Git**: GitLens, GitHub PR, Git History
+### 🤖 **Real-time Agent Monitoring**
 
-### 🔧 **Workspace Configuration**
+Watch AI agents work in real-time with:
+- **Activity Overlay**: Live agent operations display
+- **File Change Tracking**: See edits as they happen
+- **Command Execution**: Monitor terminal operations
+- **Status Indicators**: Visual progress and error reporting
+- **Activity History**: Complete operation timeline
 
-- **Auto-formatting**: Prettier on save
-- **Linting**: ESLint with auto-fix
-- **IntelliSense**: Enhanced TypeScript support
+### 👥 **Collaboration Features**
+
+Multi-user workspace sharing with:
+- **Real-time Chat**: Communicate with team and AI agent
+- **User Presence**: See who's online and active
+- **Shared Cursors**: Multiple user editing indicators
+- **Activity Broadcasting**: Share operations across users
+- **URL Sharing**: Easy workspace access links
+
+### 🎨 **Pre-configured Extensions**
+
+Automatically installed extensions:
+- **TypeScript**: Enhanced language support and IntelliSense
+- **Prettier**: Code formatting with auto-save
+- **ESLint**: Linting with auto-fix capabilities
+- **GitLens**: Advanced git visualization and history
+- **Docker**: Container management and debugging
+- **Tailwind CSS**: CSS framework support
+- **Python**: Python development tools
+- **REST Client**: API testing and development
+
+### 🔧 **Optimized Settings**
+
+Pre-configured for productivity:
+- **Theme**: Dark+ with Fira Code font and ligatures
+- **Auto-save**: 1-second delay with format on save
+- **Git Integration**: Auto-fetch and smart commits
+- **Terminal**: Bash shell with custom prompt
 - **Debugging**: Pre-configured launch configurations
-- **Tasks**: Build, test, and deployment tasks
+- **IntelliSense**: Enhanced TypeScript and JavaScript support
+
+### 🛠️ **MCP Tool Integration**
+
+The workspace integrates with 67+ MCP tools:
+- **File Operations**: Create, edit, delete, rename files
+- **Git Operations**: Commit, push, branch, merge operations
+- **Terminal Tools**: Command execution and process management
+- **Editor Tools**: Text manipulation and code formatting
+- **Testing Tools**: Test execution and coverage analysis
+- **Project Tools**: Scaffolding and dependency management
+
+### 📊 **Agent Activity Types**
+
+Monitor these agent operations:
+- 📝 **File Edit**: Real-time file modifications
+- 📁 **File Create**: New file creation
+- 🗑️ **File Delete**: File removal operations
+- 🌿 **Git Operation**: Version control actions
+- 💻 **Terminal Command**: Shell command execution
+- 🧪 **Test Run**: Test execution and analysis
 
 ## Development Tips
 

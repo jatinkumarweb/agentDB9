@@ -19,7 +19,18 @@ export default function Home() {
           </p>
           
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <Link 
+              href="/workspace" 
+              className="flex items-center p-4 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors group"
+            >
+              <Code className="w-8 h-8 text-indigo-600 mr-4 group-hover:scale-110 transition-transform" />
+              <div>
+                <h3 className="font-semibold text-indigo-900">VS Code Workspace</h3>
+                <p className="text-indigo-700 text-sm">Full IDE with agent monitoring</p>
+              </div>
+            </Link>
+            
             <Link 
               href="/chat" 
               className="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group"

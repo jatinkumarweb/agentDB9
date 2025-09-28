@@ -7,6 +7,7 @@
     "frontend",
     "backend",
     "llm-service",
+    "mcp-server",
     "shared"
   ],
 
@@ -16,11 +17,12 @@
     "postinstall": "npm run build --workspace=shared --if-present",
     "build": "npm run build:shared && npm run build:services",
     "build:shared": "npm run build --workspace=shared",
-    "build:services": "npm run build --workspace=frontend & npm run build --workspace=backend & npm run build --workspace=llm-service & wait",
+    "build:services": "npm run build --workspace=frontend & npm run build --workspace=backend & npm run build --workspace=llm-service & npm run build --workspace=mcp-server & wait",
     "dev": "./scripts/docker-setup.sh up --build",
     "dev:frontend": "./scripts/docker-setup.sh exec frontend npm run dev",
     "dev:backend": "./scripts/docker-setup.sh exec backend npm run dev",
     "dev:llm": "./scripts/docker-setup.sh exec llm-service npm run dev",
+    "dev:mcp": "npm run dev --workspace=mcp-server",
     "setup": "./scripts/setup.sh",
     "setup:ollama": "./scripts/docker-setup.sh exec ollama ollama pull codellama:7b && ./scripts/docker-setup.sh exec ollama ollama pull deepseek-coder:6.7b && ./scripts/docker-setup.sh exec ollama ollama pull codegemma:7b && ./scripts/docker-setup.sh exec ollama ollama pull starcoder2:7b && ./scripts/docker-setup.sh exec ollama ollama pull qwen2.5-coder:7b && ./scripts/docker-setup.sh exec ollama ollama pull magicoder:7b && ./scripts/docker-setup.sh exec ollama ollama pull llama3.1:8b",
     "setup:ollama:large": "./scripts/docker-setup.sh exec ollama ollama pull codellama:13b && ./scripts/docker-setup.sh exec ollama ollama pull codestral:22b",
@@ -44,6 +46,7 @@
     "logs:frontend": "./scripts/docker-setup.sh logs -f frontend",
     "logs:backend": "./scripts/docker-setup.sh logs -f backend",
     "logs:llm": "./scripts/docker-setup.sh logs -f llm-service",
+    "logs:mcp": "npm run logs --workspace=mcp-server",
     "status": "./scripts/docker-setup.sh ps",
     "health": "curl -s http://localhost:8000/health && curl -s http://localhost:9000/health && curl -s http://localhost:3000/api/health"
   },
