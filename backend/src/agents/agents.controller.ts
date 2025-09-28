@@ -179,4 +179,35 @@ export class AgentsController {
       );
     }
   }
+
+  @Post(':id/chat')
+  @ApiOperation({ summary: 'Chat with specific AI agent' })
+  @ApiResponse({ status: 200, description: 'Agent response generated successfully' })
+  async chatWithAgent(
+    @Param('id') agentId: string,
+    @Body() chatData: { message: string; context?: any },
+    @CurrentUser() user: any
+  ): Promise<APIResponse> {
+    try {
+      const result = await this.agentsService.processChatWithAgent(agentId, chatData.message, {
+        ...chatData.context,
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.username
+      });
+      
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

@@ -5,11 +5,13 @@ import { ConversationsService } from './conversations.service';
 import { Conversation } from '../entities/conversation.entity';
 import { Message } from '../entities/message.entity';
 import { WebSocketModule } from '../websocket/websocket.module';
+import { MCPModule } from '../mcp/mcp.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Conversation, Message]),
     forwardRef(() => WebSocketModule),
+    MCPModule,
   ],
   controllers: [ConversationsController],
   providers: [ConversationsService],

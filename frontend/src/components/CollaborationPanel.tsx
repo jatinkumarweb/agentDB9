@@ -51,6 +51,34 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'users' | 'chat' | 'share'>('users');
+  const [selectedAgent, setSelectedAgent] = useState<string>('');
+  const [availableAgents, setAvailableAgents] = useState<any[]>([]);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
+
+  // Fetch available agents
+  const fetchAgents = async () => {
+    setIsLoadingAgents(true);
+    try {
+      const response = await fetch('/api/agents', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth-token')}`,
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableAgents(data.data || []);
+        // Select first agent by default
+        if (data.data && data.data.length > 0) {
+          setSelectedAgent(data.data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch agents:', error);
+    } finally {
+      setIsLoadingAgents(false);
+    }
+  };
 
   useEffect(() => {
     // Initialize current user
@@ -61,6 +89,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       isAgent: false
     };
     setCurrentUser(user);
+
+    // Fetch available agents
+    fetchAgents();
 
     // Add agent user
     const agentUser: User = {
@@ -149,7 +180,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !currentUser) return;
+    if (!newMessage.trim() || !currentUser || !selectedAgent) return;
 
     const message: ChatMessage = {
       id: 'msg_' + Date.now(),
@@ -163,22 +194,38 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     setChatMessages(prev => [...prev, message]);
     wsManager.emit('chat_message', message);
     
-    // Send message to AI agent for processing
+    // Show typing indicator
+    const typingMessage: ChatMessage = {
+      id: 'typing_' + Date.now(),
+      userId: 'agent_' + selectedAgent,
+      userName: getSelectedAgentName(),
+      message: 'Thinking...',
+      timestamp: new Date(),
+      type: 'agent'
+    };
+    setChatMessages(prev => [...prev, typingMessage]);
+    
+    // Send message to selected AI agent for processing
     try {
-      const response = await fetch('/api/agents/chat', {
+      const response = await fetch(`/api/agents/${selectedAgent}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth-token')}`,
         },
         body: JSON.stringify({
           message: newMessage.trim(),
           context: {
             workspaceId: 'workspace_' + currentUser.id,
             userId: currentUser.id,
-            userName: currentUser.name
+            userName: currentUser.name,
+            agentId: selectedAgent
           }
         }),
       });
+
+      // Remove typing indicator
+      setChatMessages(prev => prev.filter(msg => msg.id !== typingMessage.id));
 
       if (response.ok) {
         const data = await response.json();
@@ -186,9 +233,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         // Add agent response to chat
         const agentMessage: ChatMessage = {
           id: 'agent_' + Date.now(),
-          userId: 'agent_ona',
-          userName: 'Agent Ona',
-          message: data.response || 'I\'ll help you with that. Let me work on it...',
+          userId: 'agent_' + selectedAgent,
+          userName: getSelectedAgentName(),
+          message: data.data?.response || 'I\'ll help you with that. Let me work on it...',
           timestamp: new Date(),
           type: 'agent'
         };
@@ -196,27 +243,32 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         setChatMessages(prev => [...prev, agentMessage]);
         
         // If agent is performing actions, show status
-        if (data.actions && data.actions.length > 0) {
+        if (data.data?.actions && data.data.actions.length > 0) {
           const statusMessage: ChatMessage = {
             id: 'status_' + Date.now(),
             userId: 'system',
             userName: 'System',
-            message: `Agent is performing ${data.actions.length} action(s): ${data.actions.map((a: any) => a.type).join(', ')}`,
+            message: `${getSelectedAgentName()} is performing ${data.data.actions.length} action(s): ${data.data.actions.map((a: any) => a.type).join(', ')}`,
             timestamp: new Date(),
             type: 'system'
           };
           setChatMessages(prev => [...prev, statusMessage]);
         }
+      } else {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
     } catch (error) {
       console.error('Failed to send message to agent:', error);
+      
+      // Remove typing indicator
+      setChatMessages(prev => prev.filter(msg => msg.id !== typingMessage.id));
       
       // Add error message
       const errorMessage: ChatMessage = {
         id: 'error_' + Date.now(),
         userId: 'system',
         userName: 'System',
-        message: 'Failed to connect to AI agent. Please try again.',
+        message: `Failed to connect to ${getSelectedAgentName()}. Please try again.`,
         timestamp: new Date(),
         type: 'system'
       };
@@ -224,6 +276,11 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     }
     
     setNewMessage('');
+  };
+
+  const getSelectedAgentName = () => {
+    const agent = availableAgents.find(a => a.id === selectedAgent);
+    return agent ? agent.name : 'AI Agent';
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -412,20 +469,51 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                 ))}
               </div>
 
-              {/* Message Input */}
+              {/* Agent Selection */}
               <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Select AI Agent
+                  </label>
+                  <select
+                    value={selectedAgent}
+                    onChange={(e) => setSelectedAgent(e.target.value)}
+                    disabled={isLoadingAgents || availableAgents.length === 0}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
+                  >
+                    {isLoadingAgents ? (
+                      <option value="">Loading agents...</option>
+                    ) : availableAgents.length === 0 ? (
+                      <option value="">No agents available</option>
+                    ) : (
+                      <>
+                        <option value="">Choose an agent...</option>
+                        {availableAgents.map(agent => (
+                          <option key={agent.id} value={agent.id}>
+                            {agent.name} - {agent.description || 'AI Assistant'}
+                          </option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Message Input */}
+              <div className="px-4 pb-4">
                 <div className="flex space-x-2">
                   <input
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Type a message..."
-                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    placeholder={selectedAgent ? `Chat with ${getSelectedAgentName()}...` : "Select an agent first..."}
+                    disabled={!selectedAgent}
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
                   />
                   <button
                     onClick={sendMessage}
-                    disabled={!newMessage.trim()}
+                    disabled={!newMessage.trim() || !selectedAgent}
                     className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <Send className="w-4 h-4" />

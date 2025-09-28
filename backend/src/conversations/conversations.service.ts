@@ -5,6 +5,7 @@ import { Conversation } from '../entities/conversation.entity';
 import { Message } from '../entities/message.entity';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
 import { WebSocketGateway } from '../websocket/websocket.gateway';
+import { MCPService } from '../mcp/mcp.service';
 // CreateMessageDto import removed - using plain object type instead
 
 @Injectable()
@@ -38,6 +39,7 @@ export class ConversationsService {
     private messagesRepository: Repository<Message>,
     @Inject(forwardRef(() => WebSocketGateway))
     private websocketGateway: WebSocketGateway,
+    private mcpService: MCPService,
   ) {
     // Initialize batch update timer
     this.startBatchUpdateTimer();
@@ -293,17 +295,38 @@ This agent is configured to use "${model}" which requires external API access.
       
       const responseTime = Date.now() - startTime;
       
+      // Check for MCP tool calls in the agent response
+      let finalResponse = agentResponse;
+      const toolCalls = this.mcpService.parseToolCalls(agentResponse);
+      
+      if (toolCalls.length > 0) {
+        console.log(`Found ${toolCalls.length} tool calls in agent response`);
+        
+        // Execute MCP tools
+        const toolResults = await Promise.all(
+          toolCalls.map(toolCall => this.mcpService.executeTool(toolCall))
+        );
+        
+        // Format tool results and append to response
+        const toolResultsText = this.mcpService.formatToolResults(toolCalls, toolResults);
+        finalResponse = agentResponse + toolResultsText;
+        
+        console.log('MCP tools executed successfully');
+      }
+      
       // Create agent response message
       const agentMessageData = {
         conversationId: conversation.id,
         role: 'agent',
-        content: agentResponse,
+        content: finalResponse,
         metadata: {
           generatedAt: new Date().toISOString(),
           model: model,
           actualModel: actualModel,
           responseTime: responseTime,
-          provider: isOllamaModel ? 'ollama' : 'external'
+          provider: isOllamaModel ? 'ollama' : 'external',
+          toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+          mcpToolsUsed: toolCalls.length > 0
         }
       };
 
