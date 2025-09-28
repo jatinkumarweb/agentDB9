@@ -151,8 +151,8 @@ services:
 
   mcp-server:
     build:
-      context: ./mcp-server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./mcp-server/Dockerfile
     ports:
       - "9001:9001"
       - "9002:9002"
