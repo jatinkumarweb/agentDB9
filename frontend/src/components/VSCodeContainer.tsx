@@ -27,12 +27,18 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
   const { currentWorkspace } = useWorkspaceStore();
 
   useEffect(() => {
-    // Get VS Code URL from environment or default
-    const baseUrl = process.env.NEXT_PUBLIC_VSCODE_URL || 'http://localhost:8080';
+    // Get VS Code proxy URL (authenticated)
+    const baseUrl = process.env.NEXT_PUBLIC_VSCODE_PROXY_URL || 'http://localhost:8081';
     const workspacePath = currentWorkspace?.path || '/home/coder/workspace';
     
-    // Construct URL with workspace path
-    const url = `${baseUrl}/?folder=${encodeURIComponent(workspacePath)}`;
+    // Get auth token from cookies
+    const token = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('auth-token='))
+      ?.split('=')[1];
+    
+    // Construct URL with workspace path and auth token for WebSocket
+    const url = `${baseUrl}/?folder=${encodeURIComponent(workspacePath)}&token=${encodeURIComponent(token || '')}`;
     setVscodeUrl(url);
   }, [currentWorkspace]);
 
@@ -40,21 +46,32 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
     setIsLoading(false);
     setError(null);
     
-    // Try to communicate with VS Code iframe
-    try {
-      const iframe = iframeRef.current;
-      if (iframe && iframe.contentWindow) {
+    // Check if iframe loaded successfully by checking for auth errors
+    const iframe = iframeRef.current;
+    if (iframe) {
+      // Listen for auth errors from the iframe
+      iframe.onload = () => {
+        try {
+          // Check if the iframe content indicates an auth error
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (iframeDoc && iframeDoc.title.includes('401') || iframeDoc.title.includes('403')) {
+            setError('Authentication failed. Please log in again.');
+            return;
+          }
+        } catch (err) {
+          // Cross-origin restrictions prevent access, which is normal
+          console.debug('Cannot access iframe content (expected for cross-origin)');
+        }
+        
         // Set up message listener for VS Code events
         window.addEventListener('message', handleVSCodeMessage);
-      }
-    } catch (err) {
-      console.warn('Could not establish communication with VS Code iframe:', err);
+      };
     }
   };
 
   const handleIframeError = () => {
     setIsLoading(false);
-    setError('Failed to load VS Code. Please check if code-server is running.');
+    setError('Failed to load VS Code. Please check your authentication or try refreshing the page.');
   };
 
   const handleVSCodeMessage = (event: MessageEvent) => {

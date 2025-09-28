@@ -51,6 +51,11 @@ agentdb9/
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── src/
+├── vscode-proxy/                  # VS Code authentication proxy
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── src/
 ├── vscode-config/                 # VS Code container configuration
 │   ├── settings.json
 │   ├── keybindings.json
@@ -215,8 +220,10 @@ See [Database Cleanup Guide](./docs/database-cleanup.md) for detailed informatio
 - **Model Library**: CodeLlama, DeepSeek-Coder, Mistral, Llama3, Qwen2.5-Coder
 - **Streaming Support**: Real-time token generation for better UX
 
-### VS Code Container (Port 8080)
+### VS Code Container (Port 8081 via Proxy)
 - **Full IDE Experience**: Complete code-server environment in browser
+- **Integrated Authentication**: Seamless JWT-based authentication with the main application
+- **Secure Access**: All access goes through authenticated proxy (no password required)
 - **Extension Ecosystem**: Auto-install project-specific extensions
 - **Terminal Integration**: Direct command execution in containers
 - **Git Integration**: Version control with GitLens and conventional commits

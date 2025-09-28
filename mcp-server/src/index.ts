@@ -12,9 +12,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const PORT = process.env.MCP_PORT || 9001;
-const VSCODE_PORT = process.env.VSCODE_PORT || 24247;
-const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL || 'http://localhost:9000';
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+const VSCODE_HOST = process.env.VSCODE_HOST || 'vscode';
+const VSCODE_PORT = process.env.VSCODE_PORT || 8080;
+const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL || 'http://llm-service:9000';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://backend:8000';
 
 async function startMCPServer() {
   try {
@@ -23,7 +24,7 @@ async function startMCPServer() {
     // Initialize VS Code bridge
     const vscode = new VSCodeBridge({
       port: Number(VSCODE_PORT),
-      host: 'localhost'
+      host: VSCODE_HOST
     });
 
     // Initialize tool providers
@@ -79,7 +80,7 @@ async function startMCPServer() {
     await mcpServer.start();
 
     logger.info(`🚀 MCP Server started on port ${PORT}`);
-    logger.info(`🔗 Connected to VS Code on port ${VSCODE_PORT}`);
+    logger.info(`🔗 Connected to VS Code at ${VSCODE_HOST}:${VSCODE_PORT}`);
     logger.info(`🧠 LLM Service: ${LLM_SERVICE_URL}`);
     logger.info(`🔧 Backend Service: ${BACKEND_URL}`);
 

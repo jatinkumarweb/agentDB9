@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { WebSocket } from 'ws';
+import fs from 'fs/promises';
+import path from 'path';
 import { 
   Position, 
   Range, 
@@ -12,34 +14,52 @@ export interface VSCodeConfig {
   host: string;
   port: number;
   timeout?: number;
+  workspaceRoot?: string;
 }
 
 export class VSCodeBridge {
   private config: VSCodeConfig;
   private ws: WebSocket | null = null;
   private isConnected = false;
+  private workspaceRoot: string;
 
   constructor(config: VSCodeConfig) {
     this.config = {
       timeout: 30000,
+      workspaceRoot: '/home/coder/workspace',
       ...config
     };
+    this.workspaceRoot = this.config.workspaceRoot!;
   }
 
   public async connect(): Promise<void> {
     try {
-      // Test HTTP connection first
+      // Test HTTP connection to VS Code server
       const response = await axios.get(`http://${this.config.host}:${this.config.port}/`, {
-        timeout: this.config.timeout
+        timeout: this.config.timeout,
+        validateStatus: (status) => status < 500 // Accept redirects and auth errors
       });
       
-      if (response.status === 200) {
+      if (response.status < 500) {
         this.isConnected = true;
         logger.info(`Connected to VS Code server at ${this.config.host}:${this.config.port}`);
+        
+        // Ensure workspace directory exists
+        await this.ensureWorkspaceExists();
       }
     } catch (error) {
       logger.error('Failed to connect to VS Code server:', error);
       throw new Error('VS Code server not accessible');
+    }
+  }
+
+  private async ensureWorkspaceExists(): Promise<void> {
+    try {
+      await fs.access(this.workspaceRoot);
+    } catch (error) {
+      // Workspace doesn't exist, create it
+      await fs.mkdir(this.workspaceRoot, { recursive: true });
+      logger.info(`Created workspace directory: ${this.workspaceRoot}`);
     }
   }
 
@@ -71,31 +91,51 @@ export class VSCodeBridge {
     }
   }
 
-  // Editor operations
-  public async openFile(path: string): Promise<void> {
-    return this.executeCommand('vscode.open', [{ path }]);
+  // File operations (direct file system access)
+  public async createFile(filePath: string, content: string = ''): Promise<void> {
+    const fullPath = path.resolve(this.workspaceRoot, filePath);
+    const dir = path.dirname(fullPath);
+    
+    // Ensure directory exists
+    await fs.mkdir(dir, { recursive: true });
+    
+    // Write file
+    await fs.writeFile(fullPath, content, 'utf8');
+    logger.info(`Created file: ${filePath}`);
   }
 
-  public async insertText(text: string, position?: Position): Promise<void> {
-    return this.executeCommand('editor.action.insertText', [{ text, position }]);
+  public async readFile(filePath: string): Promise<string> {
+    const fullPath = path.resolve(this.workspaceRoot, filePath);
+    const content = await fs.readFile(fullPath, 'utf8');
+    return content;
   }
 
-  public async replaceText(range: Range, text: string): Promise<void> {
-    return this.executeCommand('editor.action.replaceText', [{ range, text }]);
+  public async writeFile(filePath: string, content: string): Promise<void> {
+    const fullPath = path.resolve(this.workspaceRoot, filePath);
+    const dir = path.dirname(fullPath);
+    
+    // Ensure directory exists
+    await fs.mkdir(dir, { recursive: true });
+    
+    // Write file
+    await fs.writeFile(fullPath, content, 'utf8');
+    logger.info(`Updated file: ${filePath}`);
   }
 
-  public async formatDocument(path?: string): Promise<void> {
-    if (path) {
-      await this.openFile(path);
+  public async deleteFile(filePath: string): Promise<void> {
+    const fullPath = path.resolve(this.workspaceRoot, filePath);
+    await fs.unlink(fullPath);
+    logger.info(`Deleted file: ${filePath}`);
+  }
+
+  public async fileExists(filePath: string): Promise<boolean> {
+    try {
+      const fullPath = path.resolve(this.workspaceRoot, filePath);
+      await fs.access(fullPath);
+      return true;
+    } catch {
+      return false;
     }
-    return this.executeCommand('editor.action.formatDocument');
-  }
-
-  public async organizeImports(path?: string): Promise<void> {
-    if (path) {
-      await this.openFile(path);
-    }
-    return this.executeCommand('editor.action.organizeImports');
   }
 
   public async getActiveFile(): Promise<string | null> {
@@ -123,26 +163,45 @@ export class VSCodeBridge {
 
   // Workspace operations
   public async getWorkspaceRoot(): Promise<string> {
-    const result = await this.executeCommand('workspace.getWorkspaceFolder');
-    return result?.uri?.fsPath || process.cwd();
+    return this.workspaceRoot;
   }
 
-  public async findFiles(pattern: string, exclude?: string): Promise<string[]> {
-    const result = await this.executeCommand('workspace.findFiles', [pattern, exclude]);
-    return result?.map((file: any) => file.fsPath) || [];
+  public async listFiles(directory: string = '.'): Promise<string[]> {
+    const fullPath = path.resolve(this.workspaceRoot, directory);
+    try {
+      const entries = await fs.readdir(fullPath, { withFileTypes: true });
+      return entries
+        .filter(entry => entry.isFile())
+        .map(entry => path.join(directory, entry.name));
+    } catch (error) {
+      logger.warn(`Failed to list files in ${directory}:`, error);
+      return [];
+    }
   }
 
-  public async getWorkspaceFolders(): Promise<string[]> {
-    const result = await this.executeCommand('workspace.getWorkspaceFolders');
-    return result?.map((folder: any) => folder.uri.fsPath) || [];
+  public async listDirectories(directory: string = '.'): Promise<string[]> {
+    const fullPath = path.resolve(this.workspaceRoot, directory);
+    try {
+      const entries = await fs.readdir(fullPath, { withFileTypes: true });
+      return entries
+        .filter(entry => entry.isDirectory())
+        .map(entry => path.join(directory, entry.name));
+    } catch (error) {
+      logger.warn(`Failed to list directories in ${directory}:`, error);
+      return [];
+    }
   }
 
-  public async openFolder(path: string): Promise<void> {
-    return this.executeCommand('vscode.openFolder', [{ path }]);
+  public async createDirectory(dirPath: string): Promise<void> {
+    const fullPath = path.resolve(this.workspaceRoot, dirPath);
+    await fs.mkdir(fullPath, { recursive: true });
+    logger.info(`Created directory: ${dirPath}`);
   }
 
-  public async reloadWindow(): Promise<void> {
-    return this.executeCommand('workbench.action.reloadWindow');
+  public async deleteDirectory(dirPath: string): Promise<void> {
+    const fullPath = path.resolve(this.workspaceRoot, dirPath);
+    await fs.rmdir(fullPath, { recursive: true });
+    logger.info(`Deleted directory: ${dirPath}`);
   }
 
   public async getConfiguration(section?: string): Promise<any> {

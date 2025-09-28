@@ -148,7 +148,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     setChatMessages(prev => [...prev, systemMessage]);
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!newMessage.trim() || !currentUser) return;
 
     const message: ChatMessage = {
@@ -162,6 +162,67 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
     setChatMessages(prev => [...prev, message]);
     wsManager.emit('chat_message', message);
+    
+    // Send message to AI agent for processing
+    try {
+      const response = await fetch('/api/agents/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: newMessage.trim(),
+          context: {
+            workspaceId: 'workspace_' + currentUser.id,
+            userId: currentUser.id,
+            userName: currentUser.name
+          }
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Add agent response to chat
+        const agentMessage: ChatMessage = {
+          id: 'agent_' + Date.now(),
+          userId: 'agent_ona',
+          userName: 'Agent Ona',
+          message: data.response || 'I\'ll help you with that. Let me work on it...',
+          timestamp: new Date(),
+          type: 'agent'
+        };
+        
+        setChatMessages(prev => [...prev, agentMessage]);
+        
+        // If agent is performing actions, show status
+        if (data.actions && data.actions.length > 0) {
+          const statusMessage: ChatMessage = {
+            id: 'status_' + Date.now(),
+            userId: 'system',
+            userName: 'System',
+            message: `Agent is performing ${data.actions.length} action(s): ${data.actions.map((a: any) => a.type).join(', ')}`,
+            timestamp: new Date(),
+            type: 'system'
+          };
+          setChatMessages(prev => [...prev, statusMessage]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send message to agent:', error);
+      
+      // Add error message
+      const errorMessage: ChatMessage = {
+        id: 'error_' + Date.now(),
+        userId: 'system',
+        userName: 'System',
+        message: 'Failed to connect to AI agent. Please try again.',
+        timestamp: new Date(),
+        type: 'system'
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+    }
+    
     setNewMessage('');
   };
 
@@ -403,17 +464,17 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    VS Code URL
+                    VS Code URL (Authenticated)
                   </label>
                   <div className="flex space-x-2">
                     <input
                       type="text"
-                      value={process.env.NEXT_PUBLIC_VSCODE_URL || 'http://localhost:8080'}
+                      value={process.env.NEXT_PUBLIC_VSCODE_PROXY_URL || 'http://localhost:8081'}
                       readOnly
                       className="flex-1 px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                     />
                     <button
-                      onClick={() => navigator.clipboard.writeText(process.env.NEXT_PUBLIC_VSCODE_URL || 'http://localhost:8080')}
+                      onClick={() => navigator.clipboard.writeText(process.env.NEXT_PUBLIC_VSCODE_PROXY_URL || 'http://localhost:8081')}
                       className="px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
                     >
                       Copy

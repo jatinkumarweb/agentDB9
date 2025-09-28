@@ -9,6 +9,7 @@ const protectedRoutes = [
   '/projects',
   '/models',
   '/settings',
+  '/workspace',
 ];
 
 // Define auth routes that should redirect if already authenticated
