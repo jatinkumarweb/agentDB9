@@ -186,6 +186,11 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     };
   }, []);
 
+  // Helper function to get selected agent name
+  const getSelectedAgentName = () => {
+    return selectedAgent ? selectedAgent.name : 'AI Agent';
+  };
+
   // Fetch agents when authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -247,7 +252,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       wsOff('new_message', handleNewMessage);
       wsOff('generation_stopped', handleGenerationStopped);
     };
-  }, [wsConnected, currentConversation?.id, currentUser, selectedAgent, getSelectedAgentName]);
+  }, [wsConnected, currentConversation?.id, currentUser, selectedAgent]);
 
   // Join conversation room when conversation changes
   useEffect(() => {
@@ -376,10 +381,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       console.error('Failed to fetch conversation messages:', error);
       setIsGenerating(false);
     }
-  };
-
-  const getSelectedAgentName = () => {
-    return selectedAgent ? selectedAgent.name : 'AI Agent';
   };
 
   // Create or get conversation for workspace chat
