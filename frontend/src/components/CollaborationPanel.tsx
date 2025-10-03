@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import wsManager from '@/lib/websocket';
+import { useAuthStore } from '@/stores/authStore';
 
 interface User {
   id: string;
@@ -46,6 +47,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   isOpen,
   onToggle
 }) => {
+  const { isAuthenticated, token } = useAuthStore();
   const [activeUsers, setActiveUsers] = useState<User[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -57,21 +59,27 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
   // Fetch available agents
   const fetchAgents = async () => {
+    if (!isAuthenticated) {
+      console.log('Not authenticated, skipping agent fetch');
+      return;
+    }
+
     setIsLoadingAgents(true);
     try {
-      const response = await fetch('/api/agents', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth-token')}`,
-        },
-      });
+      console.log('Fetching agents for workspace chat...');
+      const response = await fetch('/api/agents');
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Workspace agents response:', data);
         setAvailableAgents(data.data || []);
         // Select first agent by default
         if (data.data && data.data.length > 0) {
           setSelectedAgent(data.data[0].id);
+          console.log('Selected default agent:', data.data[0].name);
         }
+      } else {
+        console.error('Failed to fetch agents:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Failed to fetch agents:', error);
@@ -89,9 +97,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       isAgent: false
     };
     setCurrentUser(user);
-
-    // Fetch available agents
-    fetchAgents();
 
     // Add agent user
     const agentUser: User = {
@@ -167,6 +172,13 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     };
   }, []);
 
+  // Fetch agents when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchAgents();
+    }
+  }, [isAuthenticated]);
+
   const addSystemMessage = (message: string) => {
     const systemMessage: ChatMessage = {
       id: 'sys_' + Date.now(),
@@ -211,7 +223,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth-token')}`,
         },
         body: JSON.stringify({
           message: newMessage.trim(),
