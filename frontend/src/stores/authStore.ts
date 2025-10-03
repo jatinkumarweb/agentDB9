@@ -65,7 +65,12 @@ export const useAuthStore = create<AuthState>()(
 
           // Set cookie manually for middleware compatibility
           if (typeof document !== 'undefined') {
-            document.cookie = `auth-token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=none`;
+            // Use different cookie settings for development vs production
+            const isProduction = process.env.NODE_ENV === 'production';
+            const cookieSettings = isProduction 
+              ? `auth-token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=none`
+              : `auth-token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=lax`;
+            document.cookie = cookieSettings;
           }
 
           set({
@@ -104,7 +109,12 @@ export const useAuthStore = create<AuthState>()(
 
           // Set cookie manually for middleware compatibility
           if (typeof document !== 'undefined') {
-            document.cookie = `auth-token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=none`;
+            // Use different cookie settings for development vs production
+            const isProduction = process.env.NODE_ENV === 'production';
+            const cookieSettings = isProduction 
+              ? `auth-token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=none`
+              : `auth-token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=lax`;
+            document.cookie = cookieSettings;
           }
 
           set({
@@ -232,7 +242,12 @@ export const useAuthStore = create<AuthState>()(
           
           // Set cookie for middleware compatibility
           if (typeof document !== 'undefined') {
-            document.cookie = `auth-token=${state.token}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=none`;
+            // Use different cookie settings for development vs production
+            const isProduction = process.env.NODE_ENV === 'production';
+            const cookieSettings = isProduction 
+              ? `auth-token=${state.token}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=none`
+              : `auth-token=${state.token}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=lax`;
+            document.cookie = cookieSettings;
           }
           
           // Check if the token is still valid

@@ -19,6 +19,7 @@ export default function ChatPage({}: ChatPageProps) {
   // Local state
   const [agents, setAgents] = useState<CodingAgent[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<CodingAgent | null>(null);
+  const [agentsLoading, setAgentsLoading] = useState(false);
   const [conversations, setConversations] = useState<AgentConversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<AgentConversation | null>(null);
   const [message, setMessage] = useState('');
@@ -321,17 +322,26 @@ export default function ChatPage({}: ChatPageProps) {
   // Fetch agents - stable function
   const fetchAgents = useCallback(async () => {
     try {
+      console.log('Fetching agents...');
+      setAgentsLoading(true);
       const response = await fetch('/api/agents');
       const data = await response.json();
+      console.log('Agents response:', data);
+      
       if (data.success) {
+        console.log('Setting agents:', data.data);
         setAgents(data.data);
         setSelectedAgent((prev) => prev ?? (data.data.length > 0 ? data.data[0] : null));
+        setError(null);
       } else {
         console.error('Failed to fetch agents response:', data);
+        setError(data.error || 'Failed to load agents');
       }
     } catch (err) {
       console.error('Failed to fetch agents:', err);
       setError('Failed to load agents');
+    } finally {
+      setAgentsLoading(false);
     }
   }, []);
 
@@ -578,10 +588,12 @@ if (cachedMessages) {
     loadConversationMessages();
   }, [currentConversationId, sortMessagesByTimestamp]);
 
-  // Fetch agents on mount
+  // Fetch agents only after authentication is confirmed
   useEffect(() => {
-    fetchAgents();
-  }, [fetchAgents]);
+    if (isAuthenticated && !authLoading) {
+      fetchAgents();
+    }
+  }, [isAuthenticated, authLoading, fetchAgents]);
 
   // Fetch conversations when agent is selected
   const selectedAgentId = selectedAgent?.id;
@@ -634,15 +646,23 @@ if (cachedMessages) {
               const agent = agents.find((a) => a.id === e.target.value) || null;
               setSelectedAgent(agent);
             }}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={agentsLoading}
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
           >
-            <option value="">Select an agent...</option>
+            <option value="">
+              {agentsLoading ? 'Loading agents...' : agents.length === 0 ? 'No agents available' : 'Select an agent...'}
+            </option>
             {agents.map((agent) => (
               <option key={agent.id} value={agent.id}>
                 {agent.name} ({agent.configuration.model})
               </option>
             ))}
           </select>
+          {error && (
+            <div className="mt-2 text-sm text-red-600">
+              {error}
+            </div>
+          )}
         </div>
 
         {/* Conversations List */}
