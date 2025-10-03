@@ -53,40 +53,14 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'users' | 'chat' | 'share'>('users');
-  const [selectedAgent, setSelectedAgent] = useState<string>('');
-  const [availableAgents, setAvailableAgents] = useState<any[]>([]);
-  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
-
-  // Fetch available agents
-  const fetchAgents = async () => {
-    if (!isAuthenticated) {
-      console.log('Not authenticated, skipping agent fetch');
-      return;
-    }
-
-    setIsLoadingAgents(true);
-    try {
-      console.log('Fetching agents for workspace chat...');
-      const response = await fetch('/api/agents');
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Workspace agents response:', data);
-        setAvailableAgents(data.data || []);
-        // Select first agent by default
-        if (data.data && data.data.length > 0) {
-          setSelectedAgent(data.data[0].id);
-          console.log('Selected default agent:', data.data[0].name);
-        }
-      } else {
-        console.error('Failed to fetch agents:', response.status, response.statusText);
-      }
-    } catch (error) {
-      console.error('Failed to fetch agents:', error);
-    } finally {
-      setIsLoadingAgents(false);
-    }
-  };
+  const [selectedAgent, setSelectedAgent] = useState<string>('claude');
+  
+  // Predefined agents for workspace chat
+  const availableAgents = [
+    { id: 'claude', name: 'Claude', description: 'Anthropic Claude - Advanced reasoning and coding' },
+    { id: 'gpt4', name: 'GPT-4', description: 'OpenAI GPT-4 - Powerful language model' },
+    { id: 'gemini', name: 'Gemini', description: 'Google Gemini - Multimodal AI assistant' }
+  ];
 
   useEffect(() => {
     // Initialize current user
@@ -172,12 +146,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     };
   }, []);
 
-  // Fetch agents when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchAgents();
-    }
-  }, [isAuthenticated]);
+  // No need to fetch agents - using predefined ones
 
   const addSystemMessage = (message: string) => {
     const systemMessage: ChatMessage = {
@@ -219,7 +188,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     
     // Send message to selected AI agent for processing
     try {
-      const response = await fetch(`/api/agents/${selectedAgent}/chat`, {
+      const response = await fetch('/api/agents/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -230,7 +199,8 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
             workspaceId: 'workspace_' + currentUser.id,
             userId: currentUser.id,
             userName: currentUser.name,
-            agentId: selectedAgent
+            agentType: selectedAgent,
+            preferredAgent: selectedAgent
           }
         }),
       });
@@ -489,23 +459,13 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                   <select
                     value={selectedAgent}
                     onChange={(e) => setSelectedAgent(e.target.value)}
-                    disabled={isLoadingAgents || availableAgents.length === 0}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   >
-                    {isLoadingAgents ? (
-                      <option value="">Loading agents...</option>
-                    ) : availableAgents.length === 0 ? (
-                      <option value="">No agents available</option>
-                    ) : (
-                      <>
-                        <option value="">Choose an agent...</option>
-                        {availableAgents.map(agent => (
-                          <option key={agent.id} value={agent.id}>
-                            {agent.name} - {agent.description || 'AI Assistant'}
-                          </option>
-                        ))}
-                      </>
-                    )}
+                    {availableAgents.map(agent => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.name} - {agent.description || 'AI Assistant'}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
