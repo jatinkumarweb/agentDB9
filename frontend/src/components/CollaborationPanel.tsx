@@ -16,6 +16,7 @@ import {
 import { cn } from '@/utils/cn';
 import wsManager from '@/lib/websocket';
 import { useAuthStore } from '@/stores/authStore';
+import { CodingAgent } from '@agentdb9/shared';
 
 interface User {
   id: string;
@@ -53,14 +54,44 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'users' | 'chat' | 'share'>('users');
-  const [selectedAgent, setSelectedAgent] = useState<string>('claude');
-  
-  // Predefined agents for workspace chat
-  const availableAgents = [
-    { id: 'claude', name: 'Claude', description: 'Anthropic Claude - Advanced reasoning and coding' },
-    { id: 'gpt4', name: 'GPT-4', description: 'OpenAI GPT-4 - Powerful language model' },
-    { id: 'gemini', name: 'Gemini', description: 'Google Gemini - Multimodal AI assistant' }
-  ];
+  const [selectedAgent, setSelectedAgent] = useState<CodingAgent | null>(null);
+  const [availableAgents, setAvailableAgents] = useState<CodingAgent[]>([]);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
+
+  // Fetch available agents from the same API as chat page
+  const fetchAgents = async () => {
+    if (!isAuthenticated) {
+      console.log('Not authenticated, skipping agent fetch');
+      return;
+    }
+
+    setIsLoadingAgents(true);
+    try {
+      console.log('Fetching agents for workspace chat...');
+      const response = await fetch('/api/agents');
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Workspace agents response:', data);
+        if (data.success) {
+          setAvailableAgents(data.data || []);
+          // Select first agent by default
+          if (data.data && data.data.length > 0) {
+            setSelectedAgent(data.data[0]);
+            console.log('Selected default agent:', data.data[0].name);
+          }
+        } else {
+          console.error('Failed to fetch agents:', data.error);
+        }
+      } else {
+        console.error('Failed to fetch agents:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Failed to fetch agents:', error);
+    } finally {
+      setIsLoadingAgents(false);
+    }
+  };
 
   useEffect(() => {
     // Initialize current user
@@ -146,7 +177,12 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     };
   }, []);
 
-  // No need to fetch agents - using predefined ones
+  // Fetch agents when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchAgents();
+    }
+  }, [isAuthenticated]);
 
   const addSystemMessage = (message: string) => {
     const systemMessage: ChatMessage = {
@@ -178,7 +214,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     // Show typing indicator
     const typingMessage: ChatMessage = {
       id: 'typing_' + Date.now(),
-      userId: 'agent_' + selectedAgent,
+      userId: 'agent_' + selectedAgent?.id,
       userName: getSelectedAgentName(),
       message: 'Thinking...',
       timestamp: new Date(),
@@ -188,7 +224,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     
     // Send message to selected AI agent for processing
     try {
-      const response = await fetch('/api/agents/chat', {
+      const response = await fetch(`/api/agents/${selectedAgent?.id}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -199,8 +235,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
             workspaceId: 'workspace_' + currentUser.id,
             userId: currentUser.id,
             userName: currentUser.name,
-            agentType: selectedAgent,
-            preferredAgent: selectedAgent
+            agentId: selectedAgent?.id
           }
         }),
       });
@@ -214,7 +249,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         // Add agent response to chat
         const agentMessage: ChatMessage = {
           id: 'agent_' + Date.now(),
-          userId: 'agent_' + selectedAgent,
+          userId: 'agent_' + selectedAgent?.id,
           userName: getSelectedAgentName(),
           message: data.data?.response || 'I\'ll help you with that. Let me work on it...',
           timestamp: new Date(),
@@ -260,8 +295,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   };
 
   const getSelectedAgentName = () => {
-    const agent = availableAgents.find(a => a.id === selectedAgent);
-    return agent ? agent.name : 'AI Agent';
+    return selectedAgent ? selectedAgent.name : 'AI Agent';
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -457,15 +491,28 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     Select AI Agent
                   </label>
                   <select
-                    value={selectedAgent}
-                    onChange={(e) => setSelectedAgent(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    value={selectedAgent?.id || ''}
+                    onChange={(e) => {
+                      const agent = availableAgents.find(a => a.id === e.target.value) || null;
+                      setSelectedAgent(agent);
+                    }}
+                    disabled={isLoadingAgents || availableAgents.length === 0}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
                   >
-                    {availableAgents.map(agent => (
-                      <option key={agent.id} value={agent.id}>
-                        {agent.name} - {agent.description || 'AI Assistant'}
-                      </option>
-                    ))}
+                    {isLoadingAgents ? (
+                      <option value="">Loading agents...</option>
+                    ) : availableAgents.length === 0 ? (
+                      <option value="">No agents available</option>
+                    ) : (
+                      <>
+                        <option value="">Choose an agent...</option>
+                        {availableAgents.map(agent => (
+                          <option key={agent.id} value={agent.id}>
+                            {agent.name} ({agent.configuration.model})
+                          </option>
+                        ))}
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
