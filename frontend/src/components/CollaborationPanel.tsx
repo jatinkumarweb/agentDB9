@@ -16,7 +16,8 @@ import {
 import { cn } from '@/utils/cn';
 import wsManager from '@/lib/websocket';
 import { useAuthStore } from '@/stores/authStore';
-import { CodingAgent } from '@agentdb9/shared';
+import { CodingAgent, AgentConversation, ConversationMessage } from '@agentdb9/shared';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface User {
   id: string;
@@ -57,6 +58,14 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   const [selectedAgent, setSelectedAgent] = useState<CodingAgent | null>(null);
   const [availableAgents, setAvailableAgents] = useState<CodingAgent[]>([]);
   const [isLoadingAgents, setIsLoadingAgents] = useState(false);
+  
+  // Conversation-based chat state
+  const [currentConversation, setCurrentConversation] = useState<AgentConversation | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  // WebSocket integration
+  const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff } = useWebSocket();
 
   // Fetch available agents from the same API as chat page
   const fetchAgents = async () => {
@@ -184,6 +193,78 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     }
   }, [isAuthenticated]);
 
+  // WebSocket event handlers for conversation updates
+  useEffect(() => {
+    if (!wsConnected) return;
+
+    const handleMessageUpdate = (data: {
+      conversationId: string;
+      messageId: string;
+      content: string;
+      streaming: boolean;
+      metadata?: any;
+    }) => {
+      if (currentConversation?.id === data.conversationId) {
+        setIsGenerating(data.streaming);
+        // Update the message content in real-time
+        setChatMessages(prev => prev.map(msg => 
+          msg.id === data.messageId 
+            ? { ...msg, message: data.content }
+            : msg
+        ));
+      }
+    };
+
+    const handleNewMessage = (data: {
+      conversationId: string;
+      message: ConversationMessage;
+    }) => {
+      if (currentConversation?.id === data.conversationId) {
+        const newChatMessage: ChatMessage = {
+          id: data.message.id,
+          userId: data.message.role === 'user' ? currentUser?.id || 'user' : 'agent_' + selectedAgent?.id,
+          userName: data.message.role === 'user' ? currentUser?.name || 'You' : getSelectedAgentName(),
+          message: data.message.content,
+          timestamp: new Date(data.message.timestamp),
+          type: data.message.role === 'user' ? 'user' : 'agent'
+        };
+        setChatMessages(prev => [...prev, newChatMessage]);
+      }
+    };
+
+    const handleGenerationStopped = (data: { conversationId: string; messageId: string }) => {
+      if (currentConversation?.id === data.conversationId) {
+        setIsGenerating(false);
+      }
+    };
+
+    wsOn('message_update', handleMessageUpdate);
+    wsOn('new_message', handleNewMessage);
+    wsOn('generation_stopped', handleGenerationStopped);
+
+    return () => {
+      wsOff('message_update', handleMessageUpdate);
+      wsOff('new_message', handleNewMessage);
+      wsOff('generation_stopped', handleGenerationStopped);
+    };
+  }, [wsConnected, currentConversation?.id, currentUser, selectedAgent, getSelectedAgentName]);
+
+  // Join conversation room when conversation changes
+  useEffect(() => {
+    if (!wsConnected || !currentConversation?.id) return;
+
+    const timer = setTimeout(() => {
+      console.log('Joining conversation room:', currentConversation.id);
+      wsEmit('join_conversation', { conversationId: currentConversation.id });
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      console.log('Leaving conversation room:', currentConversation.id);
+      wsEmit('leave_conversation', { conversationId: currentConversation.id });
+    };
+  }, [wsConnected, currentConversation?.id, wsEmit]);
+
   const addSystemMessage = (message: string) => {
     const systemMessage: ChatMessage = {
       id: 'sys_' + Date.now(),
@@ -197,105 +278,144 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !currentUser || !selectedAgent) return;
+    if (!newMessage.trim() || !currentUser || !selectedAgent || isLoading || isGenerating) return;
 
-    const message: ChatMessage = {
-      id: 'msg_' + Date.now(),
-      userId: currentUser.id,
-      userName: currentUser.name,
-      message: newMessage.trim(),
-      timestamp: new Date(),
-      type: 'user'
-    };
+    const messageContent = newMessage.trim();
+    setNewMessage('');
+    setIsLoading(true);
 
-    setChatMessages(prev => [...prev, message]);
-    wsManager.emit('chat_message', message);
-    
-    // Show typing indicator
-    const typingMessage: ChatMessage = {
-      id: 'typing_' + Date.now(),
-      userId: 'agent_' + selectedAgent?.id,
-      userName: getSelectedAgentName(),
-      message: 'Thinking...',
-      timestamp: new Date(),
-      type: 'agent'
-    };
-    setChatMessages(prev => [...prev, typingMessage]);
-    
-    // Send message to selected AI agent for processing
     try {
-      const response = await fetch(`/api/agents/${selectedAgent?.id}/chat`, {
+      // Get or create conversation
+      const conversation = await getOrCreateConversation();
+      if (!conversation) {
+        throw new Error('Failed to create conversation');
+      }
+
+      // Add user message immediately to UI
+      const userMessage: ChatMessage = {
+        id: 'temp_user_' + Date.now(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        message: messageContent,
+        timestamp: new Date(),
+        type: 'user'
+      };
+      setChatMessages(prev => [...prev, userMessage]);
+
+      // Send message to conversation endpoint
+      const response = await fetch(`/api/conversations/${conversation.id}/messages`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: newMessage.trim(),
-          context: {
-            workspaceId: 'workspace_' + currentUser.id,
-            userId: currentUser.id,
-            userName: currentUser.name,
-            agentId: selectedAgent?.id
-          }
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'user', content: messageContent }),
       });
 
-      // Remove typing indicator
-      setChatMessages(prev => prev.filter(msg => msg.id !== typingMessage.id));
+      const data = await response.json();
+      if (data.success) {
+        // Update the temporary message with real ID
+        setChatMessages(prev => prev.map(msg => 
+          msg.id === userMessage.id 
+            ? { ...msg, id: data.data.id || msg.id }
+            : msg
+        ));
 
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Add agent response to chat
-        const agentMessage: ChatMessage = {
-          id: 'agent_' + Date.now(),
-          userId: 'agent_' + selectedAgent?.id,
-          userName: getSelectedAgentName(),
-          message: data.data?.response || 'I\'ll help you with that. Let me work on it...',
-          timestamp: new Date(),
-          type: 'agent'
-        };
-        
-        setChatMessages(prev => [...prev, agentMessage]);
-        
-        // If agent is performing actions, show status
-        if (data.data?.actions && data.data.actions.length > 0) {
-          const statusMessage: ChatMessage = {
-            id: 'status_' + Date.now(),
-            userId: 'system',
-            userName: 'System',
-            message: `${getSelectedAgentName()} is performing ${data.data.actions.length} action(s): ${data.data.actions.map((a: any) => a.type).join(', ')}`,
-            timestamp: new Date(),
-            type: 'system'
-          };
-          setChatMessages(prev => [...prev, statusMessage]);
+        // Set generating state for agent response
+        setIsGenerating(true);
+
+        // WebSocket will handle the agent response via real-time updates
+        // If WebSocket is not connected, fall back to polling
+        if (!wsConnected) {
+          console.log('WebSocket not connected, using polling fallback');
+          setTimeout(() => {
+            // Refresh conversation messages
+            fetchConversationMessages(conversation.id);
+          }, 2000);
         }
       } else {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(data.error || 'Failed to send message');
       }
     } catch (error) {
-      console.error('Failed to send message to agent:', error);
-      
-      // Remove typing indicator
-      setChatMessages(prev => prev.filter(msg => msg.id !== typingMessage.id));
+      console.error('Failed to send message:', error);
       
       // Add error message
       const errorMessage: ChatMessage = {
         id: 'error_' + Date.now(),
         userId: 'system',
         userName: 'System',
-        message: `Failed to connect to ${getSelectedAgentName()}. Please try again.`,
+        message: `Failed to send message. Please try again.`,
         timestamp: new Date(),
         type: 'system'
       };
       setChatMessages(prev => [...prev, errorMessage]);
+      
+      // Restore the message content
+      setNewMessage(messageContent);
+    } finally {
+      setIsLoading(false);
     }
-    
-    setNewMessage('');
+  };
+
+  // Fetch conversation messages (fallback for when WebSocket is not available)
+  const fetchConversationMessages = async (conversationId: string) => {
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}/messages`);
+      const data = await response.json();
+      
+      if (data.success) {
+        const messages: ChatMessage[] = data.data.map((msg: ConversationMessage) => ({
+          id: msg.id,
+          userId: msg.role === 'user' ? currentUser?.id || 'user' : 'agent_' + selectedAgent?.id,
+          userName: msg.role === 'user' ? currentUser?.name || 'You' : getSelectedAgentName(),
+          message: msg.content,
+          timestamp: new Date(msg.timestamp),
+          type: msg.role === 'user' ? 'user' : 'agent'
+        }));
+        setChatMessages(messages);
+        setIsGenerating(false);
+      }
+    } catch (error) {
+      console.error('Failed to fetch conversation messages:', error);
+      setIsGenerating(false);
+    }
   };
 
   const getSelectedAgentName = () => {
     return selectedAgent ? selectedAgent.name : 'AI Agent';
+  };
+
+  // Create or get conversation for workspace chat
+  const getOrCreateConversation = async () => {
+    if (!selectedAgent) return null;
+
+    try {
+      // Check if we already have a conversation for this agent
+      if (currentConversation && currentConversation.agentId === selectedAgent.id) {
+        return currentConversation;
+      }
+
+      // Create a new conversation for workspace chat
+      const response = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          agentId: selectedAgent.id, 
+          title: `Workspace Chat with ${selectedAgent.name}` 
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        const newConversation = data.data;
+        setCurrentConversation(newConversation);
+        setChatMessages([]); // Clear previous messages
+        return newConversation;
+      } else {
+        console.error('Failed to create conversation:', data.error);
+        return null;
+      }
+    } catch (error) {
+      console.error('Failed to create conversation:', error);
+      return null;
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -428,6 +548,33 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     </div>
                   </div>
                 ))}
+                
+                {/* Typing indicator */}
+                {isGenerating && (
+                  <div className="flex space-x-2">
+                    <div className="flex-shrink-0">
+                      <UserCircle className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                          {getSelectedAgentName()}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {formatTime(new Date())}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-1 mt-1">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        </div>
+                        <span className="text-xs text-gray-500 ml-2">thinking...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -482,6 +629,33 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     </div>
                   </div>
                 ))}
+                
+                {/* Typing indicator */}
+                {isGenerating && (
+                  <div className="flex space-x-2">
+                    <div className="flex-shrink-0">
+                      <UserCircle className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                          {getSelectedAgentName()}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {formatTime(new Date())}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-1 mt-1">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        </div>
+                        <span className="text-xs text-gray-500 ml-2">thinking...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Agent Selection */}
@@ -495,6 +669,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     onChange={(e) => {
                       const agent = availableAgents.find(a => a.id === e.target.value) || null;
                       setSelectedAgent(agent);
+                      // Clear current conversation when agent changes
+                      setCurrentConversation(null);
+                      setChatMessages([]);
                     }}
                     disabled={isLoadingAgents || availableAgents.length === 0}
                     className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
@@ -511,6 +688,33 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                             {agent.name} ({agent.configuration.model})
                           </option>
                         ))}
+                
+                {/* Typing indicator */}
+                {isGenerating && (
+                  <div className="flex space-x-2">
+                    <div className="flex-shrink-0">
+                      <UserCircle className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                          {getSelectedAgentName()}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {formatTime(new Date())}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-1 mt-1">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        </div>
+                        <span className="text-xs text-gray-500 ml-2">thinking...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                       </>
                     )}
                   </select>
@@ -531,10 +735,14 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                   />
                   <button
                     onClick={sendMessage}
-                    disabled={!newMessage.trim() || !selectedAgent}
+                    disabled={!newMessage.trim() || !selectedAgent || isLoading || isGenerating}
                     className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    <Send className="w-4 h-4" />
+                    {isLoading || isGenerating ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
               </div>
