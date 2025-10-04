@@ -16,7 +16,10 @@ export class Message implements Omit<ConversationMessage, 'role'> {
   @Column('text')
   content: string;
 
-  @Column('jsonb', { nullable: true })
+  @Column('text', { nullable: true, transformer: {
+    to: (value: Record<string, any>) => value ? JSON.stringify(value) : null,
+    from: (value: string) => value ? JSON.parse(value) : null
+  }})
   metadata?: Record<string, any>;
 
   @CreateDateColumn()

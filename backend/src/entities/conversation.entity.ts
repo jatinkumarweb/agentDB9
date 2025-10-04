@@ -26,8 +26,8 @@ export class Conversation implements Omit<AgentConversation, 'messages'> {
   title: string;
 
   @Column({
-    type: 'enum',
-    enum: ['active', 'archived'],
+    type: 'varchar',
+    length: 20,
     default: 'active'
   })
   status: 'active' | 'archived';

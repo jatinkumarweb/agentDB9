@@ -28,13 +28,19 @@ export class Project implements ProjectInterface {
   language: string;
 
   @Column({
-    type: 'enum',
-    enum: ['active', 'archived', 'template'],
+    type: 'varchar',
+    length: 20,
     default: 'active'
   })
   status: ProjectStatus;
 
-  @Column('jsonb', { default: [] })
+  @Column('text', { 
+    default: '[]',
+    transformer: {
+      to: (value: string[]) => JSON.stringify(value || []),
+      from: (value: string) => value ? JSON.parse(value) : []
+    }
+  })
   agents: string[];
 
   @CreateDateColumn()

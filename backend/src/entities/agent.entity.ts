@@ -21,17 +21,23 @@ export class Agent implements CodingAgent {
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @Column('jsonb')
+  @Column('text', { transformer: {
+    to: (value: AgentConfiguration) => JSON.stringify(value),
+    from: (value: string) => JSON.parse(value)
+  }})
   configuration: AgentConfiguration;
 
   @Column({
-    type: 'enum',
-    enum: ['idle', 'thinking', 'coding', 'testing', 'error', 'offline'],
+    type: 'varchar',
+    length: 20,
     default: 'idle'
   })
   status: AgentStatus;
 
-  @Column('jsonb')
+  @Column('text', { transformer: {
+    to: (value: AgentCapability[]) => JSON.stringify(value),
+    from: (value: string) => JSON.parse(value)
+  }})
   capabilities: AgentCapability[];
 
   @CreateDateColumn()

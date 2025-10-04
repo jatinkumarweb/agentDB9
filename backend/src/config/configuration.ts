@@ -10,12 +10,16 @@ export default () => ({
 
   // Database
   database: {
-    type: 'postgres',
+    type: process.env.DATABASE_URL?.startsWith('sqlite:') ? 'sqlite' : 'postgres',
+    // SQLite configuration
+    database: process.env.DATABASE_URL?.startsWith('sqlite:') 
+      ? process.env.DATABASE_URL.replace('sqlite:', '') 
+      : process.env.DB_NAME || 'coding_agent',
+    // PostgreSQL configuration
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432' || "0", 10),
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
-    database: process.env.DB_NAME || 'coding_agent',
     synchronize: process.env.DB_SYNCHRONIZE === 'true' || process.env.NODE_ENV !== 'production',
     logging: process.env.DB_LOGGING === 'true' || process.env.NODE_ENV === 'development',
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,

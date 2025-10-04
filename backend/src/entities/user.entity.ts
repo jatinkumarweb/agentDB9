@@ -30,7 +30,13 @@ export class User {
   @Column({ default: 'user' })
   role: 'user' | 'admin';
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column('text', { 
+    nullable: true,
+    transformer: {
+      to: (value: any) => value ? JSON.stringify(value) : null,
+      from: (value: string) => value ? JSON.parse(value) : null
+    }
+  })
   preferences?: {
     theme?: 'light' | 'dark';
     defaultModel?: string;
