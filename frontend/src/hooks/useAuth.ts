@@ -44,7 +44,7 @@ export const useAuth = () => {
       }
 
       // Verify token with backend
-      const response = await fetch('/api/auth/profile', {
+      const response = await fetch('/api/auth/me', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -53,7 +53,7 @@ export const useAuth = () => {
       if (response.ok) {
         const userData = await response.json();
         setAuthState({
-          user: userData.user,
+          user: userData.data.user,
           isLoading: false,
           isAuthenticated: true
         });
@@ -88,10 +88,10 @@ export const useAuth = () => {
 
       const data = await response.json();
 
-      if (response.ok && data.accessToken) {
+      if (response.ok && data.success) {
         // Token is automatically set as cookie by the API
         await checkAuthStatus(); // Refresh auth state
-        return { success: true, user: data.user };
+        return { success: true, user: data.data.user };
       } else {
         return { success: false, error: data.error || 'Login failed' };
       }

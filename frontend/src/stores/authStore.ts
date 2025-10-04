@@ -26,7 +26,7 @@ interface AuthState {
   checkAuth: () => Promise<void>;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
 // Configure axios to include credentials (cookies) in requests
 axios.defaults.withCredentials = true;
@@ -57,8 +57,8 @@ export const useAuthStore = create<AuthState>()(
             password,
           });
 
-          // Backend returns { user, accessToken } directly
-          const { user, accessToken } = response.data;
+          // Backend returns { user, token } in data object
+          const { user, token: accessToken } = response.data.data;
 
           // Set authorization header for future requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
@@ -95,14 +95,14 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         
         try {
-          const response = await axios.post('/api/auth/register', {
+          const response = await axios.post('/api/auth/signup', {
             username,
             email,
             password,
           });
 
-          // Backend returns { user, accessToken } directly
-          const { user, accessToken } = response.data;
+          // Backend returns { user, token } in data object
+          const { user, token: accessToken } = response.data.data;
 
           // Set authorization header for future requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
@@ -209,8 +209,8 @@ export const useAuthStore = create<AuthState>()(
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
           // Verify the token is still valid
-          const response = await axios.get('/api/auth/profile');
-          const { data: user } = response.data;
+          const response = await axios.get('/api/auth/me');
+          const { user } = response.data.data;
 
           console.log('checkAuth: Token valid, user authenticated:', user.email);
           set({
