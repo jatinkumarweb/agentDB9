@@ -18,7 +18,11 @@ export class Message implements Omit<ConversationMessage, 'role'> {
 
   @Column('text', { nullable: true, transformer: {
     to: (value: Record<string, any>) => value ? JSON.stringify(value) : null,
-    from: (value: string) => value ? JSON.parse(value) : null
+    from: (value: any) => {
+      if (!value) return null;
+      if (typeof value === 'string') return JSON.parse(value);
+      return value;
+    }
   }})
   metadata?: Record<string, any>;
 

@@ -38,7 +38,11 @@ export class Project implements ProjectInterface {
     default: '[]',
     transformer: {
       to: (value: string[]) => JSON.stringify(value || []),
-      from: (value: string) => value ? JSON.parse(value) : []
+      from: (value: any) => {
+        if (!value) return [];
+        if (typeof value === 'string') return JSON.parse(value);
+        return value;
+      }
     }
   })
   agents: string[];

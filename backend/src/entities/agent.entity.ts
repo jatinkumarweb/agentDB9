@@ -25,7 +25,7 @@ export class Agent implements CodingAgent {
     nullable: false,
     transformer: {
       to: (value: AgentConfiguration) => JSON.stringify(value),
-      from: (value: string) => JSON.parse(value)
+      from: (value: any) => typeof value === 'string' ? JSON.parse(value) : value
     }
   })
   configuration: AgentConfiguration;
@@ -39,7 +39,7 @@ export class Agent implements CodingAgent {
 
   @Column('text', { transformer: {
     to: (value: AgentCapability[]) => JSON.stringify(value),
-    from: (value: string) => JSON.parse(value)
+    from: (value: any) => typeof value === 'string' ? JSON.parse(value) : value
   }})
   capabilities: AgentCapability[];
 
