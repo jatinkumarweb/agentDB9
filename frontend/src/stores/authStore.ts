@@ -59,8 +59,8 @@ export const useAuthStore = create<AuthState>()(
             password,
           });
 
-          // Backend returns { user, token } in data object
-          const { user, token: accessToken } = response.data.data;
+          // API route returns { user, accessToken } directly
+          const { user, accessToken } = response.data;
 
           // Set authorization header for future requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
@@ -103,8 +103,8 @@ export const useAuthStore = create<AuthState>()(
             password,
           });
 
-          // Backend returns { user, token } in data object
-          const { user, token: accessToken } = response.data.data;
+          // API route returns { user, accessToken } directly
+          const { user, accessToken } = response.data;
 
           // Set authorization header for future requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
@@ -211,7 +211,7 @@ export const useAuthStore = create<AuthState>()(
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
           // Verify the token is still valid
-          const response = await axios.get('/api/auth/me');
+          const response = await axios.get('/api/auth/profile');
           const { user } = response.data.data;
 
           console.log('checkAuth: Token valid, user authenticated:', user.email);
