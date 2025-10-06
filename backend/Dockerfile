@@ -31,6 +31,9 @@ COPY backend/package*.json ./
 # Install dependencies
 RUN npm install
 
+# Rebuild native modules for the container architecture
+RUN npm rebuild sqlite3
+
 # Copy source code
 COPY backend/ .
 
