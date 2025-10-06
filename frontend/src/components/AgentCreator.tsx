@@ -1,4 +1,5 @@
 'use client';
+import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
@@ -37,7 +38,7 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
     }
 
     try {
-      const response = await fetch('/api/agents', {
+      const response = await fetchWithAuth('/api/agents', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

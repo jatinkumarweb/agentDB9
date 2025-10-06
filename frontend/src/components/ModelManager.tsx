@@ -1,4 +1,5 @@
 'use client';
+import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
 import React, { useState, useEffect } from 'react';
 import { Download, Trash2, Key, Settings, RefreshCw, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
@@ -40,7 +41,7 @@ export default function ModelManager() {
   const fetchModels = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/models');
+      const response = await fetchWithAuth('/api/models');
       const data = await response.json();
       
       if (data.success && data.data && data.data.models) {
@@ -55,7 +56,7 @@ export default function ModelManager() {
 
   const fetchProviderConfigs = async () => {
     try {
-      const response = await fetch('/api/providers/config');
+      const response = await fetchWithAuth('/api/providers/config');
       const data = await response.json();
       
       if (data.success) {
@@ -97,7 +98,7 @@ export default function ModelManager() {
     setDownloadingModels(prev => new Set(prev).add(modelId));
     
     try {
-      const response = await fetch('/api/models/download', {
+      const response = await fetchWithAuth('/api/models/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ modelId })
@@ -129,7 +130,7 @@ export default function ModelManager() {
     setRemovingModels(prev => new Set(prev).add(modelId));
     
     try {
-      const response = await fetch('/api/models/remove', {
+      const response = await fetchWithAuth('/api/models/remove', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ modelId })
@@ -156,7 +157,7 @@ export default function ModelManager() {
   const pollModelStatus = (modelId: string, operation: 'downloading' | 'removing') => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch('/api/models');
+        const response = await fetchWithAuth('/api/models');
         const data = await response.json();
         
         if (data.success && data.data && data.data.models) {
@@ -209,7 +210,7 @@ export default function ModelManager() {
 
   const updateProviderConfig = async (provider: string, apiKey: string) => {
     try {
-      const response = await fetch('/api/providers/config', {
+      const response = await fetchWithAuth('/api/providers/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider, apiKey })

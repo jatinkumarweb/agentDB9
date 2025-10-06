@@ -1,4 +1,5 @@
 'use client';
+import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { EnvironmentHealth, ServiceStatus } from '@agentdb9/shared';
@@ -110,7 +111,7 @@ export default function EnvironmentMonitor({
 
   const fetchHealth = async () => {
     try {
-      const response = await fetch('/api/test/environment', {
+      const response = await fetchWithAuth('/api/test/environment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ runAll: true })

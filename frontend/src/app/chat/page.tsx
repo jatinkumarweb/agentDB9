@@ -9,6 +9,7 @@ import AgentCreator from '@/components/AgentCreator';
 import { useAuthStore } from '@/stores/authStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useConversationCache } from '@/hooks/useConversationCache';
+import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
 interface ChatPageProps {}
 
@@ -324,7 +325,7 @@ export default function ChatPage({}: ChatPageProps) {
     try {
       console.log('Fetching agents...');
       setAgentsLoading(true);
-      const response = await fetch('/api/agents');
+      const response = await fetchWithAuth('/api/agents');
       const data = await response.json();
       console.log('Agents response:', data);
       
@@ -356,7 +357,7 @@ export default function ChatPage({}: ChatPageProps) {
         return;
       }
 
-      const response = await fetch(`/api/conversations/agent/${agentId}`);
+      const response = await fetchWithAuth(`/api/conversations/agent/${agentId}`);
       const data = await response.json();
       if (data.success) {
         setConversations(data.data);
@@ -374,7 +375,7 @@ export default function ChatPage({}: ChatPageProps) {
 
     try {
       setIsLoading(true);
-      const response = await fetch('/api/conversations', {
+      const response = await fetchWithAuth('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agentId: selectedAgent.id, title: 'New Conversation' }),
@@ -412,7 +413,7 @@ if (cachedMessages) {
   setCurrentConversation(updatedConversation);
 }
 
-      const messagesResponse = await fetch(`/api/conversations/${currentConversation.id}/messages`);
+      const messagesResponse = await fetchWithAuth(`/api/conversations/${currentConversation.id}/messages`);
       const messagesData = await messagesResponse.json();
 
       if (messagesData.success) {
@@ -438,7 +439,7 @@ if (cachedMessages) {
     setError(null);
 
     try {
-      const response = await fetch(`/api/conversations/${currentConversation.id}/messages`, {
+      const response = await fetchWithAuth(`/api/conversations/${currentConversation.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: 'user', content: messageContent }),
@@ -509,7 +510,7 @@ if (cachedMessages) {
         wsEmit('stop_generation', { conversationId: currentConversation?.id, messageId: generatingMessageId });
       }
 
-      const response = await fetch(`/api/conversations/${currentConversation?.id}/messages/${generatingMessageId}/stop`, {
+      const response = await fetchWithAuth(`/api/conversations/${currentConversation?.id}/messages/${generatingMessageId}/stop`, {
         method: 'POST',
       });
 
@@ -572,7 +573,7 @@ if (cachedMessages) {
           return;
         }
 
-        const response = await fetch(`/api/conversations/${currentConversationId}/messages`);
+        const response = await fetchWithAuth(`/api/conversations/${currentConversationId}/messages`);
         const data = await response.json();
 
         if (data.success) {

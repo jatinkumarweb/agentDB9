@@ -1,4 +1,5 @@
 'use client';
+import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -77,7 +78,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     setIsLoadingAgents(true);
     try {
       console.log('Fetching agents for workspace chat...');
-      const response = await fetch('/api/agents');
+      const response = await fetchWithAuth('/api/agents');
       
       if (response.ok) {
         const data = await response.json();
@@ -308,7 +309,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       setChatMessages(prev => [...prev, userMessage]);
 
       // Send message to conversation endpoint
-      const response = await fetch(`/api/conversations/${conversation.id}/messages`, {
+      const response = await fetchWithAuth(`/api/conversations/${conversation.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: 'user', content: messageContent }),
@@ -362,7 +363,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   // Fetch conversation messages (fallback for when WebSocket is not available)
   const fetchConversationMessages = async (conversationId: string) => {
     try {
-      const response = await fetch(`/api/conversations/${conversationId}/messages`);
+      const response = await fetchWithAuth(`/api/conversations/${conversationId}/messages`);
       const data = await response.json();
       
       if (data.success) {
@@ -394,7 +395,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       }
 
       // Create a new conversation for workspace chat
-      const response = await fetch('/api/conversations', {
+      const response = await fetchWithAuth('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
