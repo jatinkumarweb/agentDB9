@@ -20,7 +20,9 @@ COPY shared/ /shared/
 
 # Build shared package
 WORKDIR /shared
-RUN npm install && npm run build
+RUN npm install
+RUN npm install --save-dev @types/node || true
+RUN npm run build
 
 # Switch back to app directory
 WORKDIR /app
@@ -37,8 +39,10 @@ RUN npm rebuild sqlite3
 # Copy source code
 COPY backend/ .
 
-# Create symlink to shared package
-RUN mkdir -p node_modules/@agentdb9 && ln -sf /shared node_modules/@agentdb9/shared
+# Create symlink to shared package (use absolute path)
+RUN mkdir -p node_modules/@agentdb9 && \
+    rm -f node_modules/@agentdb9/shared && \
+    ln -sf /shared node_modules/@agentdb9/shared
 
 # Build the NestJS application
 RUN npm run build
