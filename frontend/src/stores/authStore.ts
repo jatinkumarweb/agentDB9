@@ -26,12 +26,14 @@ interface AuthState {
   checkAuth: () => Promise<void>;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+// Use relative URLs to go through Next.js API routes
+// This allows the frontend to proxy requests to the backend
+const API_BASE_URL = '';
 
 // Configure axios to include credentials (cookies) in requests
 axios.defaults.withCredentials = true;
 
-// Configure axios defaults
+// Configure axios defaults - use empty string for relative URLs
 axios.defaults.baseURL = API_BASE_URL;
 axios.defaults.withCredentials = true;
 
