@@ -214,7 +214,7 @@ app.post('/api/generate', async (req, res) => {
           throw new Error(`Ollama API error: ${ollamaResponse.status}`);
         }
 
-        const ollamaData = await ollamaResponse.json();
+        const ollamaData = await ollamaResponse.json() as any;
         
         const response: LLMResponse = {
           content: ollamaData.message?.content || '',
@@ -234,12 +234,12 @@ app.post('/api/generate', async (req, res) => {
         };
 
         return res.json(apiResponse);
-      } catch (ollamaError) {
+      } catch (ollamaError: any) {
         console.error('Ollama generation error:', ollamaError);
         return res.status(500).json({
           success: false,
           error: 'Ollama service unavailable',
-          details: ollamaError.message
+          details: ollamaError?.message || 'Unknown error'
         });
       }
     }
@@ -351,9 +351,9 @@ app.post('/api/generate/stream', async (req, res) => {
       }
 
       res.end();
-    } catch (ollamaError) {
+    } catch (ollamaError: any) {
       console.error('Ollama streaming error:', ollamaError);
-      res.write(`data: ${JSON.stringify({ error: ollamaError.message })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: ollamaError?.message || 'Unknown error' })}\n\n`);
       res.end();
     }
   } catch (error) {
