@@ -93,7 +93,7 @@ export class MCPServer {
         
         // Broadcast tool execution start
         await this.broadcastToolExecution({
-          conversationId: request.context?.conversationId,
+          conversationId: (request.context as any)?.conversationId,
           tool: request.tool,
           parameters: request.parameters,
           status: 'started'
@@ -105,7 +105,7 @@ export class MCPServer {
         
         // Broadcast tool execution result
         await this.broadcastToolExecution({
-          conversationId: request.context?.conversationId,
+          conversationId: (request.context as any)?.conversationId,
           tool: request.tool,
           parameters: request.parameters,
           status: result.success ? 'completed' : 'failed',

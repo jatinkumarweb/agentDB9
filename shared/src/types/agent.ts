@@ -188,6 +188,7 @@ export interface AgentExecutionContext {
   project?: Project;
   workspace: WorkspaceInfo;
   vscode: VSCodeContext;
+  conversationId?: string;
 }
 
 export interface WorkspaceInfo {
