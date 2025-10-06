@@ -21,10 +21,13 @@ export class Agent implements CodingAgent {
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @Column('text', { transformer: {
-    to: (value: AgentConfiguration) => JSON.stringify(value),
-    from: (value: string) => JSON.parse(value)
-  }})
+  @Column('text', { 
+    nullable: false,
+    transformer: {
+      to: (value: AgentConfiguration) => JSON.stringify(value),
+      from: (value: string) => JSON.parse(value)
+    }
+  })
   configuration: AgentConfiguration;
 
   @Column({
