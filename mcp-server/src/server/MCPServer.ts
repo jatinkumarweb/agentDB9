@@ -90,10 +90,43 @@ export class MCPServer {
     this.httpServer.post('/api/tools/execute', async (req, res) => {
       try {
         const request: ToolExecutionRequest = req.body;
+        
+        // Broadcast tool execution start
+        await this.broadcastToolExecution({
+          conversationId: request.context?.conversationId,
+          tool: request.tool,
+          parameters: request.parameters,
+          status: 'started'
+        });
+        
+        const startTime = Date.now();
         const result = await this.executeTool(request);
+        const duration = Date.now() - startTime;
+        
+        // Broadcast tool execution result
+        await this.broadcastToolExecution({
+          conversationId: request.context?.conversationId,
+          tool: request.tool,
+          parameters: request.parameters,
+          status: result.success ? 'completed' : 'failed',
+          result: result.result,
+          error: result.error,
+          duration
+        });
+        
         res.json(result);
       } catch (error) {
         logger.error('Tool execution error:', error);
+        
+        // Broadcast tool execution failure
+        await this.broadcastToolExecution({
+          conversationId: undefined,
+          tool: 'unknown',
+          parameters: {},
+          status: 'failed',
+          error: error instanceof Error ? error.message : 'Tool execution failed'
+        });
+        
         res.status(500).json({
           success: false,
           error: error instanceof Error ? error.message : 'Tool execution failed'
@@ -310,6 +343,55 @@ export class MCPServer {
         reject(error);
       }
     });
+  }
+
+  private async broadcastToolExecution(data: {
+    conversationId?: string;
+    tool: string;
+    parameters: any;
+    status: 'started' | 'completed' | 'failed';
+    result?: any;
+    error?: string;
+    duration?: number;
+  }): Promise<void> {
+    try {
+      // Send to backend for WebSocket broadcasting
+      const axios = (await import('axios')).default;
+      await axios.post(`${this.config.backendUrl}/api/mcp/tool-execution`, {
+        ...data,
+        timestamp: new Date().toISOString()
+      }, {
+        timeout: 5000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error) {
+      logger.error('Failed to broadcast tool execution to backend:', error);
+      // Don't throw - broadcasting failure shouldn't break tool execution
+    }
+  }
+
+  private async broadcastFileChange(data: {
+    conversationId?: string;
+    path: string;
+    action: 'created' | 'modified' | 'deleted';
+    content?: string;
+  }): Promise<void> {
+    try {
+      const axios = (await import('axios')).default;
+      await axios.post(`${this.config.backendUrl}/api/mcp/file-change`, {
+        ...data,
+        timestamp: new Date().toISOString()
+      }, {
+        timeout: 5000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error) {
+      logger.error('Failed to broadcast file change to backend:', error);
+    }
   }
 
   public async stop(): Promise<void> {

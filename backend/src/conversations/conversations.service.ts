@@ -505,6 +505,17 @@ Would you like help setting up external API access?`;
         messageId: savedMessage.id
       });
       
+      // Get available MCP tools for tool calling
+      const availableTools = await this.mcpService.getAvailableTools();
+      const toolsForOllama = availableTools.map(toolName => ({
+        type: 'function',
+        function: {
+          name: toolName,
+          description: this.getToolDescription(toolName),
+          parameters: this.getToolParameters(toolName)
+        }
+      }));
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -515,7 +526,11 @@ Would you like help setting up external API access?`;
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.'
+              content: `You are a helpful coding assistant with access to workspace tools. You can read/write files, execute commands, manage git, and more.
+
+Available tools: ${availableTools.join(', ')}
+
+When you need to perform actions, use the appropriate tool. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.`
             },
             {
               role: 'user',
@@ -523,6 +538,7 @@ Would you like help setting up external API access?`;
             }
           ],
           stream: true,
+          tools: toolsForOllama.length > 0 ? toolsForOllama : undefined,
           options: {
             temperature: 0.3,
             top_p: 0.8,
@@ -565,6 +581,51 @@ Would you like help setting up external API access?`;
             try {
               const data = JSON.parse(line);
               hasReceivedData = true;
+              
+              // Handle tool calls from Ollama
+              if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
+                console.log('Received tool calls from Ollama:', data.message.tool_calls);
+                
+                for (const toolCall of data.message.tool_calls) {
+                  const toolName = toolCall.function?.name;
+                  const toolArgs = toolCall.function?.arguments;
+                  
+                  if (toolName && toolArgs) {
+                    console.log(`Executing tool: ${toolName} with args:`, toolArgs);
+                    
+                    // Broadcast tool execution start
+                    this.websocketGateway.broadcastAgentActivity({
+                      conversationId: conversation.id,
+                      type: this.getActivityTypeFromTool(toolName),
+                      description: `Executing: ${toolName}`,
+                      tool: toolName,
+                      parameters: toolArgs,
+                      status: 'in_progress'
+                    });
+                    
+                    // Execute the tool via MCP service
+                    const toolResult = await this.mcpService.executeTool({
+                      name: toolName,
+                      arguments: toolArgs
+                    });
+                    
+                    // Broadcast tool execution result
+                    this.websocketGateway.broadcastAgentActivity({
+                      conversationId: conversation.id,
+                      type: this.getActivityTypeFromTool(toolName),
+                      description: toolResult.success ? `Completed: ${toolName}` : `Failed: ${toolName}`,
+                      tool: toolName,
+                      parameters: toolArgs,
+                      result: toolResult.result,
+                      status: toolResult.success ? 'completed' : 'failed'
+                    });
+                    
+                    // Add tool result to content
+                    const toolResultText = `\n\n**Tool Result (${toolName}):**\n\`\`\`json\n${JSON.stringify(toolResult.result, null, 2)}\n\`\`\`\n`;
+                    fullContent += toolResultText;
+                  }
+                }
+              }
               
               if (data.message?.content) {
                 fullContent += data.message.content;
@@ -784,5 +845,101 @@ Would you like help setting up external API access?`;
   async remove(id: string): Promise<void> {
     const conversation = await this.findOne(id);
     await this.conversationsRepository.remove(conversation);
+  }
+
+  private getActivityTypeFromTool(toolName: string): 'file_edit' | 'file_create' | 'file_delete' | 'git_operation' | 'terminal_command' | 'test_run' {
+    if (toolName.startsWith('read_file') || toolName.startsWith('write_file') || toolName.startsWith('list_files')) {
+      if (toolName.includes('create')) return 'file_create';
+      if (toolName.includes('delete')) return 'file_delete';
+      return 'file_edit';
+    }
+    
+    if (toolName.includes('git')) {
+      return 'git_operation';
+    }
+    
+    if (toolName.includes('execute_command')) {
+      return 'terminal_command';
+    }
+    
+    if (toolName.includes('test')) {
+      return 'test_run';
+    }
+    
+    return 'file_edit';
+  }
+
+  private getToolDescription(toolName: string): string {
+    const descriptions: Record<string, string> = {
+      'read_file': 'Read the contents of a file from the workspace',
+      'write_file': 'Write content to a file in the workspace',
+      'list_files': 'List files in a directory',
+      'execute_command': 'Execute a shell command in the workspace',
+      'git_status': 'Get the current git repository status',
+      'git_commit': 'Commit changes to git',
+      'create_directory': 'Create a new directory',
+      'delete_file': 'Delete a file from the workspace'
+    };
+    return descriptions[toolName] || `Execute ${toolName}`;
+  }
+
+  private getToolParameters(toolName: string): any {
+    const parameters: Record<string, any> = {
+      'read_file': {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Path to the file to read' }
+        },
+        required: ['path']
+      },
+      'write_file': {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Path to the file to write' },
+          content: { type: 'string', description: 'Content to write to the file' }
+        },
+        required: ['path', 'content']
+      },
+      'list_files': {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Directory path to list', default: '.' }
+        }
+      },
+      'execute_command': {
+        type: 'object',
+        properties: {
+          command: { type: 'string', description: 'Shell command to execute' }
+        },
+        required: ['command']
+      },
+      'git_status': {
+        type: 'object',
+        properties: {}
+      },
+      'git_commit': {
+        type: 'object',
+        properties: {
+          message: { type: 'string', description: 'Commit message' },
+          files: { type: 'array', items: { type: 'string' }, description: 'Files to commit' }
+        },
+        required: ['message']
+      },
+      'create_directory': {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Directory path to create' }
+        },
+        required: ['path']
+      },
+      'delete_file': {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Path to the file to delete' }
+        },
+        required: ['path']
+      }
+    };
+    return parameters[toolName] || { type: 'object', properties: {} };
   }
 }

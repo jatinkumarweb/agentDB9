@@ -160,4 +160,78 @@ export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnec
       timestamp: new Date().toISOString(),
     });
   }
+
+  // Method to broadcast agent activity (MCP tool execution, file changes, etc.)
+  broadcastAgentActivity(data: {
+    conversationId?: string;
+    type: 'file_edit' | 'file_create' | 'file_delete' | 'git_operation' | 'terminal_command' | 'test_run';
+    description: string;
+    tool?: string;
+    parameters?: any;
+    result?: any;
+    file?: string;
+    status?: 'in_progress' | 'completed' | 'failed';
+    timestamp?: Date;
+  }) {
+    const activity = {
+      id: `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      ...data,
+      timestamp: data.timestamp || new Date(),
+    };
+
+    // Broadcast to specific conversation room if conversationId provided
+    if (data.conversationId) {
+      const room = `conversation_${data.conversationId}`;
+      this.logger.log(`Broadcasting agent activity to room ${room}: ${data.type}`);
+      this.server.to(room).emit('agent_activity', activity);
+    } else {
+      // Broadcast to all clients if no specific conversation
+      this.logger.log(`Broadcasting agent activity to all clients: ${data.type}`);
+      this.server.emit('agent_activity', activity);
+    }
+  }
+
+  // Method to broadcast tool execution events from MCP server
+  broadcastToolExecution(data: {
+    conversationId?: string;
+    tool: string;
+    parameters: any;
+    status: 'started' | 'completed' | 'failed';
+    result?: any;
+    error?: string;
+    duration?: number;
+  }) {
+    const event = {
+      ...data,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (data.conversationId) {
+      const room = `conversation_${data.conversationId}`;
+      this.logger.log(`Broadcasting tool execution to room ${room}: ${data.tool} - ${data.status}`);
+      this.server.to(room).emit('tool_execution', event);
+    } else {
+      this.server.emit('tool_execution', event);
+    }
+  }
+
+  // Method to broadcast file change events
+  broadcastFileChange(data: {
+    conversationId?: string;
+    path: string;
+    action: 'created' | 'modified' | 'deleted';
+    content?: string;
+  }) {
+    const event = {
+      ...data,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (data.conversationId) {
+      const room = `conversation_${data.conversationId}`;
+      this.server.to(room).emit('file_changed', event);
+    } else {
+      this.server.emit('file_changed', event);
+    }
+  }
 }

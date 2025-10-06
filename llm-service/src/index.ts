@@ -161,7 +161,7 @@ app.post('/api/test/model', async (req, res) => {
   }
 });
 
-// LLM inference endpoint
+// LLM inference endpoint (non-streaming)
 app.post('/api/generate', async (req, res) => {
   try {
     const request: LLMRequest = req.body;
@@ -187,25 +187,69 @@ app.post('/api/generate', async (req, res) => {
       });
     }
     
-    // Mock LLM response for now
-    const response: LLMResponse = {
-      content: `Mock response from ${model.name} to: ${request.prompt}`,
-      modelId: model.id,
-      provider: model.provider,
-      usage: {
-        promptTokens: request.prompt.length / 4,
-        completionTokens: 50,
-        totalTokens: (request.prompt.length / 4) + 50
+    // Check if this is an Ollama model
+    if (model.provider === 'ollama') {
+      const ollamaUrl = process.env.OLLAMA_HOST || 'http://ollama:11434';
+      
+      try {
+        const ollamaResponse = await fetch(`${ollamaUrl}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: model.id,
+            messages: [
+              { role: 'system', content: 'You are a helpful coding assistant.' },
+              { role: 'user', content: request.prompt }
+            ],
+            stream: false,
+            options: {
+              temperature: request.temperature || 0.3,
+              top_p: 0.8,
+              num_predict: request.maxTokens || 1024
+            }
+          })
+        });
+
+        if (!ollamaResponse.ok) {
+          throw new Error(`Ollama API error: ${ollamaResponse.status}`);
+        }
+
+        const ollamaData = await ollamaResponse.json();
+        
+        const response: LLMResponse = {
+          content: ollamaData.message?.content || '',
+          modelId: model.id,
+          provider: model.provider,
+          usage: {
+            promptTokens: ollamaData.prompt_eval_count || 0,
+            completionTokens: ollamaData.eval_count || 0,
+            totalTokens: (ollamaData.prompt_eval_count || 0) + (ollamaData.eval_count || 0)
+          }
+        };
+
+        const apiResponse: APIResponse<LLMResponse> = {
+          success: true,
+          data: response,
+          message: 'Generated successfully'
+        };
+
+        return res.json(apiResponse);
+      } catch (ollamaError) {
+        console.error('Ollama generation error:', ollamaError);
+        return res.status(500).json({
+          success: false,
+          error: 'Ollama service unavailable',
+          details: ollamaError.message
+        });
       }
-    };
-
-    const apiResponse: APIResponse<LLMResponse> = {
-      success: true,
-      data: response,
-      message: 'Generated successfully'
-    };
-
-    res.json(apiResponse);
+    }
+    
+    // For non-Ollama models, return helpful message
+    res.status(501).json({
+      success: false,
+      error: 'External API models not yet implemented',
+      message: 'Please configure API keys for OpenAI, Anthropic, or use Ollama models'
+    });
   } catch (error) {
     console.error('LLM generation error:', error);
     res.status(500).json({
@@ -214,6 +258,124 @@ app.post('/api/generate', async (req, res) => {
     });
   }
 });
+
+// LLM streaming endpoint
+app.post('/api/generate/stream', async (req, res) => {
+  try {
+    const { messages, modelId, tools, temperature, maxTokens } = req.body;
+    const { getModelById } = await import('@agentdb9/shared');
+    
+    const model = getModelById(modelId || 'codellama:7b');
+    
+    if (!model) {
+      return res.status(400).json({
+        success: false,
+        error: 'Model not found'
+      });
+    }
+
+    if (model.provider !== 'ollama') {
+      return res.status(501).json({
+        success: false,
+        error: 'Only Ollama models support streaming currently'
+      });
+    }
+
+    // Set up SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    const ollamaUrl = process.env.OLLAMA_HOST || 'http://ollama:11434';
+    
+    try {
+      const ollamaResponse = await fetch(`${ollamaUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: modelId,
+          messages: messages || [{ role: 'user', content: 'Hello' }],
+          stream: true,
+          tools: tools ? formatToolsForOllama(tools) : undefined,
+          options: {
+            temperature: temperature || 0.3,
+            top_p: 0.8,
+            num_predict: maxTokens || 1024
+          }
+        })
+      });
+
+      if (!ollamaResponse.ok) {
+        res.write(`data: ${JSON.stringify({ error: `Ollama API error: ${ollamaResponse.status}` })}\n\n`);
+        return res.end();
+      }
+
+      const reader = ollamaResponse.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        res.write(`data: ${JSON.stringify({ error: 'No response body' })}\n\n`);
+        return res.end();
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          break;
+        }
+        
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter(line => line.trim());
+        
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line);
+            
+            const streamData = {
+              content: data.message?.content || '',
+              toolCalls: data.message?.tool_calls,
+              done: data.done,
+              model: data.model,
+              eval_count: data.eval_count,
+              prompt_eval_count: data.prompt_eval_count
+            };
+            
+            res.write(`data: ${JSON.stringify(streamData)}\n\n`);
+          } catch (parseError) {
+            console.error('Failed to parse Ollama chunk:', line);
+          }
+        }
+      }
+
+      res.end();
+    } catch (ollamaError) {
+      console.error('Ollama streaming error:', ollamaError);
+      res.write(`data: ${JSON.stringify({ error: ollamaError.message })}\n\n`);
+      res.end();
+    }
+  } catch (error) {
+    console.error('Streaming error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to start streaming'
+    });
+  }
+});
+
+// Helper function to format tools for Ollama
+function formatToolsForOllama(tools: any[]): any[] {
+  return tools.map(tool => ({
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.inputSchema
+    }
+  }));
+}
 
 // Code analysis endpoint
 app.post('/api/analyze', async (req, res) => {

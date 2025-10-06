@@ -21,10 +21,11 @@ class WebSocketManagerImpl implements WebSocketManager {
       return;
     }
 
-    const wsUrl = process.env.NEXT_PUBLIC_MCP_WS_URL || 'ws://localhost:9002';
+    // Connect to backend WebSocket for unified real-time communication
+    const wsUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
     
     this.socket = io(wsUrl, {
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
@@ -33,12 +34,12 @@ class WebSocketManagerImpl implements WebSocketManager {
     });
 
     this.socket.on('connect', () => {
-      console.log('Connected to MCP WebSocket server');
+      console.log('Connected to Backend WebSocket server');
       this.reconnectAttempts = 0;
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('Disconnected from MCP WebSocket server:', reason);
+      console.log('Disconnected from Backend WebSocket server:', reason);
     });
 
     this.socket.on('connect_error', (error) => {
@@ -51,7 +52,7 @@ class WebSocketManagerImpl implements WebSocketManager {
     });
 
     this.socket.on('reconnect', (attemptNumber) => {
-      console.log(`Reconnected to MCP WebSocket server (attempt ${attemptNumber})`);
+      console.log(`Reconnected to Backend WebSocket server (attempt ${attemptNumber})`);
     });
 
     this.socket.on('reconnect_error', (error) => {
@@ -59,7 +60,7 @@ class WebSocketManagerImpl implements WebSocketManager {
     });
 
     this.socket.on('reconnect_failed', () => {
-      console.error('Failed to reconnect to MCP WebSocket server');
+      console.error('Failed to reconnect to Backend WebSocket server');
     });
   }
 

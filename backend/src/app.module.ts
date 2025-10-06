@@ -18,6 +18,7 @@ import { HealthModule } from './health/health.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { ModelsModule } from './models/models.module';
 import { ProvidersModule } from './providers/providers.module';
+import { MCPModule } from './mcp/mcp.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { ProvidersModule } from './providers/providers.module';
     WebSocketModule,
     ModelsModule,
     ProvidersModule,
+    MCPModule,
   ],
   controllers: [AppController],
   providers: [

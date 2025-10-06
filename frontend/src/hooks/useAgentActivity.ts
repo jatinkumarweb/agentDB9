@@ -32,11 +32,11 @@ export const useAgentActivity = (): UseAgentActivityReturn => {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    // Connect to MCP server WebSocket for real-time agent activity
-    const mcpServerUrl = process.env.NEXT_PUBLIC_MCP_WS_URL || 'ws://localhost:9002';
+    // Connect to backend WebSocket for unified real-time events
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
     
-    const newSocket = io(mcpServerUrl, {
-      transports: ['websocket'],
+    const newSocket = io(backendUrl, {
+      transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 5,
@@ -46,18 +46,18 @@ export const useAgentActivity = (): UseAgentActivityReturn => {
     newSocket.on('connect', () => {
       setIsConnected(true);
       setConnectionError(null);
-      console.log('Connected to MCP server for agent activity');
+      console.log('Connected to backend for agent activity');
     });
 
     newSocket.on('disconnect', () => {
       setIsConnected(false);
-      console.log('Disconnected from MCP server');
+      console.log('Disconnected from backend');
     });
 
     newSocket.on('connect_error', (error) => {
       setConnectionError(error.message);
       setIsConnected(false);
-      console.error('MCP server connection error:', error);
+      console.error('Backend connection error:', error);
     });
 
     // Listen for agent activity events
