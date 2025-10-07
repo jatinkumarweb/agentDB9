@@ -5,10 +5,22 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
 export async function GET(request: NextRequest) {
   try {
+    const headers = createBackendHeaders(request);
+    console.log('Agents API: Request headers:', {
+      hasAuth: !!headers['Authorization'],
+      authPreview: headers['Authorization']?.substring(0, 20) + '...',
+      cookie: request.cookies.get('auth-token')?.value?.substring(0, 20) + '...'
+    });
+    
     const response = await fetch(`${BACKEND_URL}/api/agents`, {
-      headers: createBackendHeaders(request),
+      headers,
     });
     const data = await response.json();
+    
+    console.log('Agents API: Backend response status:', response.status);
+    if (!response.ok) {
+      console.error('Agents API: Backend error:', data);
+    }
     
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
