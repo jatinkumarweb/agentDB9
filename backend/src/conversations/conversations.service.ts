@@ -497,7 +497,7 @@ Would you like help setting up external API access?`;
       
       // Add timeout for local environments where Ollama might not be available
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 minute timeout for streaming
+      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minute timeout for streaming (longer for tool calls)
       
       // Register this generation for potential stopping
       this.activeGenerations.set(savedMessage.id, {
@@ -529,32 +529,15 @@ Would you like help setting up external API access?`;
             {
               role: 'system',
               content: modelSupportsTools 
-                ? `You are a helpful coding assistant with access to workspace tools. You can read/write files, execute commands, manage git, and more.
+                ? `You are a coding assistant with workspace tools: ${availableTools.join(', ')}
 
-Available tools: ${availableTools.join(', ')}
+TOOL USAGE RULES:
+- execute_command: For npm projects use "mkdir dir && cd dir && npm init -y". Edit package.json with "npm pkg set key=value" NOT echo/append.
+- write_file: Provide complete file content, not partial updates.
+- read_file: Read before modifying files.
+- create_directory: Creates parent dirs automatically.
 
-IMPORTANT GUIDELINES FOR TOOL USAGE:
-
-1. **execute_command**: Run shell commands properly
-   - For npm projects: Use "mkdir project-name && cd project-name && npm init -y" to create in a subdirectory
-   - For package.json edits: Use "npm pkg set name=value" instead of echo/append
-   - Always use proper command syntax and error handling
-   - Example: "mkdir demo-app && cd demo-app && npm init -y && npm pkg set name=demo-app"
-
-2. **write_file**: Create or update files with complete content
-   - Provide the full file content, not partial updates
-   - Use proper file paths relative to workspace root
-   - Example: write_file with path="demo-app/index.js" and full content
-
-3. **read_file**: Read file contents before modifying
-   - Always read existing files before making changes
-   - Check file structure before updates
-
-4. **create_directory**: Create directories before writing files
-   - Create parent directories first
-   - Use proper path structure
-
-When you need to perform actions, use the appropriate tool. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.`
+Use tools when needed. Be clear and concise.`
                 : `You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.`
             },
             {
