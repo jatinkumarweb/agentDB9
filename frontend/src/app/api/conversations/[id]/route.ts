@@ -8,10 +8,23 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const headers = createBackendHeaders(request);
+    console.log('Conversation [id] API: Request headers:', {
+      hasAuth: !!headers['Authorization'],
+      authPreview: headers['Authorization']?.substring(0, 20) + '...',
+      cookie: request.cookies.get('auth-token')?.value?.substring(0, 20) + '...',
+      conversationId: params.id
+    });
+    
     const response = await fetch(`${BACKEND_URL}/api/conversations/${params.id}`, {
-      headers: createBackendHeaders(request),
+      headers,
     });
     const data = await response.json();
+    
+    console.log('Conversation [id] API: Backend response status:', response.status);
+    if (!response.ok) {
+      console.error('Conversation [id] API: Backend error:', data);
+    }
     
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
