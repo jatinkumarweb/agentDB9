@@ -720,7 +720,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                   
                   return (
                     <div
-                      key={msg.id}
+                      key={`${msg.id}-${msg._lastUpdated || 0}`}
                       className="flex space-x-2"
                     >
                       <div className="flex-shrink-0">
@@ -742,12 +742,12 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                             {formatTime(new Date(msg.timestamp))}
                           </span>
                         </div>
-                        <p 
+                        <div 
                           className="text-sm text-gray-900 dark:text-gray-100 mt-1 whitespace-pre-wrap"
-                          data-message-length={msg.content.length}
+                          key={`content-${msg.id}-${msg._lastUpdated || 0}`}
                         >
-                          {msg.content || (msg.metadata?.streaming ? '🤖 Thinking...' : '')}
-                        </p>
+                          {msg.content || (msg.metadata?.streaming ? 'Thinking...' : '')}
+                        </div>
                         
                         {/* Streaming indicator */}
                         {msg.metadata?.streaming && msg.content && (
@@ -835,33 +835,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                             {agent.name} ({agent.configuration.model})
                           </option>
                         ))}
-                
-                {/* Typing indicator - only show if generating and no agent message exists yet */}
-                {isGenerating && !currentConversation?.messages?.some(m => m.role === 'agent' && m.metadata?.streaming) && (
-                  <div className="flex space-x-2">
-                    <div className="flex-shrink-0">
-                      <UserCircle className="w-6 h-6 text-blue-500" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                          {getSelectedAgentName()}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          {formatTime(new Date())}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-1 mt-1">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                        </div>
-                        <span className="text-xs text-gray-500 ml-2">thinking...</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
                       </>
                     )}
                   </select>

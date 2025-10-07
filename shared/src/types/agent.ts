@@ -125,6 +125,7 @@ export interface AgentConversation {
   status: 'active' | 'archived';
   createdAt: Date;
   updatedAt: Date;
+  _forceUpdate?: number; // Client-side only: timestamp for forcing React re-renders
 }
 
 export interface ConversationMessage {
@@ -134,6 +135,7 @@ export interface ConversationMessage {
   content: string;
   metadata?: MessageMetadata;
   timestamp: Date;
+  _lastUpdated?: number; // Client-side only: timestamp for forcing React re-renders
 }
 
 export interface MessageMetadata {
