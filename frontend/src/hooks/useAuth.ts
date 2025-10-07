@@ -44,16 +44,17 @@ export const useAuth = () => {
       }
 
       // Verify token with backend
-      const response = await fetch('/api/auth/me', {
+      const response = await fetch('/api/auth/profile', {
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         }
       });
 
       if (response.ok) {
         const userData = await response.json();
         setAuthState({
-          user: userData.data.user,
+          user: userData.data,
           isLoading: false,
           isAuthenticated: true
         });
@@ -80,6 +81,7 @@ export const useAuth = () => {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },
@@ -104,7 +106,8 @@ export const useAuth = () => {
   const logout = async () => {
     try {
       await fetch('/api/auth/logout', {
-        method: 'POST'
+        method: 'POST',
+        credentials: 'include'
       });
     } catch (error) {
       console.error('Logout error:', error);
