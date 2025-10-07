@@ -29,7 +29,6 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
   useEffect(() => {
     // Get VS Code proxy URL (authenticated)
     const baseUrl = process.env.NEXT_PUBLIC_VSCODE_PROXY_URL || 'http://localhost:8081';
-    const workspacePath = currentWorkspace?.path || '/home/coder/workspace';
     
     // Get auth token from cookies
     const token = document.cookie
@@ -37,8 +36,9 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
       .find(row => row.startsWith('auth-token='))
       ?.split('=')[1];
     
-    // Construct URL with workspace path and auth token for WebSocket
-    const url = `${baseUrl}/?folder=${encodeURIComponent(workspacePath)}&token=${encodeURIComponent(token || '')}`;
+    // Construct URL with auth token for WebSocket
+    // Note: code-server automatically opens /home/coder/workspace
+    const url = `${baseUrl}/?token=${encodeURIComponent(token || '')}`;
     setVscodeUrl(url);
   }, [currentWorkspace]);
 
