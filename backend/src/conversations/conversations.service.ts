@@ -506,7 +506,9 @@ Would you like help setting up external API access?`;
       });
       
       // Get available MCP tools for tool calling
-      const availableTools = await this.mcpService.getAvailableTools();
+      // Only enable tools for models that support function calling
+      const modelSupportsTools = this.modelSupportsToolCalling(model);
+      const availableTools = modelSupportsTools ? await this.mcpService.getAvailableTools() : [];
       const toolsForOllama = availableTools.map(toolName => ({
         type: 'function',
         function: {
@@ -526,11 +528,13 @@ Would you like help setting up external API access?`;
           messages: [
             {
               role: 'system',
-              content: `You are a helpful coding assistant with access to workspace tools. You can read/write files, execute commands, manage git, and more.
+              content: modelSupportsTools 
+                ? `You are a helpful coding assistant with access to workspace tools. You can read/write files, execute commands, manage git, and more.
 
 Available tools: ${availableTools.join(', ')}
 
 When you need to perform actions, use the appropriate tool. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.`
+                : `You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.`
             },
             {
               role: 'user',
@@ -941,5 +945,24 @@ Would you like help setting up external API access?`;
       }
     };
     return parameters[toolName] || { type: 'object', properties: {} };
+  }
+
+  /**
+   * Check if a model supports tool/function calling
+   */
+  private modelSupportsToolCalling(model: string): boolean {
+    const modelLower = model.toLowerCase();
+    
+    // Models that support function calling
+    const supportedPatterns = [
+      'llama3.1', 'llama3.2', 'llama-3.1', 'llama-3.2',  // Llama 3.1/3.2
+      'mistral', 'mixtral',  // Mistral models
+      'qwen2.5',  // Qwen 2.5
+      'command-r',  // Cohere Command R
+      'gpt-', 'gpt3', 'gpt4',  // OpenAI GPT models
+      'claude',  // Anthropic Claude
+    ];
+    
+    return supportedPatterns.some(pattern => modelLower.includes(pattern));
   }
 }
