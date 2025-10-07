@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Call MCP server to save file
-    const mcpServerUrl = process.env.MCP_SERVER_URL || 'http://localhost:9001';
+    const mcpServerUrl = process.env.MCP_SERVER_URL || 'http://mcp-server:9001';
     
     const response = await fetch(`${mcpServerUrl}/api/tools/execute`, {
       method: 'POST',

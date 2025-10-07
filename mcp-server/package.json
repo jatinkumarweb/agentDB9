@@ -2,11 +2,12 @@
   "name": "@agentdb9/mcp-server",
   "version": "1.0.0",
   "description": "Model Context Protocol Server for AgentDB9 VS Code Integration",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "tsx src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint src/**/*.ts",
@@ -24,6 +25,7 @@
     "morgan": "^1.10.0",
     "node-pty": "^1.0.0",
     "simple-git": "^3.20.0",
+    "tsx": "^4.7.0",
     "uuid": "^9.0.0",
     "ws": "^8.14.0"
   },

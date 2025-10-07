@@ -5,7 +5,10 @@ export async function POST(request: NextRequest) {
     const { path } = await request.json();
     
     // Call MCP server to list files
-    const mcpServerUrl = process.env.MCP_SERVER_URL || 'http://localhost:9001';
+    const mcpServerUrl = process.env.MCP_SERVER_URL || 'http://mcp-server:9001';
+    const workspacePath = path || '/workspace';
+    
+    console.log(`Listing workspace files from: ${workspacePath}`);
     
     const response = await fetch(`${mcpServerUrl}/api/tools/execute`, {
       method: 'POST',
@@ -15,18 +18,21 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         tool: 'fs_list_directory',
         parameters: {
-          path: path || '/home/coder/workspace'
+          path: workspacePath
         }
       })
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`MCP server error: ${response.status} ${response.statusText}`, errorText);
       throw new Error(`MCP server error: ${response.statusText}`);
     }
 
     const result = await response.json();
     
     if (!result.success) {
+      console.error('MCP server returned error:', result.error);
       throw new Error(result.error || 'Failed to list files');
     }
 
@@ -39,11 +45,15 @@ export async function POST(request: NextRequest) {
       lastModified: entry.lastModified ? new Date(entry.lastModified) : undefined
     }));
 
+    console.log(`Successfully listed ${files.length} files from workspace`);
     return NextResponse.json(files);
   } catch (error) {
     console.error('Error listing workspace files:', error);
     return NextResponse.json(
-      { error: 'Failed to list workspace files' },
+      { 
+        error: 'Failed to list workspace files',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
