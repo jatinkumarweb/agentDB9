@@ -125,6 +125,7 @@ services:
       - "8080:8080"
     environment:
       - SHELL=/bin/bash
+      - DISABLE_WORKSPACE_TRUST=true
     volumes:
       - .:/home/coder/workspace
     command: >
@@ -132,9 +133,9 @@ services:
       --auth none
       --disable-telemetry
       --disable-update-check
-      --user-data-dir /tmp/code-server
-      --extensions-dir /tmp/code-server/extensions
-      --welcome-text "Welcome to AgentDB9! Start chatting with AI agents to create your project."
+      --disable-workspace-trust
+      --disable-file-downloads
+      --disable-getting-started-override
       /home/coder/workspace
 
   vscode-proxy:
