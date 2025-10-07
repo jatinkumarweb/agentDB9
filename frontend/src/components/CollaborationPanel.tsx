@@ -13,7 +13,8 @@ import {
   X,
   Send,
   UserCircle,
-  Dot
+  Dot,
+  Square
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import wsManager from '@/lib/websocket';
@@ -65,6 +66,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   const [currentConversation, setCurrentConversation] = useState<AgentConversation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingMessageId, setGeneratingMessageId] = useState<string | null>(null);
   
   // WebSocket integration
   const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff } = useWebSocket();
@@ -241,7 +243,13 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       
       // Use flushSync to force synchronous update
       flushSync(() => {
-        setIsGenerating(data.streaming);
+        if (data.streaming) {
+          setIsGenerating(true);
+          setGeneratingMessageId(data.messageId);
+        } else {
+          setIsGenerating(false);
+          setGeneratingMessageId(null);
+        }
       });
       
       flushSync(() => {
@@ -289,6 +297,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         if (data.message.role === 'agent' && data.message.metadata?.streaming) {
           console.log('🤖 Agent message started streaming');
           setIsGenerating(true);
+          setGeneratingMessageId(data.message.id);
         }
       });
 
@@ -329,6 +338,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   const handleGenerationStopped = useCallback((data: { conversationId: string; messageId: string }) => {
     console.log('⏹️ Generation stopped:', data.messageId);
     setIsGenerating(false);
+    setGeneratingMessageId(null);
   }, []);
 
   // Memoize WebSocket handlers
@@ -506,6 +516,31 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       return null;
     }
   };
+
+  const stopGeneration = useCallback(async () => {
+    if (!isGenerating || !generatingMessageId || !currentConversation?.id) return;
+
+    try {
+      console.log('⏹️ Stopping generation for message:', generatingMessageId);
+      
+      if (wsConnected) {
+        wsEmit('stop_generation', { conversationId: currentConversation.id, messageId: generatingMessageId });
+      }
+
+      const response = await fetchWithAuth(`/api/conversations/${currentConversation.id}/messages/${generatingMessageId}/stop`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        setIsGenerating(false);
+        setGeneratingMessageId(null);
+      }
+    } catch (err) {
+      console.error('Failed to stop generation:', err);
+      setIsGenerating(false);
+      setGeneratingMessageId(null);
+    }
+  }, [isGenerating, generatingMessageId, wsConnected, wsEmit, currentConversation?.id]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -717,13 +752,23 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                         
                         {/* Streaming indicator */}
                         {msg.metadata?.streaming && msg.content && (
-                          <div className="flex items-center space-x-1 mt-2">
-                            <div className="flex space-x-1">
-                              <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" />
-                              <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                              <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                          <div className="flex items-center justify-between mt-2">
+                            <div className="flex items-center space-x-1">
+                              <div className="flex space-x-1">
+                                <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" />
+                                <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                                <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                              </div>
+                              <span className="text-xs text-gray-500">Streaming...</span>
                             </div>
-                            <span className="text-xs text-gray-500">Streaming...</span>
+                            {generatingMessageId === msg.id && (
+                              <button 
+                                onClick={stopGeneration} 
+                                className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                              >
+                                Stop
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -775,7 +820,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                       setSelectedAgent(agent);
                       // Clear current conversation when agent changes
                       setCurrentConversation(null);
-                      setChatMessages([]);
                     }}
                     disabled={isLoadingAgents || availableAgents.length === 0}
                     className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
@@ -837,17 +881,27 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     disabled={!selectedAgent}
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
                   />
-                  <button
-                    onClick={sendMessage}
-                    disabled={!newMessage.trim() || !selectedAgent || isLoading || isGenerating}
-                    className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isLoading || isGenerating ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
-                  </button>
+                  {isGenerating ? (
+                    <button
+                      onClick={stopGeneration}
+                      className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-1"
+                    >
+                      <Square className="w-4 h-4" />
+                      <span className="text-xs">Stop</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={sendMessage}
+                      disabled={!newMessage.trim() || !selectedAgent || isLoading}
+                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isLoading ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
