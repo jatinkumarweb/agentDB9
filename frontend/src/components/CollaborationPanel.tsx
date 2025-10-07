@@ -74,6 +74,15 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   // Ref for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Helper function to sort messages by timestamp
+  const sortMessagesByTimestamp = useCallback((messages: ConversationMessage[]) => {
+    return [...messages].sort((a, b) => {
+      const timestampA = new Date(a.timestamp as any).getTime();
+      const timestampB = new Date(b.timestamp as any).getTime();
+      return timestampA - timestampB;
+    });
+  }, []);
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -270,15 +279,16 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
               : { ...msg } // Clone all messages
           );
 
+          const sortedMessages = sortMessagesByTimestamp(updatedMessages);
           const newConversation = { 
             ...prev, 
-            messages: updatedMessages,
+            messages: sortedMessages,
             _forceUpdate: Date.now() // Force React to detect change
           };
           
           // Log the updated message details
-          const updatedMsg = updatedMessages.find(m => m.id === data.messageId);
-          console.log('📝 Updated conversation with', updatedMessages.length, 'messages');
+          const updatedMsg = sortedMessages.find(m => m.id === data.messageId);
+          console.log('📝 Updated conversation with', sortedMessages.length, 'messages');
           console.log('📝 Updated message content:', {
             id: updatedMsg?.id,
             contentLength: updatedMsg?.content?.length || 0,
@@ -289,7 +299,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
           return newConversation;
         });
       });
-    }, []);
+    }, [sortMessagesByTimestamp]);
 
     const handleNewMessage = useCallback((data: {
       conversationId: string;
@@ -323,22 +333,26 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
           if (messageExists) {
             console.log('⚠️ Message already exists, updating instead');
             // Update existing message
+            const updatedMessages = existingMessages.map((m) =>
+              m.id === data.message.id ? { ...data.message, _lastUpdated: Date.now() } : { ...m }
+            );
             return {
               ...prev,
-              messages: existingMessages.map((m) =>
-                m.id === data.message.id ? { ...data.message, _lastUpdated: Date.now() } : { ...m }
-              ),
+              messages: sortMessagesByTimestamp(updatedMessages),
+              _forceUpdate: Date.now(),
             };
           }
 
           console.log('✅ Adding new message to conversation');
+          const newMessages = [...existingMessages, { ...data.message, _lastUpdated: Date.now() }];
           return {
             ...prev,
-            messages: [...existingMessages, { ...data.message, _lastUpdated: Date.now() }],
+            messages: sortMessagesByTimestamp(newMessages),
+            _forceUpdate: Date.now(),
           };
         });
       });
-    }, []);
+    }, [sortMessagesByTimestamp]);
 
   const handleGenerationStopped = useCallback((data: { conversationId: string; messageId: string }) => {
     console.log('⏹️ Generation stopped:', data.messageId);
@@ -384,7 +398,8 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
         if (data.success) {
           console.log('✅ Loaded', data.data.length, 'messages');
-          setCurrentConversation(prev => prev ? { ...prev, messages: data.data } : null);
+          const sortedMessages = sortMessagesByTimestamp(data.data);
+          setCurrentConversation(prev => prev ? { ...prev, messages: sortedMessages, _forceUpdate: Date.now() } : null);
         }
       } catch (error) {
         console.error('Failed to load messages:', error);
@@ -395,7 +410,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     if (!currentConversation.messages || currentConversation.messages.length === 0) {
       loadMessages();
     }
-  }, [currentConversation?.id]);
+  }, [currentConversation?.id, sortMessagesByTimestamp]);
 
   // Join conversation room AFTER handlers are set up and messages are loaded
   useEffect(() => {
@@ -467,7 +482,8 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       const data = await response.json();
       
       if (data.success) {
-        setCurrentConversation(prev => prev ? { ...prev, messages: data.data } : null);
+        const sortedMessages = sortMessagesByTimestamp(data.data);
+        setCurrentConversation(prev => prev ? { ...prev, messages: sortedMessages, _forceUpdate: Date.now() } : null);
         setIsGenerating(false);
       }
     } catch (error) {
