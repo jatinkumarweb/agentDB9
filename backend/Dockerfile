@@ -33,6 +33,9 @@ COPY backend/package*.json ./
 # Install dependencies
 RUN npm install
 
+# Explicitly install jsonrepair locally (prevent hoisting issues)
+RUN npm install jsonrepair@3.13.1
+
 # Rebuild native modules for the container architecture
 RUN npm rebuild sqlite3
 
