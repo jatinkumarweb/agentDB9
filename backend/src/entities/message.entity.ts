@@ -1,9 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { ConversationMessage } from '@agentdb9/shared';
 import { Conversation } from './conversation.entity';
-
-// Import jsonrepair using require for CommonJS compatibility
-const { jsonrepair } = require('jsonrepair');
+import { jsonrepair } from 'jsonrepair';
 
 @Entity('messages')
 export class Message implements Omit<ConversationMessage, 'role'> {

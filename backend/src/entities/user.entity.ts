@@ -2,9 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Exclude } from 'class-transformer';
 import { Agent } from './agent.entity';
 import { Conversation } from './conversation.entity';
-
-// Import jsonrepair using require for CommonJS compatibility
-const { jsonrepair } = require('jsonrepair');
+import { jsonrepair } from 'jsonrepair';
 
 @Entity('users')
 export class User {

@@ -6,10 +6,8 @@ import { Message } from '../entities/message.entity';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
 import { WebSocketGateway } from '../websocket/websocket.gateway';
 import { MCPService } from '../mcp/mcp.service';
+import { jsonrepair } from 'jsonrepair';
 // CreateMessageDto import removed - using plain object type instead
-
-// Import jsonrepair using require for CommonJS compatibility
-const { jsonrepair } = require('jsonrepair');
 
 @Injectable()
 export class ConversationsService {
