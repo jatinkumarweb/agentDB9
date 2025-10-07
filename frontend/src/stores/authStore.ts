@@ -218,6 +218,7 @@ export const useAuthStore = create<AuthState>()(
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
           // Verify the token is still valid using fetch with credentials
+          console.log('checkAuth: Calling /api/auth/profile with credentials');
           const response = await fetch('/api/auth/profile', {
             credentials: 'include',
             headers: {
@@ -225,12 +226,23 @@ export const useAuthStore = create<AuthState>()(
             },
           });
           
+          console.log('checkAuth: Profile response status:', response.status);
+          
           if (!response.ok) {
-            throw new Error('Profile request failed');
+            const errorData = await response.json();
+            console.error('checkAuth: Profile request failed:', errorData);
+            throw new Error(`Profile request failed with status ${response.status}`);
           }
           
           const data = await response.json();
-          const { user } = data.data;
+          console.log('checkAuth: Profile data received:', { hasData: !!data.data, hasUser: !!data.data?.user });
+          
+          if (!data.data || !data.data.email) {
+            console.error('checkAuth: Invalid profile data structure:', data);
+            throw new Error('Invalid profile data structure');
+          }
+          
+          const user = data.data;
 
           console.log('checkAuth: Token valid, user authenticated:', user.email);
           set({
@@ -239,6 +251,7 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           });
         } catch (error: any) {
+          console.error('checkAuth: Error occurred:', error.message, error);
           console.log('checkAuth: Token invalid, logging out');
           // Token is invalid, logout the user
           set({ isLoading: false });
