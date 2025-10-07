@@ -147,3 +147,34 @@ The implementation correctly:
 5. Provides clean user experience
 
 **Status**: Ready for production use
+
+---
+
+## Common Issues and Solutions
+
+### npm init Command Errors
+
+**Problem:** Commands like `npm init -y --name project-name` fail with:
+```
+sh: 1: create-project-name: not found
+npm error code 127
+```
+
+**Cause:** npm interprets `npm init <initializer>` as running `create-<initializer>` package. The `--name` flag is treated as the initializer name, so `npm init -y --name demo-project` tries to run `create-demo-project`.
+
+**Solution:** Use proper command chaining:
+```bash
+# ✅ Correct way to create npm project
+mkdir project-name && cd project-name && npm init -y
+
+# ✅ To set package name after init
+npm pkg set name=project-name
+
+# ✅ Or combine them
+mkdir project-name && cd project-name && npm init -y && npm pkg set name=project-name
+
+# ❌ WRONG - Don't use this
+npm init -y --name project-name
+```
+
+**Fix Applied:** The system prompt now explicitly warns against using `npm init --name` and provides correct examples to guide the LLM.

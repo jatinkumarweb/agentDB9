@@ -543,6 +543,9 @@ TOOL CALL FORMAT (use this exact XML structure):
 
 AVAILABLE TOOLS:
 - execute_command: Run shell commands. Args: {"command": "your command here"}
+  * For npm projects: Use "mkdir project-name && cd project-name && npm init -y"
+  * NEVER use "npm init -y --name" (this tries to run create-name package)
+  * To set package name after init: "npm pkg set name=project-name"
 - write_file: Write complete file content. Args: {"path": "file.js", "content": "full content"}
 - read_file: Read file contents. Args: {"path": "file.js"}
 - create_directory: Create directory. Args: {"path": "dirname"}
@@ -885,7 +888,7 @@ Would you like help setting up external API access?`;
       'read_file': 'Read the contents of a file from the workspace',
       'write_file': 'Write or update a file with complete content (not append). Provide full file content.',
       'list_files': 'List files and directories in a path',
-      'execute_command': 'Execute a shell command. For npm projects, use: mkdir dir && cd dir && npm init -y. Use npm pkg set for package.json edits.',
+      'execute_command': 'Execute a shell command. For npm projects: mkdir dir && cd dir && npm init -y (NEVER use npm init --name). Use npm pkg set name=value for package.json edits.',
       'git_status': 'Get the current git repository status',
       'git_commit': 'Commit changes to git with a message',
       'create_directory': 'Create a new directory (creates parent dirs if needed)',
