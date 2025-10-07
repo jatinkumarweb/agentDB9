@@ -518,6 +518,12 @@ Would you like help setting up external API access?`;
         }
       }));
 
+      // Log tool configuration for debugging
+      console.log(`Model: ${model}, Supports tools: ${modelSupportsTools}, Tools count: ${toolsForOllama.length}`);
+      if (toolsForOllama.length > 0) {
+        console.log('Sending tools to Ollama:', JSON.stringify(toolsForOllama.slice(0, 2), null, 2)); // Log first 2 tools
+      }
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -957,11 +963,14 @@ Would you like help setting up external API access?`;
   /**
    * Check if a model supports tool/function calling
    * 
-   * Note: This list includes models that support function calling in Ollama's format.
-   * CodeLlama does NOT support function calling despite being a code model.
-   * Models not in this list will work but won't have tool execution capabilities.
+   * Note: TEMPORARILY DISABLED - Ollama's tool calling appears to cause timeouts
+   * with streaming. Need to investigate proper implementation.
    */
   private modelSupportsToolCalling(model: string): boolean {
+    // Temporarily disable all tool calling to test if this is causing the timeout
+    return false;
+    
+    /* DISABLED - causing 60s timeouts
     const modelLower = model.toLowerCase();
     
     // Models that support function calling (verified to work with Ollama)
@@ -977,5 +986,6 @@ Would you like help setting up external API access?`;
     // Note: CodeLlama, Starcoder, and base Llama models do NOT support function calling
     
     return supportedPatterns.some(pattern => modelLower.includes(pattern));
+    */
   }
 }
