@@ -956,6 +956,7 @@ Would you like help setting up external API access?`;
     // Models that support function calling
     const supportedPatterns = [
       'llama3.1', 'llama3.2', 'llama-3.1', 'llama-3.2',  // Llama 3.1/3.2
+      'codellama',  // CodeLlama (supports function calling)
       'mistral', 'mixtral',  // Mistral models
       'qwen2.5',  // Qwen 2.5
       'command-r',  // Cohere Command R
