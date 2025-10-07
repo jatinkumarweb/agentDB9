@@ -950,22 +950,24 @@ Would you like help setting up external API access?`;
   /**
    * Check if a model supports tool/function calling
    * 
-   * Note: This list includes models that support function calling.
+   * Note: This list includes models that support function calling in Ollama's format.
+   * CodeLlama does NOT support function calling despite being a code model.
    * Models not in this list will work but won't have tool execution capabilities.
    */
   private modelSupportsToolCalling(model: string): boolean {
     const modelLower = model.toLowerCase();
     
-    // Models that support function calling
+    // Models that support function calling (verified to work with Ollama)
     const supportedPatterns = [
-      'llama3.1', 'llama3.2', 'llama-3.1', 'llama-3.2',  // Llama 3.1/3.2
-      'codellama',  // CodeLlama
+      'llama3.1', 'llama3.2', 'llama-3.1', 'llama-3.2',  // Llama 3.1/3.2 only (not base Llama)
       'mistral', 'mixtral',  // Mistral models
       'qwen2.5',  // Qwen 2.5
       'command-r',  // Cohere Command R
       'gpt-', 'gpt3', 'gpt4',  // OpenAI GPT models
       'claude',  // Anthropic Claude
     ];
+    
+    // Note: CodeLlama, Starcoder, and base Llama models do NOT support function calling
     
     return supportedPatterns.some(pattern => modelLower.includes(pattern));
   }
