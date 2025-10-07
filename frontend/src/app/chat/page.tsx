@@ -170,7 +170,8 @@ export default function ChatPage({}: ChatPageProps) {
       const sortedMessages = sortMessagesByTimestamp(updatedMessages);
       const newConversation = { 
         ...prev, 
-        messages: sortedMessages
+        messages: sortedMessages,
+        _forceUpdate: Date.now() // Force React to detect change
       };
       console.log('📝 Updated conversation with', sortedMessages.length, 'messages');
       return newConversation;
@@ -220,7 +221,8 @@ export default function ChatPage({}: ChatPageProps) {
 
       return { 
         ...prev, 
-        messages: mergedMessages
+        messages: mergedMessages,
+        _forceUpdate: Date.now() // Force React to detect change
       };
       });
     });
@@ -241,7 +243,7 @@ export default function ChatPage({}: ChatPageProps) {
       if (prev.id !== data.conversationId) return prev;
 
       const sortedMessages = sortMessagesByTimestamp(data.messages);
-      return { ...prev, messages: sortedMessages };
+      return { ...prev, messages: sortedMessages, _forceUpdate: Date.now() };
     });
 
     try {
@@ -266,7 +268,7 @@ export default function ChatPage({}: ChatPageProps) {
         msg.id === data.messageId ? { ...msg, metadata: { ...msg.metadata, streaming: false } } : msg
       );
 
-      return { ...prev, messages: sortMessagesByTimestamp(updatedMessages) };
+      return { ...prev, messages: sortMessagesByTimestamp(updatedMessages), _forceUpdate: Date.now() };
     });
   }, [sortMessagesByTimestamp]);
 
@@ -421,7 +423,7 @@ export default function ChatPage({}: ChatPageProps) {
       const cachedMessages = currentCache?.getMessages?.(currentConversation.id);
 if (cachedMessages) {
   const cloned = cachedMessages.map((m) => ({ ...m }));
-  const updatedConversation = { ...currentConversation, messages: sortMessagesByTimestamp(cloned) };
+  const updatedConversation = { ...currentConversation, messages: sortMessagesByTimestamp(cloned), _forceUpdate: Date.now() };
   setCurrentConversation(updatedConversation);
 }
 
@@ -430,7 +432,7 @@ if (cachedMessages) {
 
       if (messagesData.success) {
         const sortedMessages = sortMessagesByTimestamp(messagesData.data);
-        const updatedConversation = { ...currentConversation, messages: sortedMessages };
+        const updatedConversation = { ...currentConversation, messages: sortedMessages, _forceUpdate: Date.now() };
         setCurrentConversation(updatedConversation);
         currentCache?.setMessages?.(currentConversation.id, sortedMessages);
         setConversations((prev) => prev.map((c) => (c.id === currentConversation.id ? updatedConversation : c)));
@@ -473,7 +475,7 @@ if (cachedMessages) {
           if (!prev) return prev;
           const existingMessages = prev.messages || [];
           const mergedMessages = mergeMessages(existingMessages, [userMessage]);
-          return { ...prev, messages: mergedMessages };
+          return { ...prev, messages: mergedMessages, _forceUpdate: Date.now() };
         });
 
         // Add fallback refresh for WebSocket issues
