@@ -227,7 +227,13 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       streaming: boolean;
       metadata?: any;
     }) => {
-      console.log('🔄 Received message update:', data.messageId, 'streaming:', data.streaming, 'content length:', data.content.length);
+      console.log('🔄 Received message update:', {
+        messageId: data.messageId,
+        streaming: data.streaming,
+        contentLength: data.content?.length || 0,
+        contentPreview: data.content?.substring(0, 100) || '(empty)',
+        metadata: data.metadata
+      });
       
       // Use flushSync to force synchronous update
       flushSync(() => {
@@ -269,7 +275,17 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
             messages: updatedMessages,
             _forceUpdate: Date.now() // Force React to detect change
           };
+          
+          // Log the updated message details
+          const updatedMsg = updatedMessages.find(m => m.id === data.messageId);
           console.log('📝 Updated conversation with', updatedMessages.length, 'messages');
+          console.log('📝 Updated message content:', {
+            id: updatedMsg?.id,
+            contentLength: updatedMsg?.content?.length || 0,
+            contentPreview: updatedMsg?.content?.substring(0, 100) || '(empty)',
+            streaming: updatedMsg?.metadata?.streaming
+          });
+          
           return newConversation;
         });
       });
