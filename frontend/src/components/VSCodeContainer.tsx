@@ -54,7 +54,7 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
         try {
           // Check if the iframe content indicates an auth error
           const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-          if (iframeDoc && iframeDoc.title.includes('401') || iframeDoc.title.includes('403')) {
+          if (iframeDoc && (iframeDoc.title.includes('401') || iframeDoc.title.includes('403'))) {
             setError('Authentication failed. Please log in again.');
             return;
           }

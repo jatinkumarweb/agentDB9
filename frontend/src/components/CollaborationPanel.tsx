@@ -162,16 +162,10 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         if (exists) return prev;
         return [...prev, userData];
       });
-      
-      addSystemMessage(`${userData.name} joined the workspace`);
     });
 
     wsManager.on('user_left', (userId: string) => {
       setActiveUsers(prev => {
-        const user = prev.find(u => u.id === userId);
-        if (user) {
-          addSystemMessage(`${user.name} left the workspace`);
-        }
         return prev.filter(u => u.id !== userId);
       });
     });
@@ -188,10 +182,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       ));
     });
 
-    wsManager.on('chat_message', (message: ChatMessage) => {
-      setChatMessages(prev => [...prev, message]);
-    });
-
     wsManager.on('agent_message', (data: { message: string; context?: any }) => {
       const agentMessage: ChatMessage = {
         id: 'msg_' + Date.now(),
@@ -201,7 +191,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         timestamp: new Date(),
         type: 'agent'
       };
-      setChatMessages(prev => [...prev, agentMessage]);
     });
 
     // Join workspace
@@ -214,7 +203,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       wsManager.off('user_left');
       wsManager.off('user_status_changed');
       wsManager.off('user_file_changed');
-      wsManager.off('chat_message');
       wsManager.off('agent_message');
     };
   }, []);
@@ -278,7 +266,8 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
           const newConversation = { 
             ...prev, 
-            messages: updatedMessages
+            messages: updatedMessages,
+            _forceUpdate: Date.now() // Force React to detect change
           };
           console.log('📝 Updated conversation with', updatedMessages.length, 'messages');
           return newConversation;
@@ -447,17 +436,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       }
     } catch (error) {
       console.error('Failed to send message:', error);
-      
-      // Add error message
-      const errorMessage: ChatMessage = {
-        id: 'error_' + Date.now(),
-        userId: 'system',
-        userName: 'System',
-        message: `Failed to send message. Please try again.`,
-        timestamp: new Date(),
-        type: 'system'
-      };
-      setChatMessages(prev => [...prev, errorMessage]);
       
       // Restore the message content
       setNewMessage(messageContent);
@@ -718,6 +696,11 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                 {currentConversation?.messages?.map((msg) => {
                   const isUser = msg.role === 'user';
                   const isAgent = msg.role === 'agent';
+                  
+                  // Debug: log what we're rendering
+                  if (isAgent && msg.metadata?.streaming) {
+                    console.log('🎨 Rendering agent message:', msg.id, 'content length:', msg.content.length, 'first 50 chars:', msg.content.substring(0, 50));
+                  }
                   
                   return (
                     <div
