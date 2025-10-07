@@ -3,12 +3,16 @@
  * This is necessary for authentication to work properly
  */
 export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const defaultHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
   return fetch(url, {
     ...options,
     credentials: 'include', // Always include cookies
     headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
+      ...defaultHeaders,
+      ...(options.headers || {}),
     },
   });
 }
