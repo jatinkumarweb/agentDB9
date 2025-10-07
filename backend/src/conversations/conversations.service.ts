@@ -6,6 +6,7 @@ import { Message } from '../entities/message.entity';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
 import { WebSocketGateway } from '../websocket/websocket.gateway';
 import { MCPService } from '../mcp/mcp.service';
+import { jsonrepair } from 'jsonrepair';
 // CreateMessageDto import removed - using plain object type instead
 
 @Injectable()
@@ -599,7 +600,9 @@ After tool execution, you'll see results. Then provide your response.`
           
           for (const line of lines) {
             try {
-              const data = JSON.parse(line);
+              // Repair potentially malformed JSON from streaming response
+              const repairedLine = jsonrepair(line);
+              const data = JSON.parse(repairedLine);
               hasReceivedData = true;
               
               // Handle tool calls from Ollama
@@ -968,7 +971,9 @@ Would you like help setting up external API access?`;
       const argsJson = match[2].trim();
       
       try {
-        const args = JSON.parse(argsJson);
+        // Repair potentially malformed JSON from LLM output
+        const repairedJson = jsonrepair(argsJson);
+        const args = JSON.parse(repairedJson);
         console.log(`Executing tool: ${toolName} with args:`, args);
         
         // Broadcast tool execution start

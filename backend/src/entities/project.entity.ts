@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import type { Project as ProjectInterface, ProjectStatus } from '@agentdb9/shared';
+import { jsonrepair } from 'jsonrepair';
 
 @Entity('projects')
 export class Project implements ProjectInterface {
@@ -40,7 +41,15 @@ export class Project implements ProjectInterface {
       to: (value: string[]) => JSON.stringify(value || []),
       from: (value: any) => {
         if (!value) return [];
-        if (typeof value === 'string') return JSON.parse(value);
+        if (typeof value === 'string') {
+          try {
+            const repaired = jsonrepair(value);
+            return JSON.parse(repaired);
+          } catch (error) {
+            console.error('Failed to parse agents JSON:', error);
+            return [];
+          }
+        }
         return value;
       }
     }

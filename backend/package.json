@@ -39,6 +39,7 @@
     "compression": "^1.8.1",
     "helmet": "^8.1.0",
     "joi": "^18.0.1",
+    "jsonrepair": "^3.13.1",
     "nest-winston": "^1.10.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
