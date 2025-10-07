@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Exclude } from 'class-transformer';
 import { Agent } from './agent.entity';
 import { Conversation } from './conversation.entity';
-import { jsonrepair } from 'jsonrepair';
+import { parseJSON } from '../common/utils/json-parser.util';
 
 @Entity('users')
 export class User {
@@ -38,13 +38,7 @@ export class User {
       from: (value: any) => {
         if (!value) return null;
         if (typeof value === 'string') {
-          try {
-            const repaired = jsonrepair(value);
-            return JSON.parse(repaired);
-          } catch (error) {
-            console.error('Failed to parse preferences JSON:', error);
-            return null;
-          }
+          return parseJSON(value);
         }
         return value;
       }

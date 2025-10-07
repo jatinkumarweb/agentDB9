@@ -81,7 +81,7 @@ cat /workspaces/agentDB9/test-demo-project/package.json
 1. **LLM generates response** with embedded tool calls in XML format
 2. **parseAndExecuteToolCalls** method:
    - Parses XML using flexible regex (supports multiple formats)
-   - Repairs JSON arguments using `jsonrepair` library
+   - Repairs JSON arguments using custom `parseJSON` utility
    - Strips tool call XML from displayed content
 3. **MCP Service executes** the tool:
    - Runs shell commands via `child_process.exec`

@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import type { CodingAgent, AgentStatus, AgentCapability, AgentConfiguration } from '@agentdb9/shared';
 import { Conversation } from './conversation.entity';
 import { User } from './user.entity';
-import { jsonrepair } from 'jsonrepair';
+import { parseJSON } from '../common/utils/json-parser.util';
 
 @Entity('agents')
 export class Agent implements CodingAgent {
@@ -28,13 +28,7 @@ export class Agent implements CodingAgent {
       to: (value: AgentConfiguration) => JSON.stringify(value),
       from: (value: any) => {
         if (typeof value === 'string') {
-          try {
-            const repaired = jsonrepair(value);
-            return JSON.parse(repaired);
-          } catch (error) {
-            console.error('Failed to parse configuration JSON:', error);
-            return value;
-          }
+          return parseJSON(value) || value;
         }
         return value;
       }
@@ -53,13 +47,7 @@ export class Agent implements CodingAgent {
     to: (value: AgentCapability[]) => JSON.stringify(value),
     from: (value: any) => {
       if (typeof value === 'string') {
-        try {
-          const repaired = jsonrepair(value);
-          return JSON.parse(repaired);
-        } catch (error) {
-          console.error('Failed to parse capabilities JSON:', error);
-          return [];
-        }
+        return parseJSON(value) || [];
       }
       return value;
     }

@@ -14,8 +14,7 @@
   "scripts": {
     "install:all": "npm install && npm run install:workspaces",
     "install:workspaces": "npm install --workspaces",
-    "postinstall": "npm run build --workspace=shared --if-present && npm run setup:symlinks",
-    "setup:symlinks": "mkdir -p backend/node_modules && ln -sf ../../node_modules/jsonrepair backend/node_modules/jsonrepair || true",
+    "postinstall": "npm run build --workspace=shared --if-present",
     "build": "npm run build:shared && npm run build:services",
     "build:shared": "npm run build --workspace=shared",
     "build:services": "npm run build --workspace=frontend & npm run build --workspace=backend & npm run build --workspace=llm-service & npm run build --workspace=mcp-server & npm run build --workspace=vscode-proxy & wait",

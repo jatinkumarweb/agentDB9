@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { ConversationMessage } from '@agentdb9/shared';
 import { Conversation } from './conversation.entity';
-import { jsonrepair } from 'jsonrepair';
+import { parseJSON } from '../common/utils/json-parser.util';
 
 @Entity('messages')
 export class Message implements Omit<ConversationMessage, 'role'> {
@@ -22,13 +22,7 @@ export class Message implements Omit<ConversationMessage, 'role'> {
     from: (value: any) => {
       if (!value) return null;
       if (typeof value === 'string') {
-        try {
-          const repaired = jsonrepair(value);
-          return JSON.parse(repaired);
-        } catch (error) {
-          console.error('Failed to parse metadata JSON:', error);
-          return null;
-        }
+        return parseJSON(value);
       }
       return value;
     }

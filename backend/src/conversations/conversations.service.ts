@@ -6,7 +6,7 @@ import { Message } from '../entities/message.entity';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
 import { WebSocketGateway } from '../websocket/websocket.gateway';
 import { MCPService } from '../mcp/mcp.service';
-import { jsonrepair } from 'jsonrepair';
+import { parseJSON } from '../common/utils/json-parser.util';
 // CreateMessageDto import removed - using plain object type instead
 
 @Injectable()
@@ -606,9 +606,8 @@ IMPORTANT:
           
           for (const line of lines) {
             try {
-              // Repair potentially malformed JSON from streaming response
-              const repairedLine = jsonrepair(line);
-              const data = JSON.parse(repairedLine);
+              const data = parseJSON(line);
+              if (!data) continue;
               hasReceivedData = true;
               
               // Handle tool calls from Ollama
@@ -987,9 +986,11 @@ Would you like help setting up external API access?`;
       const argsJson = match[2].trim();
       
       try {
-        // Repair potentially malformed JSON from LLM output
-        const repairedJson = jsonrepair(argsJson);
-        const args = JSON.parse(repairedJson);
+        const args = parseJSON(argsJson);
+        if (!args) {
+          console.error(`Failed to parse tool arguments for ${toolName}`);
+          continue;
+        }
         console.log(`Executing tool: ${toolName} with args:`, args);
         
         // Broadcast tool execution start

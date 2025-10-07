@@ -1,31 +1,19 @@
 # Docker Development Setup
 
-## Issue: jsonrepair Module Not Found in Watch Mode
+## Previous Issue: jsonrepair Module Not Found in Watch Mode (RESOLVED)
 
-When running `docker-compose up` with volume mounts, the backend runs in watch mode which compiles TypeScript on file changes. This can cause "Cannot find module 'jsonrepair'" errors because:
+**Problem:** The `jsonrepair` npm package was causing "Cannot find module 'jsonrepair'" errors in Docker watch mode due to npm workspaces hoisting packages to the root `node_modules`, which Docker volume mounts couldn't resolve properly.
 
-1. Docker mounts `./backend` to `/app` in the container
-2. `node_modules` is in a Docker volume (not visible to local TypeScript)
-3. npm workspaces hoists `jsonrepair` to root `node_modules`
-4. Watch mode TypeScript compiler can't find the hoisted package
+**Solution:** Removed the `jsonrepair` dependency entirely and replaced it with a custom `parseJSON` utility function located at `backend/src/common/utils/json-parser.util.ts`.
 
-## Solution
+See [JSONREPAIR_REMOVAL.md](./JSONREPAIR_REMOVAL.md) for complete details.
 
-After running `npm install` in the root, create a symlink in backend:
+## Current Docker Setup
 
-```bash
-cd backend
-ln -sf ../node_modules/jsonrepair node_modules/jsonrepair
-```
-
-This allows the local TypeScript compiler (used by watch mode) to find the hoisted package.
-
-## Alternative: Production Mode
-
-To avoid this issue entirely, run in production mode:
+The Docker environment now works seamlessly without any module resolution issues. Simply run:
 
 ```bash
-docker-compose up -d backend
+docker-compose up -d
 ```
 
 This uses the pre-built image without watch mode.

@@ -44,9 +44,6 @@ RUN mkdir -p node_modules/@agentdb9 && \
     rm -f node_modules/@agentdb9/shared && \
     ln -sf /shared node_modules/@agentdb9/shared
 
-# Verify jsonrepair is installed
-RUN ls -la node_modules/jsonrepair || echo "WARNING: jsonrepair not found in node_modules"
-
 # Build the NestJS application
 RUN npm run build
 

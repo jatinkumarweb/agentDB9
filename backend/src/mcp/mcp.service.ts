@@ -3,7 +3,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { jsonrepair } from 'jsonrepair';
+import { parseJSON } from '../common/utils/json-parser.util';
 
 export interface MCPToolCall {
   name: string;
@@ -84,14 +84,14 @@ export class MCPService {
     while ((match = toolCallRegex.exec(agentResponse)) !== null) {
       try {
         const toolName = match[1];
-        // Repair potentially malformed JSON
-        const repairedJson = jsonrepair(match[2]);
-        const args = JSON.parse(repairedJson);
+        const args = parseJSON(match[2]);
         
-        toolCalls.push({
-          name: toolName,
-          arguments: args
-        });
+        if (args) {
+          toolCalls.push({
+            name: toolName,
+            arguments: args
+          });
+        }
       } catch (error) {
         this.logger.warn(`Failed to parse tool call: ${match[0]}`, error);
       }
