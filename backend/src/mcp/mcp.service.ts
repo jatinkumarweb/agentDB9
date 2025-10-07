@@ -3,7 +3,9 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { jsonrepair } from 'jsonrepair';
+
+// Import jsonrepair using require for CommonJS compatibility
+const { jsonrepair } = require('jsonrepair');
 
 export interface MCPToolCall {
   name: string;

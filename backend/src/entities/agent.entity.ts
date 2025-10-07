@@ -2,7 +2,9 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import type { CodingAgent, AgentStatus, AgentCapability, AgentConfiguration } from '@agentdb9/shared';
 import { Conversation } from './conversation.entity';
 import { User } from './user.entity';
-import { jsonrepair } from 'jsonrepair';
+
+// Import jsonrepair using require for CommonJS compatibility
+const { jsonrepair } = require('jsonrepair');
 
 @Entity('agents')
 export class Agent implements CodingAgent {

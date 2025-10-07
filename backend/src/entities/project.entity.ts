@@ -1,6 +1,8 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import type { Project as ProjectInterface, ProjectStatus } from '@agentdb9/shared';
-import { jsonrepair } from 'jsonrepair';
+
+// Import jsonrepair using require for CommonJS compatibility
+const { jsonrepair } = require('jsonrepair');
 
 @Entity('projects')
 export class Project implements ProjectInterface {
