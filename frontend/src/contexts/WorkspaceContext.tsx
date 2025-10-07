@@ -30,7 +30,7 @@ export const WorkspaceProvider: React.FC<WorkspaceProviderProps> = ({ children }
     const defaultWorkspace = {
       id: 'default',
       name: 'AgentDB9 Workspace',
-      path: '/home/coder/workspace',
+      path: '/workspace',
       description: 'Main development workspace'
     };
 
