@@ -377,6 +377,92 @@ function formatToolsForOllama(tools: any[]): any[] {
   }));
 }
 
+// Chat endpoint (compatible with agent service)
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { model, messages, stream, temperature, max_tokens } = req.body;
+    const { getModelById } = await import('@agentdb9/shared');
+    
+    // Get model info
+    const modelInfo = getModelById(model || 'codellama:7b');
+    
+    if (!modelInfo) {
+      return res.status(400).json({
+        success: false,
+        error: 'Model not found'
+      });
+    }
+    
+    if (modelInfo.availability.status === 'disabled') {
+      return res.status(400).json({
+        success: false,
+        error: 'Model is disabled',
+        reason: modelInfo.availability.reason
+      });
+    }
+    
+    // Check if this is an Ollama model
+    if (modelInfo.provider === 'ollama') {
+      const ollamaUrl = process.env.OLLAMA_HOST || 'http://ollama:11434';
+      
+      try {
+        const ollamaResponse = await fetch(`${ollamaUrl}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: model,
+            messages: messages || [{ role: 'user', content: 'Hello' }],
+            stream: stream || false,
+            options: {
+              temperature: temperature || 0.7,
+              top_p: 0.8,
+              num_predict: max_tokens || 500
+            }
+          })
+        });
+
+        if (!ollamaResponse.ok) {
+          throw new Error(`Ollama API error: ${ollamaResponse.status}`);
+        }
+
+        const ollamaData = await ollamaResponse.json() as any;
+        
+        return res.json({
+          response: ollamaData.message?.content || '',
+          message: ollamaData.message?.content || '',
+          model: model,
+          done: ollamaData.done,
+          usage: {
+            prompt_tokens: ollamaData.prompt_eval_count || 0,
+            completion_tokens: ollamaData.eval_count || 0,
+            total_tokens: (ollamaData.prompt_eval_count || 0) + (ollamaData.eval_count || 0)
+          }
+        });
+      } catch (ollamaError: any) {
+        console.error('Ollama chat error:', ollamaError);
+        return res.status(500).json({
+          success: false,
+          error: 'Ollama service unavailable',
+          details: ollamaError?.message || 'Unknown error'
+        });
+      }
+    }
+    
+    // For non-Ollama models, return helpful message
+    res.status(501).json({
+      success: false,
+      error: 'External API models not yet implemented',
+      message: 'Please configure API keys for OpenAI, Anthropic, or use Ollama models'
+    });
+  } catch (error) {
+    console.error('Chat error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process chat request'
+    });
+  }
+});
+
 // Code analysis endpoint
 app.post('/api/analyze', async (req, res) => {
   try {

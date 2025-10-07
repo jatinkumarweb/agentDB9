@@ -112,6 +112,10 @@ ollama_data/
 models/
 vscode-config/
 
+# User workspace (keep README.md only)
+workspace/*
+!workspace/README.md
+
 # Backup files
 *.backup
 *.bak

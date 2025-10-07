@@ -127,7 +127,9 @@ services:
       - SHELL=/bin/bash
       - DISABLE_WORKSPACE_TRUST=true
     volumes:
-      - .:/home/coder/workspace
+      - ./workspace:/home/coder/workspace
+      - vscode-data:/home/coder/.local/share/code-server
+      - vscode-extensions:/home/coder/.local/share/code-server/extensions
     command: >
       --bind-addr 0.0.0.0:8080
       --auth none
@@ -136,8 +138,6 @@ services:
       --disable-workspace-trust
       --disable-file-downloads
       --disable-getting-started-override
-      --user-data-dir /home/coder/workspace/.vscode-server
-      --extensions-dir /home/coder/workspace/.vscode-server/extensions
       /home/coder/workspace
 
   # vscode-proxy: Not needed for development - use VSCode directly on port 8080
@@ -172,8 +172,9 @@ services:
       - VSCODE_PORT=8080
       - LLM_SERVICE_URL=http://llm-service:9000
       - BACKEND_URL=http://backend:8000
+      - WORKSPACE_PATH=/workspace
     volumes:
-      - .:/workspace
+      - ./workspace:/workspace
     depends_on:
       - vscode
       - backend
