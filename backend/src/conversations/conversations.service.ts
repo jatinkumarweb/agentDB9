@@ -533,24 +533,30 @@ Would you like help setting up external API access?`;
             {
               role: 'system',
               content: modelSupportsTools 
-                ? `You are a coding assistant with workspace tools. When you need to perform actions, output tool calls in this exact format:
+                ? `You are a coding assistant with workspace tools. When you need to perform actions, use tool calls.
 
+TOOL CALL FORMAT (use this exact XML structure):
 <tool_call>
 <tool_name>execute_command</tool_name>
 <arguments>{"command": "mkdir demo && cd demo && npm init -y"}</arguments>
 </tool_call>
 
-Available tools:
-- execute_command: Run shell commands. For npm: "mkdir dir && cd dir && npm init -y". Use "npm pkg set key=value" for package.json.
+AVAILABLE TOOLS:
+- execute_command: Run shell commands. Args: {"command": "your command here"}
 - write_file: Write complete file content. Args: {"path": "file.js", "content": "full content"}
-- read_file: Read file. Args: {"path": "file.js"}
-- create_directory: Create dir. Args: {"path": "dirname"}
-- list_files: List files. Args: {"path": "."}
+- read_file: Read file contents. Args: {"path": "file.js"}
+- create_directory: Create directory. Args: {"path": "dirname"}
+- list_files: List directory contents. Args: {"path": "."}
 - git_status: Check git status. Args: {}
 - git_commit: Commit changes. Args: {"message": "msg", "files": ["file1"]}
 - delete_file: Delete file. Args: {"path": "file.js"}
 
-After tool execution, you'll see results. Then provide your response.`
+IMPORTANT:
+- Use <tool_name> tag (not the tool name as tag)
+- Provide valid JSON in <arguments>
+- Tool calls will be executed automatically
+- You'll see results, then provide your response to the user
+- Don't explain the tool call to the user, just use it`
                 : `You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.`
             },
             {
@@ -957,14 +963,24 @@ Would you like help setting up external API access?`;
    */
   private async parseAndExecuteToolCalls(content: string, conversation: any, message: any): Promise<void> {
     // Parse XML-style tool calls from the response
-    const toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/gs;
-    const matches = [...content.matchAll(toolCallRegex)];
+    // Try standard format first: <tool_call><tool_name>...</tool_name><arguments>...</arguments></tool_call>
+    let toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/gs;
+    let matches = [...content.matchAll(toolCallRegex)];
+    
+    // If no matches, try alternative format: <tool_call><execute_command>...</execute_command><arguments>...</arguments></tool_call>
+    if (matches.length === 0) {
+      toolCallRegex = /<tool_call>\s*<(\w+)>.*?<\/\1>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/gs;
+      matches = [...content.matchAll(toolCallRegex)];
+    }
     
     if (matches.length === 0) {
       return; // No tool calls found
     }
     
     console.log(`Found ${matches.length} tool call(s) in response`);
+    
+    // Remove tool call XML from content for cleaner display
+    let cleanContent = content.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
     
     for (const match of matches) {
       const toolName = match[1].trim();
@@ -1003,20 +1019,20 @@ Would you like help setting up external API access?`;
           status: toolResult.success ? 'completed' : 'failed'
         });
         
-        // Append tool result to message content
-        const toolResultText = `\n\n**Tool Result (${toolName}):**\n\`\`\`json\n${JSON.stringify(toolResult.result, null, 2)}\n\`\`\`\n`;
-        const updatedContent = content + toolResultText;
+        // Append tool result to clean content
+        const toolResultText = `\n\n**Tool Executed: ${toolName}**\n\`\`\`json\n${JSON.stringify(toolResult.result, null, 2)}\n\`\`\`\n`;
+        cleanContent += toolResultText;
         
-        // Update message with tool result
+        // Update message with clean content and tool result
         await this.messagesRepository.update(message.id, {
-          content: updatedContent
+          content: cleanContent
         });
         
         // Broadcast updated content
         this.websocketGateway.broadcastMessageUpdate(
           conversation.id,
           message.id,
-          updatedContent,
+          cleanContent,
           false,
           { toolExecuted: true, toolName, toolResult: toolResult.success }
         );
