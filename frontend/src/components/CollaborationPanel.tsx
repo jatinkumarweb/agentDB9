@@ -222,13 +222,17 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       metadata?: any;
     }) => {
       if (currentConversation?.id === data.conversationId) {
+        console.log('Updating message:', data.messageId, 'streaming:', data.streaming, 'content length:', data.content.length);
         setIsGenerating(data.streaming);
         // Update the message content in real-time
-        setChatMessages(prev => prev.map(msg => 
-          msg.id === data.messageId 
-            ? { ...msg, message: data.content }
-            : msg
-        ));
+        setChatMessages(prev => {
+          const updated = prev.map(msg => 
+            msg.id === data.messageId 
+              ? { ...msg, message: data.content }
+              : msg
+          );
+          return updated;
+        });
       }
     };
 
@@ -245,7 +249,18 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
           timestamp: new Date(data.message.timestamp),
           type: data.message.role === 'user' ? 'user' : 'agent'
         };
-        setChatMessages(prev => [...prev, newChatMessage]);
+        
+        // Only add if message doesn't already exist (prevent duplicates)
+        setChatMessages(prev => {
+          const exists = prev.some(msg => msg.id === newChatMessage.id);
+          if (exists) {
+            // Update existing message instead of adding duplicate
+            return prev.map(msg => 
+              msg.id === newChatMessage.id ? newChatMessage : msg
+            );
+          }
+          return [...prev, newChatMessage];
+        });
       }
     };
 
@@ -596,7 +611,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
             <div className="flex flex-col h-full">
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {chatMessages.map(message => (
+                {chatMessages.filter((msg, index, self) => 
+                  index === self.findIndex(m => m.id === msg.id)
+                ).map(message => (
                   <div
                     key={message.id}
                     className={cn(
