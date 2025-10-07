@@ -357,18 +357,43 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     };
   }, [wsConnected, wsOn, wsOff, wsHandlers]);
 
-  // Join conversation room AFTER handlers are set up
+  // Load messages when conversation changes
+  useEffect(() => {
+    if (!currentConversation?.id) return;
+
+    const loadMessages = async () => {
+      try {
+        console.log('📥 Loading messages for conversation:', currentConversation.id);
+        const response = await fetchWithAuth(`/api/conversations/${currentConversation.id}/messages`);
+        const data = await response.json();
+
+        if (data.success) {
+          console.log('✅ Loaded', data.data.length, 'messages');
+          setCurrentConversation(prev => prev ? { ...prev, messages: data.data } : null);
+        }
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+      }
+    };
+
+    // Only load if messages are not already present
+    if (!currentConversation.messages || currentConversation.messages.length === 0) {
+      loadMessages();
+    }
+  }, [currentConversation?.id]);
+
+  // Join conversation room AFTER handlers are set up and messages are loaded
   useEffect(() => {
     if (!wsConnected || !currentConversation?.id) return;
 
     const timer = setTimeout(() => {
-      console.log('Joining conversation room:', currentConversation.id);
+      console.log('🔗 Joining conversation room:', currentConversation.id);
       wsEmit('join_conversation', { conversationId: currentConversation.id });
     }, 100);
 
     return () => {
       clearTimeout(timer);
-      console.log('Leaving conversation room:', currentConversation.id);
+      console.log('🔌 Leaving conversation room:', currentConversation.id);
       wsEmit('leave_conversation', { conversationId: currentConversation.id });
     };
   }, [wsConnected, currentConversation?.id, wsEmit]);
