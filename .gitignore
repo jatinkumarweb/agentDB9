@@ -120,3 +120,6 @@ vscode-config/
 test-results/
 playwright-report/
 test-results.xml
+
+# Symlinks for hoisted packages (auto-created by postinstall)
+backend/node_modules/jsonrepair
