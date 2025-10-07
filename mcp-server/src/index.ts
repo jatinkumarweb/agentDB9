@@ -54,6 +54,73 @@ async function startMCPServer() {
       ...projectTools.getTools()
     ]);
 
+    // Register tool handlers
+    logger.info('Registering tool handlers...');
+    
+    // File system handlers
+    mcpServer.registerHandler('fs_read_file', async (params) => {
+      logger.info(`[HANDLER] fs_read_file called with path: ${params.path}`);
+      return await fileSystemTools.readFile(params.path);
+    });
+    
+    mcpServer.registerHandler('fs_write_file', async (params) => {
+      logger.info(`[HANDLER] fs_write_file called with path: ${params.path}`);
+      return await fileSystemTools.writeFile(params.path, params.content);
+    });
+    
+    mcpServer.registerHandler('fs_create_file', async (params) => {
+      logger.info(`[HANDLER] fs_create_file called with path: ${params.path}`);
+      return await fileSystemTools.createFile(params.path, params.content || '');
+    });
+    
+    mcpServer.registerHandler('fs_delete_file', async (params) => {
+      logger.info(`[HANDLER] fs_delete_file called with path: ${params.path}`);
+      return await fileSystemTools.deleteFile(params.path);
+    });
+    
+    mcpServer.registerHandler('fs_rename_file', async (params) => {
+      logger.info(`[HANDLER] fs_rename_file called: ${params.oldPath} -> ${params.newPath}`);
+      return await fileSystemTools.renameFile(params.oldPath, params.newPath);
+    });
+    
+    mcpServer.registerHandler('fs_copy_file', async (params) => {
+      logger.info(`[HANDLER] fs_copy_file called: ${params.source} -> ${params.destination}`);
+      return await fileSystemTools.copyFile(params.source, params.destination);
+    });
+    
+    mcpServer.registerHandler('fs_create_directory', async (params) => {
+      logger.info(`[HANDLER] fs_create_directory called with path: ${params.path}`);
+      return await fileSystemTools.createDirectory(params.path);
+    });
+    
+    mcpServer.registerHandler('fs_delete_directory', async (params) => {
+      logger.info(`[HANDLER] fs_delete_directory called with path: ${params.path}`);
+      return await fileSystemTools.deleteDirectory(params.path, params.recursive || false);
+    });
+    
+    mcpServer.registerHandler('fs_list_directory', async (params) => {
+      logger.info(`[HANDLER] fs_list_directory called with path: ${params.path}`);
+      return await fileSystemTools.listDirectory(params.path);
+    });
+    
+    mcpServer.registerHandler('fs_exists', async (params) => {
+      logger.info(`[HANDLER] fs_exists called with path: ${params.path}`);
+      return await fileSystemTools.exists(params.path);
+    });
+    
+    mcpServer.registerHandler('fs_get_stats', async (params) => {
+      logger.info(`[HANDLER] fs_get_stats called with path: ${params.path}`);
+      return await fileSystemTools.getFileStats(params.path);
+    });
+    
+    // Terminal handlers
+    mcpServer.registerHandler('terminal_execute', async (params) => {
+      logger.info(`[HANDLER] terminal_execute called with command: ${params.command}`);
+      return await terminalTools.executeCommand(params.command, params.cwd);
+    });
+    
+    logger.info('Tool handlers registered successfully');
+
     // Register resources
     mcpServer.registerResources([
       {

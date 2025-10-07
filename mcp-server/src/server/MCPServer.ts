@@ -91,6 +91,11 @@ export class MCPServer {
       try {
         const request: ToolExecutionRequest = req.body;
         
+        logger.info(`[API] Tool execution request: ${request.tool}`, { 
+          parameters: request.parameters,
+          hasHandler: this.toolRegistry.hasHandler(request.tool)
+        });
+        
         // Broadcast tool execution start
         await this.broadcastToolExecution({
           conversationId: (request.context as any)?.conversationId,
@@ -102,6 +107,11 @@ export class MCPServer {
         const startTime = Date.now();
         const result = await this.executeTool(request);
         const duration = Date.now() - startTime;
+        
+        logger.info(`[API] Tool execution completed: ${request.tool}`, { 
+          success: result.success,
+          duration 
+        });
         
         // Broadcast tool execution result
         await this.broadcastToolExecution({
@@ -116,7 +126,7 @@ export class MCPServer {
         
         res.json(result);
       } catch (error) {
-        logger.error('Tool execution error:', error);
+        logger.error('[API] Tool execution error:', error);
         
         // Broadcast tool execution failure
         await this.broadcastToolExecution({
@@ -284,6 +294,10 @@ export class MCPServer {
     tools.forEach(tool => {
       this.toolRegistry.registerTool(tool);
     });
+  }
+
+  public registerHandler(toolName: string, handler: (params: Record<string, any>) => Promise<any>): void {
+    this.toolRegistry.registerHandler(toolName, handler);
   }
 
   public registerResources(resources: MCPResource[]): void {
