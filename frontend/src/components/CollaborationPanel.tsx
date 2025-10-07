@@ -1,7 +1,7 @@
 'use client';
 import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -68,6 +68,14 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   
   // WebSocket integration
   const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff } = useWebSocket();
+  
+  // Ref for auto-scrolling
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [currentConversation?.messages]);
 
   // Debug: Log when conversation messages change
   useEffect(() => {
@@ -605,8 +613,8 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                   </div>
                 ))}
                 
-                {/* Typing indicator */}
-                {isGenerating && (
+                {/* Typing indicator - only show if generating and no agent message exists yet */}
+                {isGenerating && !currentConversation?.messages?.some(m => m.role === 'agent' && m.metadata?.streaming) && (
                   <div className="flex space-x-2">
                     <div className="flex-shrink-0">
                       <UserCircle className="w-6 h-6 text-blue-500" />
@@ -631,6 +639,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     </div>
                   </div>
                 )}
+                
+                {/* Scroll anchor */}
+                <div ref={messagesEndRef} />
               </div>
             </div>
           )}
@@ -676,15 +687,27 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                           className="text-sm text-gray-900 dark:text-gray-100 mt-1 whitespace-pre-wrap"
                           data-message-length={msg.content.length}
                         >
-                          {msg.content}
+                          {msg.content || (msg.metadata?.streaming ? '🤖 Thinking...' : '')}
                         </p>
+                        
+                        {/* Streaming indicator */}
+                        {msg.metadata?.streaming && msg.content && (
+                          <div className="flex items-center space-x-1 mt-2">
+                            <div className="flex space-x-1">
+                              <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" />
+                              <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                              <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                            </div>
+                            <span className="text-xs text-gray-500">Streaming...</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
                 })}
                 
-                {/* Typing indicator */}
-                {isGenerating && (
+                {/* Typing indicator - only show if generating and no agent message exists yet */}
+                {isGenerating && !currentConversation?.messages?.some(m => m.role === 'agent' && m.metadata?.streaming) && (
                   <div className="flex space-x-2">
                     <div className="flex-shrink-0">
                       <UserCircle className="w-6 h-6 text-blue-500" />
@@ -709,6 +732,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     </div>
                   </div>
                 )}
+                
+                {/* Scroll anchor */}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Agent Selection */}
@@ -742,8 +768,8 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                           </option>
                         ))}
                 
-                {/* Typing indicator */}
-                {isGenerating && (
+                {/* Typing indicator - only show if generating and no agent message exists yet */}
+                {isGenerating && !currentConversation?.messages?.some(m => m.role === 'agent' && m.metadata?.streaming) && (
                   <div className="flex space-x-2">
                     <div className="flex-shrink-0">
                       <UserCircle className="w-6 h-6 text-blue-500" />
