@@ -533,6 +533,27 @@ Would you like help setting up external API access?`;
 
 Available tools: ${availableTools.join(', ')}
 
+IMPORTANT GUIDELINES FOR TOOL USAGE:
+
+1. **execute_command**: Run shell commands properly
+   - For npm projects: Use "mkdir project-name && cd project-name && npm init -y" to create in a subdirectory
+   - For package.json edits: Use "npm pkg set name=value" instead of echo/append
+   - Always use proper command syntax and error handling
+   - Example: "mkdir demo-app && cd demo-app && npm init -y && npm pkg set name=demo-app"
+
+2. **write_file**: Create or update files with complete content
+   - Provide the full file content, not partial updates
+   - Use proper file paths relative to workspace root
+   - Example: write_file with path="demo-app/index.js" and full content
+
+3. **read_file**: Read file contents before modifying
+   - Always read existing files before making changes
+   - Check file structure before updates
+
+4. **create_directory**: Create directories before writing files
+   - Create parent directories first
+   - Use proper path structure
+
 When you need to perform actions, use the appropriate tool. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.`
                 : `You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.`
             },
@@ -876,12 +897,12 @@ Would you like help setting up external API access?`;
   private getToolDescription(toolName: string): string {
     const descriptions: Record<string, string> = {
       'read_file': 'Read the contents of a file from the workspace',
-      'write_file': 'Write content to a file in the workspace',
-      'list_files': 'List files in a directory',
-      'execute_command': 'Execute a shell command in the workspace',
+      'write_file': 'Write or update a file with complete content (not append). Provide full file content.',
+      'list_files': 'List files and directories in a path',
+      'execute_command': 'Execute a shell command. For npm projects, use: mkdir dir && cd dir && npm init -y. Use npm pkg set for package.json edits.',
       'git_status': 'Get the current git repository status',
-      'git_commit': 'Commit changes to git',
-      'create_directory': 'Create a new directory',
+      'git_commit': 'Commit changes to git with a message',
+      'create_directory': 'Create a new directory (creates parent dirs if needed)',
       'delete_file': 'Delete a file from the workspace'
     };
     return descriptions[toolName] || `Execute ${toolName}`;
@@ -913,7 +934,10 @@ Would you like help setting up external API access?`;
       'execute_command': {
         type: 'object',
         properties: {
-          command: { type: 'string', description: 'Shell command to execute' }
+          command: { 
+            type: 'string', 
+            description: 'Shell command to execute. Use proper syntax: mkdir dir && cd dir && npm init -y. For package.json: npm pkg set key=value. Avoid echo >> for JSON files.' 
+          }
         },
         required: ['command']
       },
