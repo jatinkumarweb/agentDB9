@@ -13,6 +13,7 @@ const PORT = process.env.VSCODE_PROXY_PORT || 8081;
 const VSCODE_URL = process.env.VSCODE_URL || 'http://vscode:8080';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here_make_it_long_and_secure_for_production_use_at_least_32_chars';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const REQUIRE_AUTH = process.env.REQUIRE_AUTH !== 'false'; // Default to true for security
 
 // Middleware
 app.use(helmet({
@@ -29,6 +30,13 @@ app.use(express.json());
 
 // Authentication middleware
 const authenticateToken = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Skip authentication if not required (development mode)
+  if (!REQUIRE_AUTH) {
+    console.log('Authentication disabled - allowing request');
+    next();
+    return;
+  }
+
   // Get token from cookie or Authorization header
   const token = req.cookies['auth-token'] || 
                 req.headers.authorization?.replace('Bearer ', '');
@@ -119,16 +127,34 @@ const server = app.listen(PORT, () => {
   console.log(`🔐 VS Code Proxy running on port ${PORT}`);
   console.log(`🎯 Proxying to: ${VSCODE_URL}`);
   console.log(`🌐 Frontend URL: ${FRONTEND_URL}`);
+  console.log(`🔒 Authentication: ${REQUIRE_AUTH ? 'ENABLED' : 'DISABLED (Development Mode)'}`);
 });
 
 // Handle WebSocket upgrade for VS Code
 server.on('upgrade', (request: IncomingMessage, socket: Socket, head: Buffer) => {
+  console.log('WebSocket upgrade request received:', request.url);
+  
+  // Skip authentication if not required
+  if (!REQUIRE_AUTH) {
+    console.log('Authentication disabled - allowing WebSocket upgrade');
+    const proxyReq = request as any;
+    proxyReq.url = request.url;
+    proxyReq.headers = request.headers;
+    proxyReq.method = request.method;
+    
+    if (vscodeProxy.upgrade) {
+      vscodeProxy.upgrade(proxyReq, socket, head);
+    }
+    return;
+  }
+
   // Extract token from query params or headers for WebSocket
   const url = new URL(request.url!, `http://${request.headers.host}`);
   const token = url.searchParams.get('token') || 
                 request.headers.authorization?.replace('Bearer ', '');
 
   if (!token) {
+    console.error('WebSocket upgrade rejected: No token provided');
     socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
     socket.destroy();
     return;
@@ -136,6 +162,7 @@ server.on('upgrade', (request: IncomingMessage, socket: Socket, head: Buffer) =>
 
   try {
     jwt.verify(token, JWT_SECRET);
+    console.log('WebSocket token verified - allowing upgrade');
     // If token is valid, proxy the WebSocket connection
     // Create a minimal request-like object for the proxy
     const proxyReq = request as any;

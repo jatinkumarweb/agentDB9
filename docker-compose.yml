@@ -151,6 +151,7 @@ services:
       - VSCODE_URL=http://vscode:8080
       - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here_make_it_long_and_secure_for_production_use_at_least_32_chars}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - REQUIRE_AUTH=false
     depends_on:
       - vscode
 
