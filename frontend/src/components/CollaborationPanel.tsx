@@ -268,16 +268,39 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
           console.log('✅ Updating conversation messages');
           const existingMessages = prev.messages || [];
-          const updatedMessages = existingMessages.map((msg) =>
-            msg.id === data.messageId
-              ? {
-                  ...msg,
-                  content: data.content && data.content.length > 0 ? data.content : msg.content,
-                  metadata: { ...msg.metadata, ...data.metadata, streaming: data.streaming },
-                  _lastUpdated: Date.now(),
-                }
-              : { ...msg } // Clone all messages
-          );
+          console.log('📋 Existing message IDs:', existingMessages.map(m => m.id));
+          console.log('🔍 Looking for message ID:', data.messageId);
+          
+          // Check if message exists
+          const messageExists = existingMessages.some(m => m.id === data.messageId);
+          
+          let updatedMessages: ConversationMessage[];
+          if (!messageExists) {
+            // Create new message if it doesn't exist
+            console.log('⚠️ Message not found, creating new message');
+            const newMessage: ConversationMessage = {
+              id: data.messageId,
+              conversationId: data.conversationId,
+              role: 'agent',
+              content: data.content || '',
+              metadata: { ...data.metadata, streaming: data.streaming },
+              timestamp: new Date(),
+              _lastUpdated: Date.now(),
+            };
+            updatedMessages = [...existingMessages, newMessage];
+          } else {
+            // Update existing message
+            updatedMessages = existingMessages.map((msg) =>
+              msg.id === data.messageId
+                ? {
+                    ...msg,
+                    content: data.content && data.content.length > 0 ? data.content : msg.content,
+                    metadata: { ...msg.metadata, ...data.metadata, streaming: data.streaming },
+                    _lastUpdated: Date.now(),
+                  }
+                : { ...msg } // Clone all messages
+            );
+          }
 
           const sortedMessages = sortMessagesByTimestamp(updatedMessages);
           const newConversation = { 
