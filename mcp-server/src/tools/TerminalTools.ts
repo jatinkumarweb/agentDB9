@@ -26,7 +26,7 @@ export class TerminalTools {
             command: { type: 'string', description: 'Command to execute' },
             cwd: { type: 'string', description: 'Working directory for the command' },
             timeout: { type: 'number', description: 'Timeout in milliseconds', default: 30000 },
-            shell: { type: 'string', description: 'Shell to use', default: '/bin/bash' }
+            shell: { type: 'string', description: 'Shell to use', default: '/bin/sh' }
           },
           required: ['command']
         }
@@ -39,7 +39,7 @@ export class TerminalTools {
           properties: {
             name: { type: 'string', description: 'Name for the terminal' },
             cwd: { type: 'string', description: 'Working directory for the terminal' },
-            shell: { type: 'string', description: 'Shell to use', default: '/bin/bash' }
+            shell: { type: 'string', description: 'Shell to use', default: '/bin/sh' }
           },
           required: ['name']
         }
@@ -128,7 +128,7 @@ export class TerminalTools {
     command: string, 
     cwd?: string, 
     timeout: number = 30000,
-    shell: string = '/bin/bash'
+    shell: string = '/bin/sh'
   ): Promise<CommandResult> {
     const startTime = Date.now();
     
