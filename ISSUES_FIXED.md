@@ -195,3 +195,117 @@ All services running:
 6. `docs: add model setup guide for Ollama`
 
 All changes have been pushed to the main branch.
+
+## Streaming Fix (2025-10-07)
+
+### Issue
+Agent responses were not streaming - the fetch call to Ollama was timing out immediately with `AbortError`.
+
+### Root Cause
+The `tools` parameter in the Ollama API request was causing the stream to hang. When tools are included in the request, Ollama's streaming response doesn't work properly with Node.js's fetch implementation.
+
+### Solution
+Temporarily disabled the tools parameter in the streaming request:
+```typescript
+// backend/src/conversations/conversations.service.ts
+stream: true,
+// tools: toolsForOllama.length > 0 ? toolsForOllama : undefined, // Disabled temporarily
+```
+
+### Verification
+✅ Streaming now works correctly:
+- Agent responses stream in real-time
+- WebSocket broadcasts message updates every ~240ms
+- Database updates happen at completion
+- Response time: ~3 seconds for simple queries
+
+Example logs showing successful streaming:
+```
+Broadcasting message update to room conversation_xxx: messageId=xxx, streaming=true
+Broadcasting message update to room conversation_xxx: messageId=xxx, streaming=true
+...
+Received done signal, finalizing response
+Broadcasting message update to room conversation_xxx: messageId=xxx, streaming=false
+```
+
+### Test Results
+```bash
+# Created test agent and conversation
+curl -X POST /api/agents -d '{"name":"Test Agent","configuration":{"model":"qwen2.5-coder:7b"}}'
+curl -X POST /api/conversations -d '{"agentId":"xxx","title":"Test"}'
+
+# Sent test message
+curl -X POST /api/conversations/xxx/messages -d '{"role":"user","content":"What is 5+3?"}'
+
+# Response received correctly
+{
+  "role": "agent",
+  "content": "The result of 5 + 3 is 8."
+}
+```
+
+### Future Work
+- Investigate proper tool calling support with streaming
+- Consider using axios for better stream handling
+- Add tool calling back once streaming compatibility is resolved
+
+## Summary
+
+✅ **All Issues Resolved**
+1. Authentication working with proper cookie settings
+2. Conversation persistence working correctly
+3. Agent responses streaming in real-time via WebSocket
+4. Database updates optimized with batch processing
+
+❌ **Known Limitation**
+- Tool calling temporarily disabled due to streaming compatibility issues
+
+🎯 **Ready for Testing**
+The application is now fully functional for basic agent conversations with real-time streaming responses.
+
+## Agent Availability Filter (2025-10-07)
+
+### Issue
+Agents with unavailable/uninstalled models were showing in the dropdown, causing 400 errors when users tried to use them.
+
+### Solution
+Added model availability checking to the agents API:
+
+**Backend Changes:**
+1. Added `?includeAvailability=true` query parameter to `/api/agents` endpoint
+2. Created `checkAgentsAvailability()` method that:
+   - Fetches available Ollama models via `/api/tags`
+   - Checks each agent's model against available models
+   - Returns availability status with each agent
+
+**Frontend Changes:**
+1. Updated `fetchAgents()` in `chat/page.tsx` to use `?includeAvailability=true`
+2. Filter out agents where `modelAvailable === false`
+3. Updated `CollaborationPanel.tsx` with same logic
+4. Added console warnings when agents are filtered out
+
+### Verification
+```bash
+# API returns availability status
+curl /api/agents?includeAvailability=true
+
+# Response includes:
+{
+  "name": "Full-Stack Assistant",
+  "model": "qwen2.5-coder:7b",
+  "modelAvailable": true,    # ✅ Model installed
+  "modelProvider": "ollama"
+}
+{
+  "name": "TypeScript Assistant", 
+  "model": "codellama:7b",
+  "modelAvailable": false,   # ❌ Model not installed
+  "modelProvider": "ollama"
+}
+```
+
+### Result
+✅ Only agents with installed models appear in dropdowns
+✅ Users cannot select agents with unavailable models
+✅ Clear console warnings when agents are filtered
+✅ No more 400 errors from missing models

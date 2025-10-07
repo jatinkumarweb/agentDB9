@@ -538,7 +538,7 @@ When you need to perform actions, use the appropriate tool. Provide clear, conci
             }
           ],
           stream: true,
-          tools: toolsForOllama.length > 0 ? toolsForOllama : undefined,
+          // tools: toolsForOllama.length > 0 ? toolsForOllama : undefined, // Disabled temporarily - causing stream issues
           options: {
             temperature: 0.3,
             top_p: 0.8,

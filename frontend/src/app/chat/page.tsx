@@ -323,16 +323,28 @@ export default function ChatPage({}: ChatPageProps) {
   // Fetch agents - stable function
   const fetchAgents = useCallback(async () => {
     try {
-      console.log('Fetching agents...');
+      console.log('Fetching agents with availability...');
       setAgentsLoading(true);
-      const response = await fetchWithAuth('/api/agents');
+      const response = await fetchWithAuth('/api/agents?includeAvailability=true');
       const data = await response.json();
       console.log('Agents response:', data);
       
       if (data.success) {
-        console.log('Setting agents:', data.data);
-        setAgents(data.data);
-        setSelectedAgent((prev) => prev ?? (data.data.length > 0 ? data.data[0] : null));
+        // Filter out agents with unavailable models
+        const availableAgents = data.data.filter((agent: any) => 
+          agent.modelAvailable !== false
+        );
+        
+        console.log('Setting available agents:', availableAgents);
+        setAgents(availableAgents);
+        setSelectedAgent((prev) => prev ?? (availableAgents.length > 0 ? availableAgents[0] : null));
+        
+        // Show warning if some agents were filtered out
+        const unavailableCount = data.data.length - availableAgents.length;
+        if (unavailableCount > 0) {
+          console.warn(`${unavailableCount} agent(s) hidden due to unavailable models`);
+        }
+        
         setError(null);
       } else {
         console.error('Failed to fetch agents response:', data);

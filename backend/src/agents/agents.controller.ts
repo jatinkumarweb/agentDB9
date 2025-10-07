@@ -14,9 +14,19 @@ export class AgentsController {
   @Get()
   @ApiOperation({ summary: 'Get all agents' })
   @ApiResponse({ status: 200, description: 'List of agents retrieved successfully' })
-  async findAll(@CurrentUser() user: any): Promise<APIResponse> {
+  async findAll(@CurrentUser() user: any, @Query('includeAvailability') includeAvailability?: string): Promise<APIResponse> {
     try {
       const agents = await this.agentsService.findAll(user.id);
+      
+      // If includeAvailability is requested, check model availability
+      if (includeAvailability === 'true') {
+        const agentsWithAvailability = await this.agentsService.checkAgentsAvailability(agents);
+        return {
+          success: true,
+          data: agentsWithAvailability,
+        };
+      }
+      
       return {
         success: true,
         data: agents,

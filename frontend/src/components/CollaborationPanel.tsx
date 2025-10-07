@@ -77,18 +77,29 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
     setIsLoadingAgents(true);
     try {
-      console.log('Fetching agents for workspace chat...');
-      const response = await fetchWithAuth('/api/agents');
+      console.log('Fetching agents for workspace chat with availability...');
+      const response = await fetchWithAuth('/api/agents?includeAvailability=true');
       
       if (response.ok) {
         const data = await response.json();
         console.log('Workspace agents response:', data);
         if (data.success) {
-          setAvailableAgents(data.data || []);
+          // Filter out agents with unavailable models
+          const availableAgents = (data.data || []).filter((agent: any) => 
+            agent.modelAvailable !== false
+          );
+          
+          setAvailableAgents(availableAgents);
           // Select first agent by default
-          if (data.data && data.data.length > 0) {
-            setSelectedAgent(data.data[0]);
-            console.log('Selected default agent:', data.data[0].name);
+          if (availableAgents.length > 0) {
+            setSelectedAgent(availableAgents[0]);
+            console.log('Selected default agent:', availableAgents[0].name);
+          }
+          
+          // Log warning if some agents were filtered
+          const unavailableCount = (data.data || []).length - availableAgents.length;
+          if (unavailableCount > 0) {
+            console.warn(`${unavailableCount} agent(s) hidden due to unavailable models`);
           }
         } else {
           console.error('Failed to fetch agents:', data.error);

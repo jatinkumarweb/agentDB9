@@ -326,4 +326,62 @@ Respond in a helpful, professional manner. Be specific about what you'll do and 
       // Don't throw error, just log it
     }
   }
+
+  async checkAgentsAvailability(agents: Agent[]): Promise<any[]> {
+    try {
+      // Get available Ollama models
+      const availableModels = await this.getAvailableOllamaModels();
+      
+      return agents.map(agent => {
+        const model = agent.configuration?.model || '';
+        const isOllamaModel = this.isOllamaModel(model);
+        const isAvailable = isOllamaModel ? availableModels.includes(model) : false;
+        
+        return {
+          ...agent,
+          modelAvailable: isAvailable,
+          modelProvider: isOllamaModel ? 'ollama' : 'external',
+          availableModels: isOllamaModel ? availableModels : []
+        };
+      });
+    } catch (error) {
+      console.error('Failed to check agent availability:', error);
+      // Return agents without availability info on error
+      return agents.map(agent => ({
+        ...agent,
+        modelAvailable: null,
+        modelProvider: 'unknown',
+        availableModels: []
+      }));
+    }
+  }
+
+  private async getAvailableOllamaModels(): Promise<string[]> {
+    try {
+      const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
+      const response = await fetch(`${ollamaUrl}/api/tags`);
+      
+      if (!response.ok) {
+        return [];
+      }
+      
+      const data = await response.json();
+      return data.models?.map((m: any) => m.name) || [];
+    } catch (error) {
+      console.error('Failed to get Ollama models:', error);
+      return [];
+    }
+  }
+
+  private isOllamaModel(model: string): boolean {
+    // Common Ollama model patterns
+    const ollamaPatterns = [
+      'llama', 'codellama', 'mistral', 'mixtral', 'phi', 'gemma',
+      'qwen', 'deepseek', 'starcoder', 'wizardcoder', 'solar',
+      'openchat', 'starling', 'neural-chat', 'orca', 'vicuna'
+    ];
+    
+    const lowerModel = model.toLowerCase();
+    return ollamaPatterns.some(pattern => lowerModel.includes(pattern));
+  }
 }
