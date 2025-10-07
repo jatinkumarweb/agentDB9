@@ -54,7 +54,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 }) => {
   const { isAuthenticated, token } = useAuthStore();
   const [activeUsers, setActiveUsers] = useState<User[]>([]);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'users' | 'chat' | 'share'>('users');
@@ -62,7 +61,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   const [availableAgents, setAvailableAgents] = useState<CodingAgent[]>([]);
   const [isLoadingAgents, setIsLoadingAgents] = useState(false);
   
-  // Conversation-based chat state
+  // Conversation-based chat state - messages stored IN conversation like chat page
   const [currentConversation, setCurrentConversation] = useState<AgentConversation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -70,14 +69,15 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   // WebSocket integration
   const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff } = useWebSocket();
 
-  // Debug: Log when chatMessages changes
+  // Debug: Log when conversation messages change
   useEffect(() => {
-    console.log('chatMessages state updated, count:', chatMessages.length, 'activeTab:', activeTab);
-    if (chatMessages.length > 0) {
-      const lastMsg = chatMessages[chatMessages.length - 1];
-      console.log('Last message:', lastMsg.id, 'content:', lastMsg.message.substring(0, 50));
+    const messageCount = currentConversation?.messages?.length || 0;
+    console.log('💬 Conversation messages updated, count:', messageCount, 'activeTab:', activeTab);
+    if (messageCount > 0) {
+      const lastMsg = currentConversation!.messages![messageCount - 1];
+      console.log('Last message:', lastMsg.id, 'content:', lastMsg.content.substring(0, 50));
     }
-  }, [chatMessages, activeTab]);
+  }, [currentConversation?.messages, activeTab]);
 
   // Fetch available agents from the same API as chat page
   const fetchAgents = async () => {
@@ -232,68 +232,93 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       streaming: boolean;
       metadata?: any;
     }) => {
-      if (currentConversation?.id === data.conversationId) {
-        console.log('🔄 Updating message:', data.messageId, 'streaming:', data.streaming, 'content length:', data.content.length);
-        
-        // Use flushSync to force synchronous update
-        flushSync(() => {
-          setIsGenerating(data.streaming);
+      console.log('🔄 Received message update:', data.messageId, 'streaming:', data.streaming, 'content length:', data.content.length);
+      
+      // Use flushSync to force synchronous update
+      flushSync(() => {
+        setIsGenerating(data.streaming);
+      });
+      
+      flushSync(() => {
+        setCurrentConversation((prev) => {
+          if (!prev) {
+            console.log('❌ No current conversation');
+            return prev;
+          }
+          if (prev.id !== data.conversationId) {
+            console.log('❌ Conversation ID mismatch:', prev.id, 'vs', data.conversationId);
+            return prev;
+          }
+
+          console.log('✅ Updating conversation messages');
+          const existingMessages = prev.messages || [];
+          const updatedMessages = existingMessages.map((msg) =>
+            msg.id === data.messageId
+              ? {
+                  ...msg,
+                  content: data.content && data.content.length > 0 ? data.content : msg.content,
+                  metadata: { ...msg.metadata, ...data.metadata, streaming: data.streaming },
+                  _lastUpdated: Date.now(),
+                }
+              : { ...msg } // Clone all messages
+          );
+
+          const newConversation = { 
+            ...prev, 
+            messages: updatedMessages
+          };
+          console.log('📝 Updated conversation with', updatedMessages.length, 'messages');
+          return newConversation;
         });
-        
-        flushSync(() => {
-          // Update the message content in real-time
-          setChatMessages(prev => {
-            const messageIndex = prev.findIndex(msg => msg.id === data.messageId);
-            if (messageIndex === -1) {
-              console.warn('❌ Message not found for update:', data.messageId);
-              return prev;
-            }
-            
-            // Create a completely new array with new objects to ensure React detects the change
-            const updated = prev.map((msg, idx) => 
-              idx === messageIndex
-                ? {
-                    ...msg,
-                    message: data.content,
-                    timestamp: new Date(),
-                    _lastUpdated: Date.now() // Force change detection
-                  }
-                : { ...msg } // Clone all messages to ensure new references
-            );
-            
-            console.log('✅ Message updated in state, new content:', data.content.substring(0, 50) + '...');
-            return updated;
-          });
-        });
-      }
+      });
     };
 
     const handleNewMessage = (data: {
       conversationId: string;
       message: ConversationMessage;
     }) => {
-      if (currentConversation?.id === data.conversationId) {
-        const newChatMessage: ChatMessage = {
-          id: data.message.id,
-          userId: data.message.role === 'user' ? currentUser?.id || 'user' : 'agent_' + selectedAgent?.id,
-          userName: data.message.role === 'user' ? currentUser?.name || 'You' : getSelectedAgentName(),
-          message: data.message.content,
-          timestamp: new Date(data.message.timestamp),
-          type: data.message.role === 'user' ? 'user' : 'agent'
-        };
-        
-        // Only add if message doesn't already exist (prevent duplicates)
-        setChatMessages(prev => {
-          const exists = prev.some(msg => msg.id === newChatMessage.id);
-          if (exists) {
-            // Update existing message instead of adding duplicate
-            return prev.map(msg => 
-              msg.id === newChatMessage.id ? newChatMessage : msg
-            );
+      console.log('📨 Received new message:', data.message.id, 'role:', data.message.role);
+
+      // If agent started streaming, mark generating immediately
+      flushSync(() => {
+        if (data.message.role === 'agent' && data.message.metadata?.streaming) {
+          console.log('🤖 Agent message started streaming');
+          setIsGenerating(true);
+        }
+      });
+
+      flushSync(() => {
+        setCurrentConversation((prev) => {
+          if (!prev) {
+            console.log('❌ No current conversation for new message');
+            return prev;
           }
-          return [...prev, newChatMessage];
+          if (prev.id !== data.conversationId) {
+            console.log('❌ Conversation ID mismatch for new message');
+            return prev;
+          }
+
+          const existingMessages = prev.messages || [];
+          const messageExists = existingMessages.some((m) => m.id === data.message.id);
+
+          if (messageExists) {
+            console.log('⚠️ Message already exists, updating instead');
+            // Update existing message
+            return {
+              ...prev,
+              messages: existingMessages.map((m) =>
+                m.id === data.message.id ? { ...data.message, _lastUpdated: Date.now() } : { ...m }
+              ),
+            };
+          }
+
+          console.log('✅ Adding new message to conversation');
+          return {
+            ...prev,
+            messages: [...existingMessages, { ...data.message, _lastUpdated: Date.now() }],
+          };
         });
-      }
+      });
     };
 
     const handleGenerationStopped = (data: { conversationId: string; messageId: string }) => {
@@ -329,17 +354,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     };
   }, [wsConnected, currentConversation?.id, wsEmit]);
 
-  const addSystemMessage = (message: string) => {
-    const systemMessage: ChatMessage = {
-      id: 'sys_' + Date.now(),
-      userId: 'system',
-      userName: 'System',
-      message,
-      timestamp: new Date(),
-      type: 'system'
-    };
-    setChatMessages(prev => [...prev, systemMessage]);
-  };
+
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !currentUser || !selectedAgent || isLoading || isGenerating) return;
@@ -355,17 +370,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         throw new Error('Failed to create conversation');
       }
 
-      // Add user message immediately to UI
-      const userMessage: ChatMessage = {
-        id: 'temp_user_' + Date.now(),
-        userId: currentUser.id,
-        userName: currentUser.name,
-        message: messageContent,
-        timestamp: new Date(),
-        type: 'user'
-      };
-      setChatMessages(prev => [...prev, userMessage]);
-
       // Send message to conversation endpoint
       const response = await fetchWithAuth(`/api/conversations/${conversation.id}/messages`, {
         method: 'POST',
@@ -375,17 +379,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
       const data = await response.json();
       if (data.success) {
-        // Update the temporary message with real ID
-        setChatMessages(prev => prev.map(msg => 
-          msg.id === userMessage.id 
-            ? { ...msg, id: data.data.id || msg.id }
-            : msg
-        ));
-
-        // Set generating state for agent response
-        setIsGenerating(true);
-
-        // WebSocket will handle the agent response via real-time updates
+        // WebSocket will handle adding the message and agent response
         // If WebSocket is not connected, fall back to polling
         if (!wsConnected) {
           console.log('WebSocket not connected, using polling fallback');
@@ -425,15 +419,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       const data = await response.json();
       
       if (data.success) {
-        const messages: ChatMessage[] = data.data.map((msg: ConversationMessage) => ({
-          id: msg.id,
-          userId: msg.role === 'user' ? currentUser?.id || 'user' : 'agent_' + selectedAgent?.id,
-          userName: msg.role === 'user' ? currentUser?.name || 'You' : getSelectedAgentName(),
-          message: msg.content,
-          timestamp: new Date(msg.timestamp),
-          type: msg.role === 'user' ? 'user' : 'agent'
-        }));
-        setChatMessages(messages);
+        setCurrentConversation(prev => prev ? { ...prev, messages: data.data } : null);
         setIsGenerating(false);
       }
     } catch (error) {
@@ -464,9 +450,8 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
       const data = await response.json();
       if (data.success) {
-        const newConversation = data.data;
+        const newConversation = { ...data.data, messages: [] };
         setCurrentConversation(newConversation);
-        setChatMessages([]); // Clear previous messages
         return newConversation;
       } else {
         console.error('Failed to create conversation:', data.error);
@@ -643,62 +628,49 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
             <div className="flex flex-col h-full">
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {chatMessages.length === 0 && (
+                {(!currentConversation?.messages || currentConversation.messages.length === 0) && (
                   <div className="text-center text-gray-500 py-8">
                     No messages yet. Start a conversation!
                   </div>
                 )}
-                {chatMessages.filter((msg, index, self) => 
-                  index === self.findIndex(m => m.id === msg.id)
-                ).map(message => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "flex space-x-2",
-                      message.type === 'system' && "justify-center"
-                    )}
-                  >
-                    {message.type !== 'system' && (
+                {currentConversation?.messages?.map((msg) => {
+                  const isUser = msg.role === 'user';
+                  const isAgent = msg.role === 'agent';
+                  
+                  return (
+                    <div
+                      key={msg.id}
+                      className="flex space-x-2"
+                    >
                       <div className="flex-shrink-0">
                         <UserCircle className={cn(
                           "w-6 h-6",
-                          message.type === 'agent' ? "text-blue-500" : "text-gray-400"
+                          isAgent ? "text-blue-500" : "text-gray-400"
                         )} />
                       </div>
-                    )}
-                    
-                    <div className={cn(
-                      "flex-1",
-                      message.type === 'system' && "text-center"
-                    )}>
-                      {message.type === 'system' ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-                          {message.message}
+                      
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <span className={cn(
+                            "text-xs font-medium",
+                            isAgent ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"
+                          )}>
+                            {isUser ? 'You' : getSelectedAgentName()}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {formatTime(new Date(msg.timestamp))}
+                          </span>
+                        </div>
+                        <p 
+                          className="text-sm text-gray-900 dark:text-gray-100 mt-1 whitespace-pre-wrap"
+                          data-message-length={msg.content.length}
+                        >
+                          {msg.content}
                         </p>
-                      ) : (
-                        <>
-                          <div className="flex items-center space-x-2">
-                            <span className={cn(
-                              "text-xs font-medium",
-                              message.type === 'agent' ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"
-                            )}>
-                              {message.userName}
-                            </span>
-                            <span className="text-xs text-gray-400">
-                              {formatTime(message.timestamp)}
-                            </span>
-                          </div>
-                          <p 
-                            className="text-sm text-gray-900 dark:text-gray-100 mt-1"
-                            data-message-length={message.message.length}
-                          >
-                            {message.message}
-                          </p>
-                        </>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 
                 {/* Typing indicator */}
                 {isGenerating && (
