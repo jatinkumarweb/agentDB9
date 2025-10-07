@@ -246,10 +246,35 @@ If you see EACCES errors again:
 - `23ca9ff` - "fix: resolve WebSocket 1006 error by making authentication optional"
 - `263e4cc` - "fix: resolve vscode permission errors causing WebSocket issues"
 
+## Additional Fix: ENOPRO Filesystem Errors
+
+### Problem
+After fixing WebSocket and permission issues, VSCode was still showing errors:
+```
+ENOPRO: No file system provider found for resource 'vscode-remote:/home/coder/.local/share/code-server/User/settings.json'
+```
+
+### Root Cause
+VSCode was trying to access files outside the workspace mount using the `vscode-remote://` protocol, which doesn't work properly in iframe/proxy setups.
+
+### Solution
+Move VSCode user data directory into the workspace:
+
+```yaml
+vscode:
+  command: >
+    --user-data-dir /home/coder/workspace/.vscode-server
+    --extensions-dir /home/coder/workspace/.vscode-server/extensions
+    /home/coder/workspace
+```
+
+This ensures all VSCode data is within the workspace mount and accessible without the remote protocol.
+
 ## Summary
 
-The WebSocket 1006 error was caused by two issues:
+The WebSocket 1006 and ENOPRO errors were caused by three issues:
 1. **Authentication blocking connections** - Fixed by making auth optional in development
 2. **Permission errors in vscode service** - Fixed by removing user constraints and problematic volume mounts
+3. **Remote filesystem protocol errors** - Fixed by moving user-data-dir into workspace
 
-Both issues are now resolved, and VSCode works seamlessly in the browser without WebSocket errors.
+All issues are now resolved, and VSCode works seamlessly in the browser without any errors.
