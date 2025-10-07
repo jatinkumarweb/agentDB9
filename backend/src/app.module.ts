@@ -39,7 +39,7 @@ import { MCPModule } from './mcp/mcp.module';
       password: process.env.DB_PASSWORD || 'password',
       database: process.env.DB_NAME || 'coding_agent',
       autoLoadEntities: true,
-      synchronize: false,
+      synchronize: process.env.DB_SYNCHRONIZE === 'true',
       logging: true,
     }),
     CommonModule,
