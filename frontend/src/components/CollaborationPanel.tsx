@@ -1,7 +1,7 @@
 'use client';
 import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -221,11 +221,8 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     }
   }, [isAuthenticated]);
 
-  // WebSocket event handlers for conversation updates
-  useEffect(() => {
-    if (!wsConnected) return;
-
-    const handleMessageUpdate = (data: {
+  // WebSocket event handlers - use useCallback to prevent re-registration
+  const handleMessageUpdate = useCallback((data: {
       conversationId: string;
       messageId: string;
       content: string;
@@ -271,9 +268,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
           return newConversation;
         });
       });
-    };
+    }, []);
 
-    const handleNewMessage = (data: {
+    const handleNewMessage = useCallback((data: {
       conversationId: string;
       message: ConversationMessage;
     }) => {
@@ -319,26 +316,40 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
           };
         });
       });
-    };
+    }, []);
 
-    const handleGenerationStopped = (data: { conversationId: string; messageId: string }) => {
-      if (currentConversation?.id === data.conversationId) {
-        setIsGenerating(false);
-      }
-    };
+  const handleGenerationStopped = useCallback((data: { conversationId: string; messageId: string }) => {
+    console.log('⏹️ Generation stopped:', data.messageId);
+    setIsGenerating(false);
+  }, []);
 
-    wsOn('message_update', handleMessageUpdate);
-    wsOn('new_message', handleNewMessage);
-    wsOn('generation_stopped', handleGenerationStopped);
+  // Memoize WebSocket handlers
+  const wsHandlers = useMemo(() => ({
+    message_update: handleMessageUpdate,
+    new_message: handleNewMessage,
+    generation_stopped: handleGenerationStopped,
+  }), [handleMessageUpdate, handleNewMessage, handleGenerationStopped]);
+
+  // Set up WebSocket handlers BEFORE joining rooms
+  useEffect(() => {
+    if (!wsConnected) return;
+
+    console.log('🔌 Setting up WebSocket event handlers');
+
+    Object.entries(wsHandlers).forEach(([event, handler]) => {
+      wsOn(event, handler);
+      console.log(`✅ Registered handler for: ${event}`);
+    });
 
     return () => {
-      wsOff('message_update', handleMessageUpdate);
-      wsOff('new_message', handleNewMessage);
-      wsOff('generation_stopped', handleGenerationStopped);
+      console.log('🔌 Cleaning up WebSocket event handlers');
+      Object.entries(wsHandlers).forEach(([event, handler]) => {
+        wsOff(event, handler);
+      });
     };
-  }, [wsConnected, currentConversation?.id, currentUser, selectedAgent]);
+  }, [wsConnected, wsOn, wsOff, wsHandlers]);
 
-  // Join conversation room when conversation changes
+  // Join conversation room AFTER handlers are set up
   useEffect(() => {
     if (!wsConnected || !currentConversation?.id) return;
 
