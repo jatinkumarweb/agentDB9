@@ -519,10 +519,7 @@ Would you like help setting up external API access?`;
       }));
 
       // Log tool configuration for debugging
-      console.log(`Model: ${model}, Supports tools: ${modelSupportsTools}, Tools count: ${toolsForOllama.length}`);
-      if (toolsForOllama.length > 0) {
-        console.log('Sending tools to Ollama:', JSON.stringify(toolsForOllama.slice(0, 2), null, 2)); // Log first 2 tools
-      }
+      console.log(`Model: ${model}, Supports tools: ${modelSupportsTools} (using prompt-based tool calling)`);
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -535,15 +532,24 @@ Would you like help setting up external API access?`;
             {
               role: 'system',
               content: modelSupportsTools 
-                ? `You are a coding assistant with workspace tools: ${availableTools.join(', ')}
+                ? `You are a coding assistant with workspace tools. When you need to perform actions, output tool calls in this exact format:
 
-TOOL USAGE RULES:
-- execute_command: For npm projects use "mkdir dir && cd dir && npm init -y". Edit package.json with "npm pkg set key=value" NOT echo/append.
-- write_file: Provide complete file content, not partial updates.
-- read_file: Read before modifying files.
-- create_directory: Creates parent dirs automatically.
+<tool_call>
+<tool_name>execute_command</tool_name>
+<arguments>{"command": "mkdir demo && cd demo && npm init -y"}</arguments>
+</tool_call>
 
-Use tools when needed. Be clear and concise.`
+Available tools:
+- execute_command: Run shell commands. For npm: "mkdir dir && cd dir && npm init -y". Use "npm pkg set key=value" for package.json.
+- write_file: Write complete file content. Args: {"path": "file.js", "content": "full content"}
+- read_file: Read file. Args: {"path": "file.js"}
+- create_directory: Create dir. Args: {"path": "dirname"}
+- list_files: List files. Args: {"path": "."}
+- git_status: Check git status. Args: {}
+- git_commit: Commit changes. Args: {"message": "msg", "files": ["file1"]}
+- delete_file: Delete file. Args: {"path": "file.js"}
+
+After tool execution, you'll see results. Then provide your response.`
                 : `You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.`
             },
             {
@@ -552,7 +558,7 @@ Use tools when needed. Be clear and concise.`
             }
           ],
           stream: true,
-          tools: toolsForOllama.length > 0 ? toolsForOllama : undefined,
+          // Don't send tools parameter - use prompt-based approach instead
           options: {
             temperature: 0.3,
             top_p: 0.8,
@@ -719,6 +725,9 @@ Use tools when needed. Be clear and concise.`
                   await this.processPendingUpdates();
                 }
                 
+                // Parse and execute tool calls from the response
+                await this.parseAndExecuteToolCalls(finalContent, conversation, savedMessage);
+                
                 return finalContent;
               }
             } catch (parseError) {
@@ -861,27 +870,7 @@ Would you like help setting up external API access?`;
     await this.conversationsRepository.remove(conversation);
   }
 
-  private getActivityTypeFromTool(toolName: string): 'file_edit' | 'file_create' | 'file_delete' | 'git_operation' | 'terminal_command' | 'test_run' {
-    if (toolName.startsWith('read_file') || toolName.startsWith('write_file') || toolName.startsWith('list_files')) {
-      if (toolName.includes('create')) return 'file_create';
-      if (toolName.includes('delete')) return 'file_delete';
-      return 'file_edit';
-    }
-    
-    if (toolName.includes('git')) {
-      return 'git_operation';
-    }
-    
-    if (toolName.includes('execute_command')) {
-      return 'terminal_command';
-    }
-    
-    if (toolName.includes('test')) {
-      return 'test_run';
-    }
-    
-    return 'file_edit';
-  }
+
 
   private getToolDescription(toolName: string): string {
     const descriptions: Record<string, string> = {
@@ -961,21 +950,113 @@ Would you like help setting up external API access?`;
   }
 
   /**
+   * Parse and execute tool calls from model response
+   */
+  private async parseAndExecuteToolCalls(content: string, conversation: any, message: any): Promise<void> {
+    // Parse XML-style tool calls from the response
+    const toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/gs;
+    const matches = [...content.matchAll(toolCallRegex)];
+    
+    if (matches.length === 0) {
+      return; // No tool calls found
+    }
+    
+    console.log(`Found ${matches.length} tool call(s) in response`);
+    
+    for (const match of matches) {
+      const toolName = match[1].trim();
+      const argsJson = match[2].trim();
+      
+      try {
+        const args = JSON.parse(argsJson);
+        console.log(`Executing tool: ${toolName} with args:`, args);
+        
+        // Broadcast tool execution start
+        this.websocketGateway.broadcastAgentActivity({
+          conversationId: conversation.id,
+          type: this.getActivityTypeFromTool(toolName),
+          description: `Executing: ${toolName}`,
+          tool: toolName,
+          parameters: args,
+          status: 'in_progress'
+        });
+        
+        // Execute the tool
+        const toolResult = await this.mcpService.executeTool({
+          name: toolName,
+          arguments: args
+        });
+        
+        // Broadcast tool execution result
+        this.websocketGateway.broadcastAgentActivity({
+          conversationId: conversation.id,
+          type: this.getActivityTypeFromTool(toolName),
+          description: toolResult.success ? `Completed: ${toolName}` : `Failed: ${toolName}`,
+          tool: toolName,
+          parameters: args,
+          result: toolResult.result,
+          status: toolResult.success ? 'completed' : 'failed'
+        });
+        
+        // Append tool result to message content
+        const toolResultText = `\n\n**Tool Result (${toolName}):**\n\`\`\`json\n${JSON.stringify(toolResult.result, null, 2)}\n\`\`\`\n`;
+        const updatedContent = content + toolResultText;
+        
+        // Update message with tool result
+        await this.messagesRepository.update(message.id, {
+          content: updatedContent
+        });
+        
+        // Broadcast updated content
+        this.websocketGateway.broadcastMessageUpdate(
+          conversation.id,
+          message.id,
+          updatedContent,
+          false,
+          { toolExecuted: true, toolName, toolResult: toolResult.success }
+        );
+        
+      } catch (error) {
+        console.error(`Failed to execute tool ${toolName}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Map tool name to activity type
+   */
+  private getActivityTypeFromTool(toolName: string): 'file_edit' | 'file_create' | 'file_delete' | 'git_operation' | 'terminal_command' | 'test_run' {
+    if (toolName === 'execute_command') {
+      return 'terminal_command';
+    }
+    if (toolName === 'write_file') {
+      return 'file_create';
+    }
+    if (toolName === 'delete_file') {
+      return 'file_delete';
+    }
+    if (toolName.includes('git')) {
+      return 'git_operation';
+    }
+    if (toolName.includes('test')) {
+      return 'test_run';
+    }
+    return 'file_edit';
+  }
+
+  /**
    * Check if a model supports tool/function calling
    * 
-   * Note: TEMPORARILY DISABLED - Ollama's tool calling appears to cause timeouts
-   * with streaming. Need to investigate proper implementation.
+   * Note: Ollama's native tool calling with streaming causes timeouts.
+   * Instead, we use prompt-based tool calling where the model outputs
+   * tool calls as text that we parse and execute.
    */
   private modelSupportsToolCalling(model: string): boolean {
-    // Temporarily disable all tool calling to test if this is causing the timeout
-    return false;
-    
-    /* DISABLED - causing 60s timeouts
     const modelLower = model.toLowerCase();
     
-    // Models that support function calling (verified to work with Ollama)
+    // Models that can understand and output tool calls via prompting
     const supportedPatterns = [
-      'llama3.1', 'llama3.2', 'llama-3.1', 'llama-3.2',  // Llama 3.1/3.2 only (not base Llama)
+      'llama3.1', 'llama3.2', 'llama-3.1', 'llama-3.2',  // Llama 3.1/3.2
       'mistral', 'mixtral',  // Mistral models
       'qwen2.5',  // Qwen 2.5
       'command-r',  // Cohere Command R
@@ -983,9 +1064,6 @@ Would you like help setting up external API access?`;
       'claude',  // Anthropic Claude
     ];
     
-    // Note: CodeLlama, Starcoder, and base Llama models do NOT support function calling
-    
     return supportedPatterns.some(pattern => modelLower.includes(pattern));
-    */
   }
 }
