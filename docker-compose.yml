@@ -136,6 +136,8 @@ services:
       --disable-workspace-trust
       --disable-file-downloads
       --disable-getting-started-override
+      --user-data-dir /home/coder/workspace/.vscode-server
+      --extensions-dir /home/coder/workspace/.vscode-server/extensions
       /home/coder/workspace
 
   vscode-proxy:
