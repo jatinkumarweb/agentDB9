@@ -1,467 +1,206 @@
-# VS Code Agent-Driven Development
+# VSCode Integration
 
 ## Overview
 
-AgentDB9 provides an agent-driven development environment where AI agents create and modify code in a blank VS Code workspace based on natural language chat instructions. Users chat with AI agents who then execute development tasks directly in VS Code through MCP (Model Context Protocol) tools.
+AgentDB9 includes an embedded VSCode instance that allows agents to create and modify files directly in a browser-based IDE. This works across all platforms: local development, Docker, and cloud environments like Gitpod.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Frontend (Next.js)                       │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │   Workspace     │  │  Agent Activity │  │  Collaboration  │  │
-│  │     Page        │  │    Overlay      │  │     Panel       │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                                │ JWT Token
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    VS Code Proxy (Port 8081)                    │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │ JWT Validation  │  │  Request Proxy  │  │ WebSocket Proxy │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                                │ Authenticated Requests
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                VS Code Container (code-server, Port 8080)       │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │   File Explorer │  │     Editor      │  │    Terminal     │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │   Extensions    │  │   Git Panel     │  │   Debug Panel   │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        MCP Server                               │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │   File Tools    │  │   Git Tools     │  │  Terminal Tools │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │  Editor Tools   │  │  Testing Tools  │  │  Project Tools  │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────┐      ┌──────────────┐      ┌─────────────┐
+│   Frontend  │─────▶│ VSCode Proxy │─────▶│   VSCode    │
+│  (Port 3000)│      │  (Port 8081) │      │ (Port 8080) │
+└─────────────┘      └──────────────┘      └─────────────┘
+                            │                      │
+                            │                      │
+                     Authentication           Workspace
+                      JWT Tokens              /workspace
 ```
 
-### Authentication Flow
+### Components
 
-1. **User Login**: User authenticates with the backend and receives a JWT token
-2. **Token Storage**: Frontend stores the JWT token in cookies/localStorage
-3. **VS Code Access**: When accessing the workspace, the frontend embeds VS Code via the proxy
-4. **Token Validation**: The VS Code proxy validates the JWT token on every request
-5. **Proxy Pass-through**: Valid requests are proxied to the VS Code container
-6. **WebSocket Handling**: WebSocket connections for real-time features are also authenticated
+1. **VSCode Service** (Port 8080)
+   - Runs code-server (browser-based VSCode)
+   - Mounts project directory at `/home/coder/workspace`
+   - No authentication (protected by proxy)
 
-## Features
+2. **VSCode Proxy** (Port 8081)
+   - Authenticates users via JWT tokens
+   - Proxies requests to VSCode service
+   - Handles WebSocket connections
+   - Adds security headers for iframe embedding
 
-### 🤖 **AI Agent-Driven Development**
-- **Natural Language Instructions**: Chat with agents using plain English
-- **Intelligent Task Analysis**: Agents understand complex development requests
-- **Automatic Code Generation**: Agents create files, components, and entire projects
-- **Smart Dependency Management**: Agents install required packages automatically
-- **Context-Aware Development**: Agents understand project structure and requirements
+3. **Backend Service** (Port 8000)
+   - Executes tool calls (mkdir, write_file, etc.)
+   - Shares same workspace mount at `/workspace`
+   - Files created by agents appear in VSCode
 
-### 🖥️ **Blank Canvas Workspace**
-- **Clean Start**: Every workspace begins completely empty
-- **Agent-Created Content**: All code and files are generated by agents
-- **Full VS Code Interface**: Complete IDE experience with all native features
-- **Real-time Updates**: Watch agents work in real-time as they create your project
+## Workspace Mounting
 
-### 💬 **Integrated Chat Interface**
-- **Collaboration Panel**: Built-in chat with AI agents
-- **Multi-Agent Support**: Different agents for different tasks
-- **Request History**: Track all your development requests
-- **Status Updates**: Real-time feedback on agent actions
-
-### 🔧 **MCP Tool Integration**
-- **File Operations**: Agents create, edit, and manage files
-- **Terminal Commands**: Agents execute shell commands and scripts
-- **Package Management**: Agents install dependencies and configure projects
-- **Git Operations**: Agents handle version control and commits
-
-### 📊 **Development Workflow**
-- **Request → Analysis → Action**: Streamlined development process
-- **Multi-Step Projects**: Agents handle complex, multi-file projects
-- **Error Handling**: Agents detect and fix issues automatically
-- **Progress Tracking**: Visual indicators of agent work progress
-
-## Getting Started
-
-### 1. Access the Workspace
-
-Navigate to the workspace page in your browser:
-```
-https://your-domain.com/workspace
-```
-
-The workspace starts with a **blank VS Code environment** - no pre-loaded code or projects. This is intentional as agents will create everything from scratch based on your instructions.
-
-The VS Code interface is embedded in the workspace page and also accessible via the authenticated proxy:
-```
-http://localhost:8081
-```
-
-**Note**: Direct access to VS Code (port 8080) is disabled for security. All access must go through the authenticated proxy on port 8081.
-
-### 2. VS Code Authentication
-
-The VS Code container is integrated with AgentDB9's authentication system:
-- **JWT Token Authentication**: Uses the same authentication as the main application
-- **Automatic Login**: Users authenticated in the frontend automatically access VS Code
-- **Session Management**: Authentication state is synchronized across all services
-- **No Password Required**: Password authentication has been replaced with seamless JWT integration
-
-### 3. Agent-Driven Development
-
-Instead of pre-loaded code, you interact with AI agents through chat:
-
-1. **Chat with Agents**: Use the collaboration panel to send natural language instructions
-2. **Agent Analysis**: Agents analyze your requests and determine required actions
-3. **Automatic Execution**: Agents execute development tasks in VS Code via MCP tools
-4. **Real-time Updates**: Watch as agents create files, write code, and set up projects
-
-**Example Workflow**:
-- You: "Create a React todo app with TypeScript"
-- Agent: Analyzes request → Creates files → Writes components → Installs dependencies
-- Result: Complete project appears in your blank VS Code workspace
-
-## Configuration
-
-### Authentication Setup
-
-The VS Code integration requires proper JWT configuration:
+All services that need file access share the same workspace:
 
 ```yaml
 # docker-compose.yml
 services:
-  vscode-proxy:
-    environment:
-      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here_make_it_long_and_secure_for_production_use_at_least_32_chars}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
-      - VSCODE_URL=http://vscode:8080
-      - VSCODE_PROXY_PORT=8081
-
   vscode:
-    command: ["--auth", "none", "--bind-addr", "0.0.0.0:8080", "/home/coder/workspace"]
+    volumes:
+      - .:/home/coder/workspace  # Project root
+      
+  backend:
+    volumes:
+      - .:/workspace  # Same project root
+      
+  mcp-server:
+    volumes:
+      - .:/workspace  # Same project root
 ```
 
-**Important**: The `JWT_SECRET` must match between the backend, vscode-proxy, and any other services that validate tokens.
+This ensures:
+- Files created by agents appear in VSCode immediately
+- Changes in VSCode are visible to agents
+- No file synchronization needed
 
-### VS Code Extensions
+## Platform-Specific Setup
 
-Pre-installed extensions include:
-- **TypeScript**: Enhanced TypeScript support
-- **Prettier**: Code formatting
-- **ESLint**: Code linting
-- **Docker**: Container management
-- **GitLens**: Enhanced git capabilities
-- **Tailwind CSS**: CSS framework support
-- **Python**: Python development
-- **Go**: Go language support
+### Local Development
 
-### Settings
+1. Start all services:
+   ```bash
+   docker compose up -d
+   ```
 
-VS Code is pre-configured with:
-- **Theme**: Dark+ (default dark theme)
-- **Font**: Fira Code with ligatures
-- **Auto-save**: Enabled with 1-second delay
-- **Format on save**: Enabled
-- **Git auto-fetch**: Enabled
-- **Integrated terminal**: Bash shell
+2. Access the application:
+   - Frontend: http://localhost:3000
+   - VSCode (direct): http://localhost:8080
+   - VSCode (proxied): http://localhost:8081
 
-### Keyboard Shortcuts
+3. Files created by agents will appear in:
+   - Your local project directory
+   - VSCode file explorer
+   - Your IDE (if you have the project open)
 
-All standard VS Code shortcuts are available:
-- `Ctrl+Shift+P`: Command palette
-- `Ctrl+P`: Quick file open
-- `Ctrl+`` `: Toggle terminal
-- `Ctrl+Shift+E`: File explorer
-- `Ctrl+Shift+G`: Git panel
-- `F5`: Start debugging
+### Gitpod
 
-## Agent Integration
+Gitpod provides its own VSCode instance, so you have two options:
 
-### Real-time Monitoring
+**Option A: Use Gitpod's VSCode** (Recommended)
+- Files created by agents appear in Gitpod's file explorer automatically
+- No need to run vscode/vscode-proxy services
+- Better integration with Gitpod features
 
-The agent activity overlay shows:
-- **Current Operations**: What the agent is currently doing
-- **File Changes**: Real-time file modifications
-- **Command Execution**: Terminal commands and their output
-- **Git Operations**: Commits, pushes, branch changes
-- **Test Results**: Test execution and coverage reports
+**Option B: Use Embedded VSCode**
+- Start vscode services: `docker compose up -d vscode vscode-proxy`
+- Access via frontend at http://localhost:3000
+- Useful for testing the embedded experience
 
-### Activity Types
+### Docker-Only Environments
 
-The system tracks these agent activities:
-- `file_edit`: File modifications and edits
-- `file_create`: New file creation
-- `file_delete`: File deletion
-- `git_operation`: Git commands (commit, push, etc.)
-- `terminal_command`: Shell command execution
-- `test_run`: Test execution and analysis
+For environments without a native IDE:
 
-### Status Indicators
+1. Start all services including VSCode:
+   ```bash
+   docker compose up -d
+   ```
 
-Each activity has a status:
-- 🔵 **In Progress**: Operation currently running
-- ✅ **Completed**: Operation finished successfully  
-- ❌ **Failed**: Operation encountered an error
+2. Access VSCode through the frontend:
+   - Login at http://localhost:3000
+   - VSCode will be embedded in the UI
+   - All agent-created files appear immediately
 
-## Collaboration
+## Tool Execution and File Visibility
 
-### Multi-user Support
+When an agent executes a tool like `execute_command` or `write_file`:
 
-Multiple users can access the same workspace:
-- **Shared Editing**: Multiple cursors and selections
-- **Real-time Chat**: Communication with team and AI
-- **Presence Indicators**: See who's online and what they're working on
-- **Activity Sharing**: See each other's file changes and operations
+1. **Backend receives tool call** from LLM
+2. **MCP service executes** the command in `/workspace`
+3. **File is created** on the shared volume
+4. **VSCode detects change** via file watcher
+5. **File appears** in VSCode file explorer
 
-### Chat Features
+### Example Flow
 
-The integrated chat supports:
-- **User Messages**: Team communication
-- **Agent Messages**: AI agent status and responses
-- **System Messages**: Workspace events and notifications
-- **Message History**: Persistent chat history
-
-### Sharing
-
-Share workspace access via:
-- **Workspace URL**: Full frontend interface
-- **VS Code URL**: Direct code-server access
-- **Copy Links**: One-click URL copying
-
-## API Integration
-
-### Workspace Synchronization
-
-The frontend communicates with VS Code via:
-- **File Operations**: Read, write, create, delete files
-- **WebSocket Events**: Real-time activity updates
-- **MCP Tools**: Execute development operations
-
-### Available APIs
-
-- `POST /api/workspace/files`: List workspace files
-- `POST /api/workspace/read-file`: Read file content
-- `POST /api/workspace/save-file`: Save file changes
-- **WebSocket**: Real-time agent activity events
-
-## Agent-Driven Workflow
-
-### 1. Chat-Based Development
-
-**Step 1: Send Request**
 ```
-User: "Create a React todo app with TypeScript and Tailwind CSS"
-```
+User: "Create a new React component"
 
-**Step 2: Agent Analysis**
-- Agent analyzes the request
-- Determines required actions: create files, write code, install dependencies
-- Plans the project structure
+Agent generates tool call:
+<tool_call>
+<tool_name>write_file</tool_name>
+<arguments>{"path": "src/components/Button.tsx", "content": "..."}</arguments>
+</tool_call>
 
-**Step 3: Automatic Execution**
-- Agent creates `package.json` with required dependencies
-- Agent generates React components with TypeScript
-- Agent sets up Tailwind CSS configuration
-- Agent creates example todo functionality
+Backend executes:
+/workspace/src/components/Button.tsx created
 
-**Step 4: Real-time Updates**
-- Watch files appear in VS Code file explorer
-- See code being written in real-time
-- Monitor terminal output for dependency installation
-
-### 2. Supported Agent Actions
-
-**File Operations**:
-- `create_file`: Create new files with generated content
-- `write_code`: Write code based on requirements
-- `create_tests`: Generate test files and test cases
-
-**Project Setup**:
-- `install_dependencies`: Install npm packages automatically
-- `setup_project`: Initialize project structure
-- `configure_tools`: Set up development tools and configs
-
-**Code Generation**:
-- React components with TypeScript
-- Express.js API servers
-- Database schemas and models
-- Test suites and configurations
-
-### 3. Example Interactions
-
-**Creating a Component**:
-```
-User: "Create a login form component with email and password fields"
-Agent: "I'll create a LoginForm component with validation and TypeScript types"
-Result: LoginForm.tsx file created with complete implementation
-```
-
-**Setting up a Project**:
-```
-User: "Set up a full-stack app with React frontend and Express backend"
-Agent: "I'll create the project structure with both frontend and backend"
-Result: Complete project with package.json, components, API routes, and configuration
-```
-
-**Adding Features**:
-```
-User: "Add user authentication to the existing app"
-Agent: "I'll add JWT authentication with login/register functionality"
-Result: Auth components, API endpoints, and middleware added to existing project
+VSCode shows:
+📁 src
+  📁 components
+    📄 Button.tsx  ← New file appears
 ```
 
 ## Troubleshooting
 
-### Common Issues
+### Files Not Appearing in VSCode
 
-1. **Authentication Errors (401/403)**
-   - Verify user is logged in to the frontend
-   - Check JWT token validity: tokens expire after 24 hours by default
-   - Ensure JWT_SECRET matches between backend and vscode-proxy
-   - Check vscode-proxy logs: `docker-compose logs vscode-proxy`
+**Problem:** Agent creates files but they don't show in VSCode
 
-2. **VS Code Won't Load**
-   - Check if vscode-proxy container is running: `docker-compose ps vscode-proxy`
-   - Verify port 8081 is accessible (not 8080)
-   - Check container logs: `docker-compose logs vscode vscode-proxy`
-   - Ensure VS Code container is running with `--auth none`
+**Solution:**
+1. Check workspace mounts are correct:
+   ```bash
+   docker compose exec vscode ls -la /home/coder/workspace
+   docker compose exec backend ls -la /workspace
+   ```
+   Both should show the same files.
 
-3. **Token Validation Failures**
-   - Check JWT_SECRET environment variables match
-   - Restart vscode-proxy after JWT_SECRET changes: `docker-compose restart vscode-proxy`
-   - Verify token format in browser developer tools
-   - Check for token expiration
+2. Verify services are using actual directory, not Docker volumes:
+   ```yaml
+   # ✅ Correct
+   volumes:
+     - .:/workspace
+   
+   # ❌ Wrong
+   volumes:
+     - vscode-workspace:/workspace
+   ```
 
-4. **Permission Errors**
-   - Ensure proper volume permissions
-   - Check user ID mapping in Docker
-   - Restart container: `docker-compose restart vscode`
+### VSCode Connection Errors
 
-5. **Agent Activity Not Showing**
-   - Verify MCP server is running on port 9001
-   - Check WebSocket connection to port 9002
-   - Ensure frontend can reach MCP server
+**Problem:** `Unable to resolve resource vscode-remote://localhost:8081`
 
-6. **Extensions Not Loading**
-   - Check extension installation in container logs
-   - Verify volume mounts for extension storage
-   - Manually install extensions via VS Code interface
+**Solutions:**
+1. Check vscode-proxy is running:
+   ```bash
+   docker compose ps vscode-proxy
+   curl http://localhost:8081/health
+   ```
 
-### Performance Optimization
+2. Verify authentication token is being passed
+3. Check browser console for detailed errors
 
-- **Resource Limits**: Configure Docker memory/CPU limits
-- **Extension Management**: Disable unused extensions
-- **File Watching**: Limit file watchers for large projects
-- **Terminal Sessions**: Close unused terminal sessions
+## Environment Variables
 
-## Security Considerations
-
-### Access Control
-- **JWT Token Authentication**: Integrated with AgentDB9's user authentication system
-- **Session-based Access**: Users must be logged in to access VS Code
-- **Automatic Token Validation**: All requests are validated against the authentication service
-- **Network Isolation**: VS Code container is not directly accessible from outside
-- **Proxy-based Security**: All access goes through the authenticated vscode-proxy service
-- **File System Sandboxing**: Container-based isolation for workspace files
-
-### Data Protection
-- Local file storage only
-- No external data transmission
-- Secure WebSocket connections
-- Container-based isolation
-
-## Future Enhancements
-
-### Planned Features
-- **Live Share**: Real-time collaborative editing
-- **Voice Chat**: Audio communication
-- **Screen Sharing**: Share VS Code sessions
-- **Advanced Debugging**: Multi-language debugging support
-- **Cloud Sync**: Workspace synchronization across devices
-- **Mobile Support**: Responsive VS Code interface
-
-### Extension Ecosystem
-- **Custom Extensions**: AgentDB9-specific extensions
-- **AI Assistants**: Integrated AI coding assistants
-- **Workflow Automation**: Custom development workflows
-- **Team Tools**: Enhanced collaboration features
-
-## Testing Agent-Driven Development
-
-### 1. Authentication Test
-
-```bash
-# Get authentication token
-TOKEN=$(curl -X POST http://localhost:8000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"your-email","password":"your-password"}' \
-  | jq -r '.accessToken')
-
-# Test VS Code access
-curl -i http://localhost:8081/ \
-  -H "Authorization: Bearer $TOKEN"
-# Should return 302 redirect to blank VS Code workspace
+### Frontend
+```env
+NEXT_PUBLIC_VSCODE_PROXY_URL=http://localhost:8081
 ```
 
-### 2. Agent Chat Test
-
-```bash
-# Test agent chat endpoint
-curl -X POST http://localhost:8000/api/agents/chat \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "message": "Create a React component for a todo list",
-    "context": {"workspaceId": "test-workspace"}
-  }'
-
-# Expected response:
-# {
-#   "success": true,
-#   "data": {
-#     "response": "I'll help you with that! I'm going to: Create a new file...",
-#     "actions": [{"type": "create_file", "description": "Create a new file", "priority": 1}],
-#     "timestamp": "2025-09-28T09:19:57.905Z"
-#   }
-# }
+### VSCode Proxy
+```env
+VSCODE_PROXY_PORT=8081
+VSCODE_URL=http://vscode:8080
+JWT_SECRET=your_secret_key
+FRONTEND_URL=http://localhost:3000
 ```
 
-### 3. Workflow Test
-
-1. **Access Workspace**: Navigate to `/workspace` in browser
-2. **Open Chat Panel**: Click collaboration panel button
-3. **Send Message**: Type "Create a simple React app"
-4. **Watch Agent Work**: See agent response and planned actions
-5. **Check VS Code**: Verify blank workspace is ready for agent actions
-
-### 4. Health Checks
-
-```bash
-# VS Code Proxy health
-curl http://localhost:8081/health
-
-# Backend API health
-curl http://localhost:8000/api/health
-
-# Agent chat availability
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/agents
+### Backend
+```env
+VSCODE_WORKSPACE=/workspace
 ```
 
-## Support
+## Summary
 
-For issues and questions:
-- **Documentation**: Check this guide and MCP_INTEGRATION.md
-- **Logs**: Review container and application logs
-- **Community**: Join discussions and share feedback
-- **Issues**: Report bugs and feature requests
+✅ **Works on all platforms**: Local, Docker, Gitpod, cloud  
+✅ **Real-time file sync**: Changes appear immediately  
+✅ **Secure**: JWT authentication and CORS protection  
+✅ **Flexible**: Use embedded VSCode or native IDE  
 
----
-
-The VS Code container integration transforms AgentDB9 into a complete development environment where humans and AI agents can collaborate seamlessly in a familiar, powerful IDE interface.
+The integration ensures that agents can create and modify files that are immediately visible to users, regardless of the platform they're using.
