@@ -68,6 +68,15 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   // WebSocket integration
   const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff } = useWebSocket();
 
+  // Debug: Log when chatMessages changes
+  useEffect(() => {
+    console.log('chatMessages state updated, count:', chatMessages.length, 'activeTab:', activeTab);
+    if (chatMessages.length > 0) {
+      const lastMsg = chatMessages[chatMessages.length - 1];
+      console.log('Last message:', lastMsg.id, 'content:', lastMsg.message.substring(0, 50));
+    }
+  }, [chatMessages, activeTab]);
+
   // Fetch available agents from the same API as chat page
   const fetchAgents = async () => {
     if (!isAuthenticated) {
@@ -226,11 +235,21 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         setIsGenerating(data.streaming);
         // Update the message content in real-time
         setChatMessages(prev => {
-          const updated = prev.map(msg => 
-            msg.id === data.messageId 
-              ? { ...msg, message: data.content }
-              : msg
-          );
+          const messageIndex = prev.findIndex(msg => msg.id === data.messageId);
+          if (messageIndex === -1) {
+            console.warn('Message not found for update:', data.messageId);
+            return prev;
+          }
+          
+          // Create a completely new array with a new object to ensure React detects the change
+          const updated = [...prev];
+          updated[messageIndex] = {
+            ...updated[messageIndex],
+            message: data.content,
+            timestamp: new Date() // Update timestamp to force re-render
+          };
+          
+          console.log('Message updated in state, new content:', data.content.substring(0, 50) + '...');
           return updated;
         });
       }
@@ -611,6 +630,11 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
             <div className="flex flex-col h-full">
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {chatMessages.length === 0 && (
+                  <div className="text-center text-gray-500 py-8">
+                    No messages yet. Start a conversation!
+                  </div>
+                )}
                 {chatMessages.filter((msg, index, self) => 
                   index === self.findIndex(m => m.id === msg.id)
                 ).map(message => (
@@ -651,7 +675,10 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                               {formatTime(message.timestamp)}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
+                          <p 
+                            className="text-sm text-gray-900 dark:text-gray-100 mt-1"
+                            data-message-length={message.message.length}
+                          >
                             {message.message}
                           </p>
                         </>
