@@ -66,3 +66,22 @@ The custom JSON parser handles:
 - Malformed JSON (returns null gracefully)
 
 All entity transformers now use this consistent parsing approach.
+
+## Important Notes
+
+### Database Synchronization
+If you encounter errors like "column 'configuration' of relation 'agents' contains null values" when enabling `DB_SYNCHRONIZE=true` on an existing database:
+
+1. **Option 1 - Clean Database**: Drop and recreate the database
+   ```bash
+   docker compose down -v
+   docker compose up -d
+   ```
+
+2. **Option 2 - Use Migrations**: Disable synchronization and use proper migrations
+   ```bash
+   # In docker-compose.yml, set:
+   DB_SYNCHRONIZE=false
+   ```
+
+The error occurs when TypeORM tries to alter existing columns during synchronization. For production environments, always use migrations instead of synchronization.
