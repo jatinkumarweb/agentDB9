@@ -27,20 +27,11 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
   const { currentWorkspace } = useWorkspaceStore();
 
   useEffect(() => {
-    // Get VS Code proxy URL
-    const baseUrl = process.env.NEXT_PUBLIC_VSCODE_PROXY_URL || 'http://localhost:8081';
+    // Use VSCode directly without proxy - simpler and no authentication issues
+    const baseUrl = process.env.NEXT_PUBLIC_VSCODE_URL || 'http://localhost:8080';
     
-    // In development, authentication is disabled on the proxy
-    // In production, get auth token from cookies
-    const token = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('auth-token='))
-      ?.split('=')[1];
-    
-    // Construct URL - include token if available for production
-    // Note: code-server automatically opens /home/coder/workspace
-    const url = token ? `${baseUrl}/?token=${encodeURIComponent(token)}` : baseUrl;
-    setVscodeUrl(url);
+    // code-server automatically opens /home/coder/workspace
+    setVscodeUrl(baseUrl);
   }, [currentWorkspace]);
 
   const handleIframeLoad = () => {

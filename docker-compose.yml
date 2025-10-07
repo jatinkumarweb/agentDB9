@@ -18,7 +18,7 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
       - NEXT_PUBLIC_WS_URL=ws://localhost:8000
-      - NEXT_PUBLIC_VSCODE_PROXY_URL=http://localhost:8081
+      - NEXT_PUBLIC_VSCODE_URL=http://localhost:8080
       - NEXT_PUBLIC_MCP_WS_URL=ws://localhost:9002
       - BACKEND_URL=http://backend:8000
       - NODE_OPTIONS=--dns-result-order=ipv4first
@@ -140,21 +140,23 @@ services:
       --extensions-dir /home/coder/workspace/.vscode-server/extensions
       /home/coder/workspace
 
-  vscode-proxy:
-    build:
-      context: ./vscode-proxy
-      dockerfile: Dockerfile
-    ports:
-      - "8081:8081"
-    environment:
-      - NODE_ENV=development
-      - VSCODE_PROXY_PORT=8081
-      - VSCODE_URL=http://vscode:8080
-      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here_make_it_long_and_secure_for_production_use_at_least_32_chars}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
-      - REQUIRE_AUTH=false
-    depends_on:
-      - vscode
+  # vscode-proxy: Not needed for development - use VSCode directly on port 8080
+  # Uncomment for production if you need authentication
+  # vscode-proxy:
+  #   build:
+  #     context: ./vscode-proxy
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8081:8081"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - VSCODE_PROXY_PORT=8081
+  #     - VSCODE_URL=http://vscode:8080
+  #     - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here_make_it_long_and_secure_for_production_use_at_least_32_chars}
+  #     - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+  #     - REQUIRE_AUTH=true
+  #   depends_on:
+  #     - vscode
 
   mcp-server:
     build:
