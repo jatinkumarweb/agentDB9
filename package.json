@@ -43,11 +43,11 @@
     "clean:docker": "./scripts/docker-cleanup.sh",
     "clean:docker:deep": "./scripts/docker-deep-cleanup.sh",
     "monitor:storage": "./scripts/docker-storage-monitor.sh",
-    "logs": "./scripts/docker-setup.sh logs -f",
+    "logs": "./scripts/docker-setup.sh logs -f frontend backend llm-service mcp-server ollama",
     "logs:frontend": "./scripts/docker-setup.sh logs -f frontend",
     "logs:backend": "./scripts/docker-setup.sh logs -f backend",
     "logs:llm": "./scripts/docker-setup.sh logs -f llm-service",
-    "logs:mcp": "npm run logs --workspace=mcp-server",
+    "logs:mcp": "./scripts/docker-setup.sh logs -f mcp-server",
     "status": "./scripts/docker-setup.sh ps",
     "health": "curl -s http://localhost:8000/health && curl -s http://localhost:9000/health && curl -s http://localhost:3000/api/health"
   },
