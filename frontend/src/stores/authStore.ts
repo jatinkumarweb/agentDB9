@@ -53,14 +53,24 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         
         try {
-          // Use mock login for testing when backend is not available
-          const response = await axios.post('/api/auth/login', {
-            email,
-            password,
+          // Use fetch with credentials to ensure cookies are handled properly
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
           });
 
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || errorData.error || 'Login failed');
+          }
+
+          const data = await response.json();
           // API route returns { user, accessToken } directly
-          const { user, accessToken } = response.data;
+          const { user, accessToken } = data;
 
           // Set authorization header for future requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
@@ -83,13 +93,7 @@ export const useAuthStore = create<AuthState>()(
           });
         } catch (error: any) {
           set({ isLoading: false });
-          
-          // Handle different error response formats
-          const errorMessage = error.response?.data?.message || 
-                              error.response?.data?.error || 
-                              error.message ||
-                              'Login failed. Please try again.';
-          throw new Error(errorMessage);
+          throw new Error(error.message || 'Login failed. Please try again.');
         }
       },
 
@@ -97,14 +101,23 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         
         try {
-          const response = await axios.post('/api/auth/signup', {
-            username,
-            email,
-            password,
+          const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, email, password }),
           });
 
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || errorData.error || 'Signup failed');
+          }
+
+          const data = await response.json();
           // API route returns { user, accessToken } directly
-          const { user, accessToken } = response.data;
+          const { user, accessToken } = data;
 
           // Set authorization header for future requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
@@ -127,13 +140,7 @@ export const useAuthStore = create<AuthState>()(
           });
         } catch (error: any) {
           set({ isLoading: false });
-          
-          // Handle different error response formats
-          const errorMessage = error.response?.data?.message || 
-                              error.response?.data?.error || 
-                              error.message ||
-                              'Signup failed. Please try again.';
-          throw new Error(errorMessage);
+          throw new Error(error.message || 'Signup failed. Please try again.');
         }
       },
 
@@ -210,9 +217,20 @@ export const useAuthStore = create<AuthState>()(
           // Set the authorization header
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
-          // Verify the token is still valid
-          const response = await axios.get('/api/auth/profile');
-          const { user } = response.data.data;
+          // Verify the token is still valid using fetch with credentials
+          const response = await fetch('/api/auth/profile', {
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (!response.ok) {
+            throw new Error('Profile request failed');
+          }
+          
+          const data = await response.json();
+          const { user } = data.data;
 
           console.log('checkAuth: Token valid, user authenticated:', user.email);
           set({
