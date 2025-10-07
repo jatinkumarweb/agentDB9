@@ -8,10 +8,33 @@ export async function GET(
   { params }: { params: { agentId: string } }
 ) {
   try {
+    // Get all cookies for debugging
+    const allCookies = request.cookies.getAll();
+    const authCookie = request.cookies.get('auth-token');
+    
+    console.log('Conversations/agent API: Incoming request cookies:', {
+      hasCookies: allCookies.length > 0,
+      cookieCount: allCookies.length,
+      hasAuthCookie: !!authCookie,
+      authCookieValue: authCookie?.value?.substring(0, 30) + '...',
+      agentId: params.agentId
+    });
+    
+    const headers = createBackendHeaders(request);
+    console.log('Conversations/agent API: Headers being sent:', {
+      hasAuth: !!headers['Authorization'],
+      authHeader: headers['Authorization']?.substring(0, 50) + '...'
+    });
+    
     const response = await fetch(`${BACKEND_URL}/api/conversations/agent/${params.agentId}`, {
-      headers: createBackendHeaders(request),
+      headers,
     });
     const data = await response.json();
+    
+    console.log('Conversations/agent API: Backend response:', {
+      status: response.status,
+      ok: response.ok
+    });
     
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
