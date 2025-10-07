@@ -7,7 +7,10 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
     'Content-Type': 'application/json',
   };
   
-  return fetch(url, {
+  // Log the request for debugging
+  console.log('fetchWithAuth: Making request to', url, 'with credentials: include');
+  
+  const response = await fetch(url, {
     ...options,
     credentials: 'include', // Always include cookies
     headers: {
@@ -15,4 +18,8 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
       ...(options.headers || {}),
     },
   });
+  
+  console.log('fetchWithAuth: Response status:', response.status, 'for', url);
+  
+  return response;
 }
