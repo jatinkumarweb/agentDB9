@@ -125,17 +125,15 @@ services:
       - "8080:8080"
     environment:
       - SHELL=/bin/bash
-    user: "1000:1000"
     volumes:
       - .:/home/coder/workspace
-      - ./vscode-config:/home/coder/.local/share/code-server/User
-      - vscode-extensions:/home/coder/.local/share/code-server/extensions
-      - vscode-data:/home/coder/.local/share/code-server
     command: >
       --bind-addr 0.0.0.0:8080
       --auth none
       --disable-telemetry
       --disable-update-check
+      --user-data-dir /tmp/code-server
+      --extensions-dir /tmp/code-server/extensions
       --welcome-text "Welcome to AgentDB9! Start chatting with AI agents to create your project."
       /home/coder/workspace
 
