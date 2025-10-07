@@ -33,9 +33,6 @@ COPY backend/package*.json ./
 # Install dependencies
 RUN npm install
 
-# Explicitly install jsonrepair locally (prevent hoisting issues)
-RUN npm install jsonrepair@3.13.1
-
 # Rebuild native modules for the container architecture
 RUN npm rebuild sqlite3
 
@@ -46,6 +43,9 @@ COPY backend/ .
 RUN mkdir -p node_modules/@agentdb9 && \
     rm -f node_modules/@agentdb9/shared && \
     ln -sf /shared node_modules/@agentdb9/shared
+
+# Verify jsonrepair is installed
+RUN ls -la node_modules/jsonrepair || echo "WARNING: jsonrepair not found in node_modules"
 
 # Build the NestJS application
 RUN npm run build

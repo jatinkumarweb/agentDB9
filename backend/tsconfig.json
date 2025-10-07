@@ -19,9 +19,6 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false,
-    "paths": {
-      "jsonrepair": ["../node_modules/jsonrepair", "./node_modules/jsonrepair"]
-    }
+    "noFallthroughCasesInSwitch": false
   }
 }
