@@ -2,6 +2,7 @@
 import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
 import React, { useState, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
@@ -37,6 +38,7 @@ interface ChatMessage {
   message: string;
   timestamp: Date;
   type: 'user' | 'system' | 'agent';
+  _lastUpdated?: number; // For forcing React re-renders
 }
 
 interface CollaborationPanelProps {
@@ -231,26 +233,37 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       metadata?: any;
     }) => {
       if (currentConversation?.id === data.conversationId) {
-        console.log('Updating message:', data.messageId, 'streaming:', data.streaming, 'content length:', data.content.length);
-        setIsGenerating(data.streaming);
-        // Update the message content in real-time
-        setChatMessages(prev => {
-          const messageIndex = prev.findIndex(msg => msg.id === data.messageId);
-          if (messageIndex === -1) {
-            console.warn('Message not found for update:', data.messageId);
-            return prev;
-          }
-          
-          // Create a completely new array with a new object to ensure React detects the change
-          const updated = [...prev];
-          updated[messageIndex] = {
-            ...updated[messageIndex],
-            message: data.content,
-            timestamp: new Date() // Update timestamp to force re-render
-          };
-          
-          console.log('Message updated in state, new content:', data.content.substring(0, 50) + '...');
-          return updated;
+        console.log('🔄 Updating message:', data.messageId, 'streaming:', data.streaming, 'content length:', data.content.length);
+        
+        // Use flushSync to force synchronous update
+        flushSync(() => {
+          setIsGenerating(data.streaming);
+        });
+        
+        flushSync(() => {
+          // Update the message content in real-time
+          setChatMessages(prev => {
+            const messageIndex = prev.findIndex(msg => msg.id === data.messageId);
+            if (messageIndex === -1) {
+              console.warn('❌ Message not found for update:', data.messageId);
+              return prev;
+            }
+            
+            // Create a completely new array with new objects to ensure React detects the change
+            const updated = prev.map((msg, idx) => 
+              idx === messageIndex
+                ? {
+                    ...msg,
+                    message: data.content,
+                    timestamp: new Date(),
+                    _lastUpdated: Date.now() // Force change detection
+                  }
+                : { ...msg } // Clone all messages to ensure new references
+            );
+            
+            console.log('✅ Message updated in state, new content:', data.content.substring(0, 50) + '...');
+            return updated;
+          });
         });
       }
     };
