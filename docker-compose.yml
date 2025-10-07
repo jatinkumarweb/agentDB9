@@ -63,7 +63,7 @@ services:
       - ./backend:/app
       - ./shared:/shared
       - backend_node_modules:/app/node_modules
-      - .:/workspace
+      - ./workspace:/workspace
     command: ["npm", "run", "start:dev"]
     depends_on:
       - qdrant
