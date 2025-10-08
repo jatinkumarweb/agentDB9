@@ -187,7 +187,9 @@ services:
         max-file: "2"
 
   vscode:
-    image: codercom/code-server:latest
+    build:
+      context: ./vscode
+      dockerfile: Dockerfile
     platform: linux/amd64
     ports:
       - "8080:8080"
