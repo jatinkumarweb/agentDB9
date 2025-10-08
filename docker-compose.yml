@@ -30,6 +30,19 @@ services:
       - /app/.next
     depends_on:
       - backend
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
   backend:
     build:
@@ -41,6 +54,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       - NODE_ENV=development
+      - LOG_LEVEL=${LOG_LEVEL:-warn}
       - PORT=8000
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -69,6 +83,19 @@ services:
       - qdrant
       - postgres
       - redis
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   llm-service:
     build:
@@ -79,7 +106,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
+      - LOG_LEVEL=${LOG_LEVEL:-warn}
       - OLLAMA_HOST=http://ollama:11434
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -93,6 +121,19 @@ services:
       - /app/node_modules
     depends_on:
       - redis
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+        reservations:
+          cpus: '2.0'
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -103,6 +144,19 @@ services:
       - ./qdrant_data:/qdrant_data
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
 
   ollama:
     image: ollama/ollama:latest
@@ -114,9 +168,23 @@ services:
     environment:
       - OLLAMA_ORIGINS=*
       - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_NUM_PARALLEL=1
-      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_MAX_LOADED_MODELS=2
+      - OLLAMA_KEEP_ALIVE=5m
     runtime: runc
+    deploy:
+      resources:
+        limits:
+          cpus: '6.0'
+          memory: 8G
+        reservations:
+          cpus: '4.0'
+          memory: 4G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
 
   vscode:
     image: codercom/code-server:latest
@@ -139,6 +207,19 @@ services:
       --disable-file-downloads
       --disable-getting-started-override
       /home/coder/workspace
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
   # vscode-proxy: Not needed for development - use VSCode directly on port 8080
   # Uncomment for production if you need authentication
@@ -179,6 +260,19 @@ services:
       - vscode
       - backend
       - llm-service
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
   postgres:
     image: postgres:15
@@ -191,6 +285,19 @@ services:
       - POSTGRES_PASSWORD=password
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
 
   redis:
     image: redis:7-alpine
@@ -199,6 +306,20 @@ services:
       - "6379:6379"
     volumes:
       - ./redis_data:/data
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
 volumes:
   backend_node_modules:

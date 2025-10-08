@@ -460,6 +460,31 @@ The system maintains rich context including:
 - **Resource utilization**: CPU, memory, and GPU usage
 - **Auto-optimization**: Adjust model selection based on metrics
 
+## Performance Optimization
+
+The docker-compose.yml includes production-ready performance settings:
+
+### Resource Limits
+- **LLM Service**: 4 CPU cores, 4GB RAM (optimized for AI inference)
+- **Ollama**: 6 CPU cores, 8GB RAM (maximum resources for model inference)
+- **Backend**: 2 CPU cores, 2GB RAM
+- **Qdrant**: 2 CPU cores, 2GB RAM (vector database)
+- **Frontend/VSCode/MCP**: 1 CPU core, 1GB RAM each
+- **PostgreSQL**: 1 CPU core, 1GB RAM
+- **Redis**: 1 CPU core, 512MB RAM (with LRU eviction)
+
+### Log Rotation
+All services include automatic log rotation:
+- High-traffic services: 10MB max size, 3 files
+- Standard services: 5MB max size, 2 files
+
+### Environment Variables
+- `NODE_ENV=production` for LLM service (reduced logging overhead)
+- `LOG_LEVEL=warn` for all services (configurable via .env)
+- Ollama tuning: `OLLAMA_NUM_PARALLEL=2`, `OLLAMA_MAX_LOADED_MODELS=2`
+
+These settings provide optimal performance out of the box. Adjust resource limits in docker-compose.yml based on your hardware capabilities.
+
 ### 🎯 **Intelligent Features**
 
 - **Auto-completion**: Context-aware code suggestions
