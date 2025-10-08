@@ -155,6 +155,198 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       devDependencies: ['@types/react', '@types/react-dom', '@vitejs/plugin-react', 'typescript', 'vite', 'vitest']
     },
     {
+      name: 'nextjs-typescript',
+      description: 'Next.js 14+ with TypeScript, Tailwind CSS, and App Router',
+      language: 'typescript',
+      framework: 'nextjs',
+      files: [
+        {
+          path: 'package.json',
+          content: JSON.stringify({
+            name: 'nextjs-app',
+            version: '0.1.0',
+            private: true,
+            scripts: {
+              dev: 'next dev',
+              build: 'next build',
+              start: 'next start',
+              lint: 'next lint'
+            }
+          }, null, 2)
+        },
+        {
+          path: 'tsconfig.json',
+          content: JSON.stringify({
+            compilerOptions: {
+              target: 'ES2017',
+              lib: ['dom', 'dom.iterable', 'esnext'],
+              allowJs: true,
+              skipLibCheck: true,
+              strict: true,
+              noEmit: true,
+              esModuleInterop: true,
+              module: 'esnext',
+              moduleResolution: 'bundler',
+              resolveJsonModule: true,
+              isolatedModules: true,
+              jsx: 'preserve',
+              incremental: true,
+              plugins: [{ name: 'next' }],
+              paths: { '@/*': ['./src/*'] }
+            },
+            include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
+            exclude: ['node_modules']
+          }, null, 2)
+        },
+        {
+          path: 'next.config.ts',
+          content: `import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  /* config options here */
+}
+
+export default nextConfig`
+        },
+        {
+          path: 'src/app/layout.tsx',
+          content: `import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Next.js App',
+  description: 'Created with Next.js',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}`
+        },
+        {
+          path: 'src/app/page.tsx',
+          content: `export default function Home() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center p-24">
+      <h1 className="text-4xl font-bold">Welcome to Next.js!</h1>
+      <p className="mt-4 text-lg">Get started by editing src/app/page.tsx</p>
+    </main>
+  )
+}`
+        },
+        {
+          path: 'src/app/globals.css',
+          content: `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}`
+        },
+        {
+          path: 'tailwind.config.ts',
+          content: `import type { Config } from 'tailwindcss'
+
+const config: Config = {
+  content: [
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+export default config`
+        },
+        {
+          path: 'postcss.config.mjs',
+          content: `/** @type {import('postcss-load-config').Config} */
+const config = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+
+export default config`
+        },
+        {
+          path: '.gitignore',
+          content: `# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts`
+        },
+        {
+          path: '.eslintrc.json',
+          content: JSON.stringify({
+            extends: 'next/core-web-vitals'
+          }, null, 2)
+        }
+      ],
+      dependencies: ['next', 'react', 'react-dom'],
+      devDependencies: ['typescript', '@types/node', '@types/react', '@types/react-dom', 'tailwindcss', 'postcss', 'autoprefixer', 'eslint', 'eslint-config-next']
+    },
+    {
       name: 'python-basic',
       description: 'Basic Python project with pytest',
       language: 'python',
