@@ -553,13 +553,55 @@ AVAILABLE TOOLS:
   * ALL commands execute in the VSCode container where the user works
   * For npm projects: Use "mkdir project-name && cd project-name && npm init -y"
   * For Next.js: Use "npx create-next-app@latest project-name --yes" (ALWAYS include --yes flag)
-    IMPORTANT: After creating Next.js project, configure for container:
-    1. "cd project-name && npm pkg set scripts.dev='next dev --turbopack -H 0.0.0.0' && npm pkg set scripts.start='next start -H 0.0.0.0'"
-    2. Update next.config.ts to fix static files: Add "images: { unoptimized: process.env.NODE_ENV === 'development' }" to prevent 404s on images
+    IMPORTANT: After creating Next.js project, configure for universal environment:
+    1. Update next.config.ts with environment-aware configuration:
+       "cat > project-name/next.config.ts << 'EOF'
+import type { NextConfig } from \"next\";
+
+const isVSCodeProxy = process.env.VSCODE_PROXY === 'true';
+const port = process.env.PORT || '3000';
+const proxyPath = isVSCodeProxy ? \`/proxy/\${port}\` : '';
+
+const nextConfig: NextConfig = {
+  basePath: proxyPath,
+  assetPrefix: proxyPath,
+  images: { unoptimized: process.env.NODE_ENV === 'development' }
+};
+
+export default nextConfig;
+EOF"
+    2. Update package.json dev script: "cd project-name && npm pkg set scripts.dev='next dev --turbopack -H 0.0.0.0'"
+    3. Inform user: "✅ Next.js project configured for universal access! Access at: http://localhost:8080/proxy/3000/ (VSCode proxy) or http://localhost:3000/ (direct)"
   * For React: Use "npx create-react-app project-name --template typescript"
+    Note: CRA doesn't support dynamic basePath. Recommend direct port access.
   * For Vite: Use "npm create vite@latest project-name -- --template react-ts"
+    After creation, configure vite.config.ts:
+    "cat > project-name/vite.config.ts << 'EOF'
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+const isVSCodeProxy = process.env.VSCODE_PROXY === 'true';
+const port = parseInt(process.env.PORT || '5173');
+const proxyPath = isVSCodeProxy ? \`/proxy/\${port}\` : '/';
+
+export default defineConfig({
+  plugins: [react()],
+  base: proxyPath,
+  server: { host: '0.0.0.0', port: port }
+})
+EOF"
+    Then: "cd project-name && npm pkg set scripts.dev='vite'"
   * NEVER use "npm init -y --name" (this tries to run create-name package)
   * To set package name after init: "npm pkg set name=project-name"
+  
+  ENVIRONMENT-AWARE CONFIGURATION:
+  * Projects run in VSCode container at /home/coder/workspace/
+  * VSCode proxies dev servers at: http://localhost:8080/proxy/<port>/
+  * Direct access available at: http://localhost:<port>/ (if port exposed)
+  * Use VSCODE_PROXY=true environment variable to enable proxy mode
+  * Default is direct access mode (no proxy prefix)
+  * Always bind dev servers to 0.0.0.0 (not localhost) for container access
+  * Projects configured with this pattern work universally (VSCode, Gitpod, Codespaces, etc.)
   
   COMMAND EXECUTION:
   * All commands execute in the VSCode container workspace
