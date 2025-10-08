@@ -1,0 +1,146 @@
+# Performance-Optimized Docker Compose Configuration
+# Use this for faster LLM responses and better resource allocation
+# 
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.performance.yml up
+
+services:
+  # LLM Service - Increased resources for faster inference
+  llm-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'      # Allocate 4 CPU cores
+          memory: 4G       # 4GB RAM
+        reservations:
+          cpus: '2.0'      # Reserve 2 cores minimum
+          memory: 2G       # Reserve 2GB minimum
+    environment:
+      # Reduce logging verbosity
+      - LOG_LEVEL=warn
+      - NODE_ENV=production
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Backend - Optimized for API performance
+  backend:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    environment:
+      # Reduce logging
+      - LOG_LEVEL=warn
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Frontend - Standard allocation
+  frontend:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Ollama - Maximum resources for model inference
+  ollama:
+    deploy:
+      resources:
+        limits:
+          cpus: '6.0'      # Allocate 6 CPU cores for model inference
+          memory: 8G       # 8GB RAM for models
+        reservations:
+          cpus: '4.0'      # Reserve 4 cores
+          memory: 4G       # Reserve 4GB
+    environment:
+      # Ollama performance tuning
+      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_MAX_LOADED_MODELS=2
+      - OLLAMA_KEEP_ALIVE=5m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+  # Redis - Optimized for caching
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # PostgreSQL - Standard allocation
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+  # Qdrant - Vector database optimization
+  qdrant:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+  # MCP Server - Lightweight allocation
+  mcp-server:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"

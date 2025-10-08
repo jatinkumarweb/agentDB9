@@ -10,7 +10,14 @@ const PORT = process.env.PORT || 9000;
 // Middleware
 app.use(helmet());
 app.use(cors());
-app.use(morgan('combined'));
+
+// Use minimal logging in development, only errors in production
+const logFormat = process.env.NODE_ENV === 'production' ? 'tiny' : 'dev';
+const shouldLog = process.env.LOG_LEVEL !== 'silent';
+if (shouldLog) {
+  app.use(morgan(logFormat));
+}
+
 app.use(express.json());
 
 // Health check endpoint

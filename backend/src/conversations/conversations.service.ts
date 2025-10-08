@@ -164,7 +164,10 @@ export class ConversationsService {
     );
 
     // Emit WebSocket event for new message
-    console.log('About to broadcast new message via WebSocket:', savedMessage.id);
+    // Only log in debug mode
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.log('About to broadcast new message via WebSocket:', savedMessage.id);
+    }
     if (this.websocketGateway) {
       this.websocketGateway.broadcastNewMessage(messageData.conversationId, savedMessage);
     } else {
@@ -231,34 +234,38 @@ export class ConversationsService {
       const startTime = Date.now();
       
       // Debug logging
-      console.log('=== AGENT RESPONSE DEBUG ===');
-      console.log('Conversation ID:', conversation.id);
-      console.log('Agent loaded:', !!conversation.agent);
-      console.log('Agent ID:', conversation.agent?.id);
-      console.log('Agent configuration:', conversation.agent?.configuration);
+      // Debug logging (only in development with verbose mode)
+      const isVerbose = process.env.LOG_LEVEL === 'debug';
+      if (isVerbose) {
+        console.log('=== AGENT RESPONSE DEBUG ===');
+        console.log('Conversation ID:', conversation.id);
+        console.log('Agent loaded:', !!conversation.agent);
+        console.log('Agent ID:', conversation.agent?.id);
+        console.log('Agent configuration:', conversation.agent?.configuration);
+      }
       
       const model = conversation.agent?.configuration?.model || 'qwen2.5-coder:7b';
-      console.log('Using model:', model);
+      if (isVerbose) console.log('Using model:', model);
       
       // Check if this is an Ollama model and if we should attempt to use it
       const isOllamaModel = this.isOllamaModel(model);
-      console.log('Is Ollama model:', isOllamaModel);
+      if (isVerbose) console.log('Is Ollama model:', isOllamaModel);
       let agentResponse: string;
       let actualModel = model; // Track the actual model used
       
       if (isOllamaModel) {
         // Check if Ollama is available before making the call
         const isOllamaHealthy = await this.checkOllamaHealth();
-        console.log(`Ollama health check result: ${isOllamaHealthy} for model: ${model}`);
+        if (isVerbose) console.log(`Ollama health check result: ${isOllamaHealthy} for model: ${model}`);
         
         // Check what models are actually available
         const availableModels = await this.getAvailableOllamaModels();
-        console.log('Available Ollama models:', availableModels);
+        if (isVerbose) console.log('Available Ollama models:', availableModels);
         
         // If the configured model isn't available, try to use an available one
         if (!availableModels.includes(model) && availableModels.length > 0) {
           actualModel = availableModels[0];
-          console.log(`Model ${model} not available, using ${actualModel} instead`);
+          if (isVerbose) console.log(`Model ${model} not available, using ${actualModel} instead`);
         }
         
         if (isOllamaHealthy && availableModels.length > 0) {

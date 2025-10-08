@@ -51,7 +51,11 @@
     "logs:mcp:show": "./scripts/show-mcp-logs.sh",
     "status": "./scripts/docker-setup.sh ps",
     "status:mcp": "./scripts/check-mcp-status.sh",
-    "health": "curl -s http://localhost:8000/health && curl -s http://localhost:9000/health && curl -s http://localhost:3000/api/health"
+    "health": "curl -s http://localhost:8000/health && curl -s http://localhost:9000/health && curl -s http://localhost:3000/api/health",
+    "optimize": "./scripts/optimize-performance.sh",
+    "optimize:quick": "docker-compose restart backend llm-service",
+    "optimize:full": "docker-compose -f docker-compose.yml -f docker-compose.performance.yml up -d",
+    "monitor": "watch -n 1 'docker stats --no-stream'"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
