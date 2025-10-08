@@ -551,6 +551,9 @@ TOOL CALL FORMAT (use this exact XML structure):
 AVAILABLE TOOLS:
 - execute_command: Run shell commands. Args: {"command": "your command here"}
   * For npm projects: Use "mkdir project-name && cd project-name && npm init -y"
+  * For Next.js: Use "npx create-next-app@latest project-name --yes" (ALWAYS include --yes flag)
+  * For React: Use "npx create-react-app project-name --template typescript"
+  * For Vite: Use "npm create vite@latest project-name -- --template react-ts"
   * NEVER use "npm init -y --name" (this tries to run create-name package)
   * To set package name after init: "npm pkg set name=project-name"
 - write_file: Write complete file content. Args: {"path": "file.js", "content": "full content"}
@@ -895,7 +898,7 @@ Would you like help setting up external API access?`;
       'read_file': 'Read the contents of a file from the workspace',
       'write_file': 'Write or update a file with complete content (not append). Provide full file content.',
       'list_files': 'List files and directories in a path',
-      'execute_command': 'Execute a shell command. For npm projects: mkdir dir && cd dir && npm init -y (NEVER use npm init --name). Use npm pkg set name=value for package.json edits.',
+      'execute_command': 'Execute a shell command. For Next.js: npx create-next-app@latest name --yes. For React: npx create-react-app name --template typescript. For npm: mkdir dir && cd dir && npm init -y (NEVER use npm init --name).',
       'git_status': 'Get the current git repository status',
       'git_commit': 'Commit changes to git with a message',
       'create_directory': 'Create a new directory (creates parent dirs if needed)',
@@ -932,7 +935,7 @@ Would you like help setting up external API access?`;
         properties: {
           command: { 
             type: 'string', 
-            description: 'Shell command to execute. Use proper syntax: mkdir dir && cd dir && npm init -y. For package.json: npm pkg set key=value. Avoid echo >> for JSON files.' 
+            description: 'Shell command to execute. Next.js: npx create-next-app@latest name --yes. React: npx create-react-app name --template typescript. Vite: npm create vite@latest name -- --template react-ts. npm: mkdir dir && cd dir && npm init -y. For package.json: npm pkg set key=value.' 
           }
         },
         required: ['command']
