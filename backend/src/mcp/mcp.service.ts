@@ -269,66 +269,11 @@ export class MCPService {
                 actualCommand = `${scriptCommand}${extraArgs}`;
                 this.logger.log(`Converted npm run ${scriptName} to: ${actualCommand}`);
                 
-                // For dev servers, we'll use terminal_create to create a persistent terminal
-                // This allows users to see the output in real-time
+                // For dev servers, run in background
+                // Since MCP and VSCode share network namespace, the server will be accessible
                 if (isDevServer) {
-                  // Create a persistent terminal session
-                  try {
-                    const terminalName = `Agent Dev Server - ${scriptName}`;
-                    const createTerminalResponse = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        tool: 'terminal_create',
-                        parameters: {
-                          name: terminalName,
-                          cwd: workingDir,
-                          shell: '/bin/bash'
-                        }
-                      })
-                    });
-                    
-                    if (createTerminalResponse.ok) {
-                      const terminalResult = await createTerminalResponse.json();
-                      if (terminalResult.success) {
-                        const terminalId = terminalResult.result;
-                        this.logger.log(`Created terminal ${terminalId} for dev server`);
-                        
-                        // Send the command to the terminal
-                        await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
-                          method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                          },
-                          body: JSON.stringify({
-                            tool: 'terminal_send_text',
-                            parameters: {
-                              terminalId,
-                              text: actualCommand,
-                              addNewLine: true
-                            }
-                          })
-                        });
-                        
-                        // Return success message with terminal info
-                        return {
-                          success: true,
-                          output: `Dev server started in terminal: ${terminalName}\nTerminal ID: ${terminalId}\nCommand: ${actualCommand}\n\nThe server is running in a persistent terminal session.`,
-                          error: '',
-                          exitCode: 0
-                        };
-                      }
-                    }
-                  } catch (error) {
-                    this.logger.error(`Failed to create terminal for dev server: ${error.message}`);
-                    // Fall back to background execution
-                  }
-                  
-                  // Fallback: run in background with nohup
-                  actualCommand = `nohup ${actualCommand} > ${workingDir}/.dev-server.log 2>&1 & echo "Dev server started in background. PID: $!" && sleep 2 && tail -20 ${workingDir}/.dev-server.log`;
-                  this.logger.log(`Running dev server in background (fallback)`);
+                  actualCommand = `nohup ${actualCommand} > ${workingDir}/.dev-server.log 2>&1 & echo "Dev server started in background. PID: $!" && sleep 3 && tail -30 ${workingDir}/.dev-server.log`;
+                  this.logger.log(`Running dev server in background`);
                 }
               }
             }
