@@ -1,0 +1,53 @@
+{
+  "name": "agentdb9-terminal",
+  "displayName": "AgentDB9 Terminal Integration",
+  "description": "Shows AI agent commands in VSCode terminal in real-time",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "agentdb9.showAgentTerminal",
+        "title": "AgentDB9: Show Agent Terminal"
+      },
+      {
+        "command": "agentdb9.clearAgentTerminal",
+        "title": "AgentDB9: Clear Agent Terminal"
+      }
+    ],
+    "configuration": {
+      "title": "AgentDB9 Terminal",
+      "properties": {
+        "agentdb9.terminal.autoShow": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically show terminal when agent executes commands"
+        },
+        "agentdb9.terminal.logFile": {
+          "type": "string",
+          "default": "/home/coder/workspace/.agent-terminal.log",
+          "description": "Path to agent terminal log file"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.0"
+  }
+}
