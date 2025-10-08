@@ -96,6 +96,14 @@ case $FRAMEWORK in
       --turbopack \
       --use-$PACKAGE_MANAGER \
       --yes
+    
+    # Configure for container environment
+    echo -e "${BLUE}📦 Configuring for container environment...${NC}"
+    cd "$PROJECT_NAME"
+    npm pkg set scripts.dev="next dev --turbopack -H 0.0.0.0"
+    npm pkg set scripts.start="next start -H 0.0.0.0"
+    cd ..
+    echo -e "${GREEN}✅ Container configuration complete${NC}"
     ;;
   
   nextjs-js)
@@ -110,6 +118,14 @@ case $FRAMEWORK in
       --turbopack \
       --use-$PACKAGE_MANAGER \
       --yes
+    
+    # Configure for container environment
+    echo -e "${BLUE}📦 Configuring for container environment...${NC}"
+    cd "$PROJECT_NAME"
+    npm pkg set scripts.dev="next dev --turbopack -H 0.0.0.0"
+    npm pkg set scripts.start="next start -H 0.0.0.0"
+    cd ..
+    echo -e "${GREEN}✅ Container configuration complete${NC}"
     ;;
   
   nextjs-minimal)
@@ -124,6 +140,14 @@ case $FRAMEWORK in
       --turbopack \
       --use-$PACKAGE_MANAGER \
       --yes
+    
+    # Configure for container environment
+    echo -e "${BLUE}📦 Configuring for container environment...${NC}"
+    cd "$PROJECT_NAME"
+    npm pkg set scripts.dev="next dev --turbopack -H 0.0.0.0"
+    npm pkg set scripts.start="next start -H 0.0.0.0"
+    cd ..
+    echo -e "${GREEN}✅ Container configuration complete${NC}"
     ;;
   
   react)

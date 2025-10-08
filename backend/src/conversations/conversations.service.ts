@@ -552,6 +552,8 @@ AVAILABLE TOOLS:
 - execute_command: Run shell commands. Args: {"command": "your command here"}
   * For npm projects: Use "mkdir project-name && cd project-name && npm init -y"
   * For Next.js: Use "npx create-next-app@latest project-name --yes" (ALWAYS include --yes flag)
+    IMPORTANT: After creating Next.js project, configure for container:
+    "cd project-name && npm pkg set scripts.dev='next dev --turbopack -H 0.0.0.0' && npm pkg set scripts.start='next start -H 0.0.0.0'"
   * For React: Use "npx create-react-app project-name --template typescript"
   * For Vite: Use "npm create vite@latest project-name -- --template react-ts"
   * NEVER use "npm init -y --name" (this tries to run create-name package)
