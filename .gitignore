@@ -129,3 +129,6 @@ test-results.xml
 backend/node_modules/jsonrepair
 .vscode-server/
 shared/tsconfig.tsbuildinfo
+!workspace/AGENT_TERMINAL_LOG.md
+!workspace/.vscode/
+!workspace/.vscode/settings.json
