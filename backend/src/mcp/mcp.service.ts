@@ -212,6 +212,26 @@ export class MCPService {
       // This ensures consistency, proper environment, and user visibility
       this.logger.log(`Executing command in VSCode container: ${command}`);
       
+      // Parse command to extract cd directory if present
+      let actualCommand = command;
+      let workingDir = '/workspace';
+      
+      // Match patterns like: "cd dir && command" or "cd dir; command"
+      const cdMatch = command.match(/^cd\s+([^\s;&|]+)\s*(?:&&|;)\s*(.+)$/);
+      if (cdMatch) {
+        const targetDir = cdMatch[1];
+        actualCommand = cdMatch[2];
+        
+        // Handle relative paths
+        if (targetDir.startsWith('/')) {
+          workingDir = targetDir;
+        } else {
+          workingDir = `/workspace/${targetDir}`;
+        }
+        
+        this.logger.log(`Parsed cd command: dir=${workingDir}, command=${actualCommand}`);
+      }
+      
       const response = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
         method: 'POST',
         headers: {
@@ -220,8 +240,8 @@ export class MCPService {
         body: JSON.stringify({
           tool: 'terminal_execute',
           parameters: {
-            command,
-            cwd: '/workspace',
+            command: actualCommand,
+            cwd: workingDir,
             timeout: 60000,
             shell: '/bin/sh'
           }
