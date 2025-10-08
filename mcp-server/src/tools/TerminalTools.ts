@@ -219,7 +219,8 @@ export class TerminalTools {
       
       const options: any = {
         cwd: workingDir,
-        shell: true,
+        // Don't use shell: true when explicitly spawning a shell
+        // This causes issues with npm and other commands
         env
       };
 
