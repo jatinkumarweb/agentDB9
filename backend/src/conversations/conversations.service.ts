@@ -562,7 +562,9 @@ AVAILABLE TOOLS:
   
   COMMAND EXECUTION:
   * All commands execute in the VSCode container workspace
-  * User can see all command output and interact with processes
+  * Commands are logged to .agent-commands.log (visible in VSCode)
+  * User can open .agent-commands.log to see all executed commands and output
+  * When executing first command, inform user: "Commands are logged to .agent-commands.log - open it in VSCode to see execution details"
   * Dev servers (npm run dev, npm start) run in the background
   * User can access dev servers at the specified ports
 - write_file: Write complete file content. Args: {"path": "file.js", "content": "full content"}

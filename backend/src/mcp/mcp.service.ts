@@ -22,6 +22,7 @@ export class MCPService {
   private readonly mcpServerUrl = process.env.MCP_SERVER_URL || 'http://mcp-server:9001';
   private readonly workspaceRoot = process.env.VSCODE_WORKSPACE || '/workspace';
   private readonly execAsync = promisify(exec);
+  private readonly COMMAND_LOG = '/home/coder/workspace/.agent-commands.log';
 
   constructor() {}
 
@@ -194,7 +195,18 @@ export class MCPService {
   }
 
   private async executeCommand(command: string): Promise<any> {
+    const timestamp = new Date().toISOString();
+    const separator = '='.repeat(80);
+    
     try {
+      // Log command execution start
+      await this.logToFile(
+        `\n${separator}\n` +
+        `[${timestamp}] Executing Command\n` +
+        `${separator}\n` +
+        `$ ${command}\n\n`
+      );
+      
       // ALL commands execute in VSCode container via MCP Server
       // This ensures consistency, proper environment, and user visibility
       this.logger.log(`Executing command in VSCode container: ${command}`);
@@ -225,15 +237,36 @@ export class MCPService {
         throw new Error(result.error || 'Command execution failed');
       }
 
+      // Log output
+      const stdout = result.result?.output || '';
+      const stderr = result.result?.error || '';
+      const exitCode = result.result?.exitCode || 0;
+      
+      await this.logToFile(
+        `STDOUT:\n${stdout || '(no output)'}\n\n` +
+        (stderr ? `STDERR:\n${stderr}\n\n` : '') +
+        `Exit Code: ${exitCode}\n` +
+        `Completed at: ${new Date().toISOString()}\n` +
+        `${separator}\n`
+      );
+
       // Return formatted result
       return {
-        stdout: result.result?.output || '',
-        stderr: result.result?.error || '',
-        exitCode: result.result?.exitCode || 0,
-        command
+        stdout,
+        stderr,
+        exitCode,
+        command,
+        logFile: this.COMMAND_LOG,
+        message: `Command executed. View details in VSCode: ${this.COMMAND_LOG}`
       };
     } catch (error) {
       this.logger.error(`Failed to execute command in VSCode container: ${error.message}`);
+      
+      // Log error
+      await this.logToFile(
+        `ERROR: ${error.message}\n` +
+        `${separator}\n`
+      );
       
       // Fallback to local execution only if MCP Server is unavailable
       this.logger.warn('MCP Server unavailable, falling back to local execution');
@@ -242,14 +275,29 @@ export class MCPService {
           cwd: this.workspaceRoot,
           timeout: 30000
         });
+        
+        // Log fallback execution
+        await this.logToFile(
+          `FALLBACK EXECUTION (Backend Container):\n` +
+          `STDOUT:\n${stdout.trim() || '(no output)'}\n\n` +
+          (stderr ? `STDERR:\n${stderr.trim()}\n\n` : '') +
+          `${separator}\n`
+        );
+        
         return {
           stdout: stdout.trim(),
           stderr: stderr.trim(),
           exitCode: 0,
           command,
-          fallback: true
+          fallback: true,
+          logFile: this.COMMAND_LOG
         };
       } catch (execError) {
+        await this.logToFile(
+          `FALLBACK EXECUTION FAILED: ${execError.message}\n` +
+          `${separator}\n`
+        );
+        
         return {
           stdout: '',
           stderr: execError.message,
@@ -257,6 +305,52 @@ export class MCPService {
           command
         };
       }
+    }
+  }
+
+  /**
+   * Log command execution to file visible in VSCode
+   */
+  private async logToFile(content: string): Promise<void> {
+    try {
+      // Read existing content
+      let existingContent = '';
+      try {
+        const readResponse = await fetch(`${this.mcpServerUrl}/api/execute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tool: 'read_file',
+            parameters: { path: this.COMMAND_LOG }
+          })
+        });
+        
+        if (readResponse.ok) {
+          const readResult = await readResponse.json();
+          existingContent = readResult.result?.content || '';
+        }
+      } catch (readError) {
+        // File doesn't exist yet, that's okay
+      }
+      
+      // Append new content
+      const newContent = existingContent + content;
+      
+      // Write to file
+      await fetch(`${this.mcpServerUrl}/api/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool: 'write_file',
+          parameters: {
+            path: this.COMMAND_LOG,
+            content: newContent
+          }
+        })
+      });
+    } catch (error) {
+      // Don't fail command execution if logging fails
+      this.logger.warn('Failed to log to file:', error.message);
     }
   }
 
