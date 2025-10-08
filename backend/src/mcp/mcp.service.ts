@@ -195,66 +195,10 @@ export class MCPService {
 
   private async executeCommand(command: string): Promise<any> {
     try {
-      // Detect long-running commands that should run in VSCode terminal
-      const isLongRunning = this.isLongRunningCommand(command);
+      // ALL commands execute in VSCode container via MCP Server
+      // This ensures consistency, proper environment, and user visibility
+      this.logger.log(`Executing command in VSCode container: ${command}`);
       
-      if (isLongRunning) {
-        this.logger.log(`Executing long-running command in VSCode terminal: ${command}`);
-        return await this.executeInVSCodeTerminal(command);
-      }
-      
-      // Execute short commands locally in backend container
-      this.logger.log(`Executing command locally: ${command}`);
-      const { stdout, stderr } = await this.execAsync(command, {
-        cwd: this.workspaceRoot,
-        timeout: 30000
-      });
-      return {
-        stdout: stdout.trim(),
-        stderr: stderr.trim(),
-        exitCode: 0,
-        command
-      };
-    } catch (error) {
-      return {
-        stdout: '',
-        stderr: error.message,
-        exitCode: error.code || 1,
-        command
-      };
-    }
-  }
-
-  /**
-   * Check if command is long-running and should execute in VSCode terminal
-   */
-  private isLongRunningCommand(command: string): boolean {
-    const longRunningPatterns = [
-      'npm run dev',
-      'npm start',
-      'npm run start',
-      'yarn dev',
-      'yarn start',
-      'pnpm dev',
-      'pnpm start',
-      'next dev',
-      'vite',
-      'webpack serve',
-      'webpack-dev-server',
-      'nodemon',
-      'watch',
-      'serve',
-      'http-server'
-    ];
-    
-    return longRunningPatterns.some(pattern => command.includes(pattern));
-  }
-
-  /**
-   * Execute command in VSCode container terminal via MCP Server
-   */
-  private async executeInVSCodeTerminal(command: string): Promise<any> {
-    try {
       const response = await fetch(`${this.mcpServerUrl}/api/execute`, {
         method: 'POST',
         headers: {
@@ -265,7 +209,7 @@ export class MCPService {
           parameters: {
             command,
             cwd: '/home/coder/workspace',
-            timeout: 60000, // Longer timeout for dev servers
+            timeout: 60000,
             shell: '/bin/bash'
           }
         })
@@ -278,34 +222,41 @@ export class MCPService {
       const result = await response.json();
       
       if (!result.success) {
-        throw new Error(result.error || 'Terminal execution failed');
+        throw new Error(result.error || 'Command execution failed');
       }
 
-      // Format result to match expected structure
+      // Return formatted result
       return {
         stdout: result.result?.output || '',
         stderr: result.result?.error || '',
         exitCode: result.result?.exitCode || 0,
-        command,
-        terminal: true, // Flag to indicate this ran in terminal
-        message: 'Command executed in VSCode terminal. Check the terminal for output.'
+        command
       };
     } catch (error) {
-      this.logger.error(`Failed to execute in VSCode terminal: ${error.message}`);
+      this.logger.error(`Failed to execute command in VSCode container: ${error.message}`);
       
-      // Fallback to local execution
-      this.logger.warn('Falling back to local execution');
-      const { stdout, stderr } = await this.execAsync(command, {
-        cwd: this.workspaceRoot,
-        timeout: 30000
-      });
-      return {
-        stdout: stdout.trim(),
-        stderr: stderr.trim(),
-        exitCode: 0,
-        command,
-        fallback: true
-      };
+      // Fallback to local execution only if MCP Server is unavailable
+      this.logger.warn('MCP Server unavailable, falling back to local execution');
+      try {
+        const { stdout, stderr } = await this.execAsync(command, {
+          cwd: this.workspaceRoot,
+          timeout: 30000
+        });
+        return {
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+          exitCode: 0,
+          command,
+          fallback: true
+        };
+      } catch (execError) {
+        return {
+          stdout: '',
+          stderr: execError.message,
+          exitCode: execError.code || 1,
+          command
+        };
+      }
     }
   }
 

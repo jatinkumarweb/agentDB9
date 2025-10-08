@@ -549,7 +549,8 @@ TOOL CALL FORMAT (use this exact XML structure):
 </tool_call>
 
 AVAILABLE TOOLS:
-- execute_command: Run shell commands. Args: {"command": "your command here"}
+- execute_command: Run shell commands in the VSCode workspace. Args: {"command": "your command here"}
+  * ALL commands execute in the VSCode container where the user works
   * For npm projects: Use "mkdir project-name && cd project-name && npm init -y"
   * For Next.js: Use "npx create-next-app@latest project-name --yes" (ALWAYS include --yes flag)
     IMPORTANT: After creating Next.js project, configure for container:
@@ -560,10 +561,10 @@ AVAILABLE TOOLS:
   * To set package name after init: "npm pkg set name=project-name"
   
   COMMAND EXECUTION:
-  * Long-running commands (npm run dev, npm start, dev servers) execute in VSCode terminal
-  * User can see output and interact with the process in their terminal
-  * Short commands (ls, git, npm install) execute immediately and return output
-  * When starting dev servers, inform user: "Dev server started in terminal. Check VSCode terminal for output."
+  * All commands execute in the VSCode container workspace
+  * User can see all command output and interact with processes
+  * Dev servers (npm run dev, npm start) run in the background
+  * User can access dev servers at the specified ports
 - write_file: Write complete file content. Args: {"path": "file.js", "content": "full content"}
 - read_file: Read file contents. Args: {"path": "file.js"}
 - create_directory: Create directory. Args: {"path": "dirname"}
