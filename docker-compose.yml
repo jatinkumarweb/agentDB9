@@ -12,7 +12,7 @@ services:
       context: .
       dockerfile: ./frontend/Dockerfile
     ports:
-      - "3333:3000"  # AgentDB9 frontend on port 3333, freeing 3000 for user apps
+      - "3000:3000"
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -204,14 +204,9 @@ services:
     # Make IPC namespace shareable for mcp-server
     ipc: shareable
     ports:
-      - "8080:8080"   # VSCode
-      - "9001:9001"   # MCP server HTTP port (shared network namespace)
-      - "9002:9002"   # MCP server WebSocket port (shared network namespace)
-      - "3000:3000"   # Next.js/React dev server (most common)
-      - "3001-3010:3001-3010"  # Additional dev server ports
-      - "5173:5173"   # Vite dev server
-      - "4200:4200"   # Angular dev server
-      - "8081-8090:8081-8090"  # Additional dev server range
+      - "8080:8080"
+      - "9001:9001"  # MCP server HTTP port (shared network namespace)
+      - "9002:9002"  # MCP server WebSocket port (shared network namespace)
     environment:
       - SHELL=/bin/bash
       - DISABLE_WORKSPACE_TRUST=true
