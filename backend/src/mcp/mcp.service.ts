@@ -221,9 +221,9 @@ export class MCPService {
           tool: 'terminal_execute',
           parameters: {
             command,
-            cwd: '/home/coder/workspace',
+            cwd: '/workspace',
             timeout: 60000,
-            shell: '/bin/bash'
+            shell: '/bin/sh'
           }
         })
       });
