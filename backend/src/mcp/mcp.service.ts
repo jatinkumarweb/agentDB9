@@ -212,7 +212,7 @@ export class MCPService {
       // This ensures consistency, proper environment, and user visibility
       this.logger.log(`Executing command in VSCode container: ${command}`);
       
-      const response = await fetch(`${this.mcpServerUrl}/api/execute`, {
+      const response = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
