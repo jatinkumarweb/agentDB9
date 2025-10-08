@@ -76,5 +76,7 @@ export class RateLimitGuard implements CanActivate {
 }
 
 // Decorators for setting rate limits
-export const RateLimit = (limit: number) => Reflector.createDecorator<number>();
-export const RateLimitWindow = (window: number) => Reflector.createDecorator<number>();
+import { SetMetadata } from '@nestjs/common';
+
+export const RateLimit = (limit: number) => SetMetadata('rateLimit', limit);
+export const RateLimitWindow = (window: number) => SetMetadata('rateLimitWindow', window);

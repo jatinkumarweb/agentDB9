@@ -74,6 +74,14 @@ agentdb9/
 - Node.js 18+ (for local development)
 - Git
 
+### 📚 Important Guides
+
+- **[Interactive Prompts Solution](./INTERACTIVE_PROMPTS_SOLUTION.md)** - Handle CLI prompts (Next.js, React, Vite, etc.)
+- **[Docker-in-Docker Guide](./DOCKER_IN_DOCKER_GUIDE.md)** - Use Docker inside the dev container
+- **[Security Implementation](./SECURITY_IMPLEMENTATION.md)** - Rate limiting and session management
+- **[Cleanup Report](./CLEANUP_REPORT.md)** - Code cleanup and optimization
+- **[Issues Resolved](./ISSUES_RESOLVED.md)** - Recent fixes and solutions
+
 ### Quick Start
 
 ### 🚨 Local Chat Not Working?

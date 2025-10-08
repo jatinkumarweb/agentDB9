@@ -1,3 +1,40 @@
+/**
+ * EnvironmentMonitor Component
+ * 
+ * CURRENTLY UNUSED - But potentially useful for future admin/monitoring pages
+ * 
+ * This component provides real-time monitoring of:
+ * - Service health status (backend, llm-service, mcp-server)
+ * - Model availability (Ollama, OpenAI, etc.)
+ * - Database connectivity (PostgreSQL, SQLite)
+ * - System issues and alerts
+ * 
+ * Features:
+ * - WebSocket support for real-time updates
+ * - Polling fallback for reliability
+ * - Auto-reconnection on disconnect
+ * - Configurable refresh intervals
+ * 
+ * To use this component:
+ * 1. Import it in your admin/monitoring page
+ * 2. Add it to the layout: <EnvironmentMonitor autoRefresh={true} refreshInterval={30} />
+ * 3. Optionally handle health changes: onHealthChange={(health) => console.log(health)}
+ * 
+ * Example:
+ * ```tsx
+ * import EnvironmentMonitor from '@/components/EnvironmentMonitor';
+ * 
+ * export default function AdminPage() {
+ *   return (
+ *     <div>
+ *       <h1>System Monitoring</h1>
+ *       <EnvironmentMonitor autoRefresh={true} refreshInterval={30} />
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
+
 'use client';
 import { fetchWithAuth } from '@/utils/fetch-with-auth';
 

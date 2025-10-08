@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Body, Param, Query, HttpStatus, HttpException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, HttpStatus, HttpException, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ConversationsService } from './conversations.service';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
 import { AddMessageDto } from '../dto/add-message.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { APIResponse } from '@agentdb9/shared';
+import { RateLimitGuard, RateLimit, RateLimitWindow } from '../common/guards/rate-limit.guard';
 
 @ApiTags('conversations')
 @ApiBearerAuth()
@@ -87,8 +88,12 @@ export class ConversationsController {
   }
 
   @Post()
+  @UseGuards(RateLimitGuard)
+  @RateLimit(20)  // 20 conversation creations
+  @RateLimitWindow(60000)  // per minute
   @ApiOperation({ summary: 'Create a new conversation' })
   @ApiResponse({ status: 201, description: 'Conversation created successfully' })
+  @ApiResponse({ status: 429, description: 'Too many conversation creation attempts' })
   async create(@Body() createConversationDto: CreateConversationDto, @CurrentUser() user: any): Promise<APIResponse> {
     try {
       const conversation = await this.conversationsService.create(createConversationDto, user.id);
@@ -129,8 +134,12 @@ export class ConversationsController {
   }
 
   @Post(':id/messages')
+  @UseGuards(RateLimitGuard)
+  @RateLimit(30)  // 30 messages
+  @RateLimitWindow(60000)  // per minute
   @ApiOperation({ summary: 'Add a message to a conversation' })
   @ApiResponse({ status: 201, description: 'Message added successfully' })
+  @ApiResponse({ status: 429, description: 'Too many messages sent' })
   async addMessage(@Param('id') id: string, @Body() addMessageDto: AddMessageDto): Promise<APIResponse> {
     try {
       // Create full message data with conversationId from URL parameter

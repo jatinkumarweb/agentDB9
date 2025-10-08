@@ -1,3 +1,65 @@
+/**
+ * SessionTimeout Component
+ * 
+ * ⚠️ IMPORTANT: This component is implemented but NOT currently integrated!
+ * 
+ * This is a critical security feature that should be added to the main layout.
+ * 
+ * Features:
+ * - Shows warning before session expires (default: 5 minutes before)
+ * - Displays countdown timer
+ * - Auto-refresh token capability
+ * - Manual session extension
+ * - Toast notifications for session events
+ * 
+ * Security Benefits:
+ * - Prevents unauthorized access from abandoned sessions
+ * - Gives users time to save work before logout
+ * - Automatic token refresh for active users
+ * - Clear visual feedback on session status
+ * 
+ * TO INTEGRATE (HIGH PRIORITY):
+ * 
+ * 1. Add to main layout (frontend/src/app/layout.tsx):
+ * ```tsx
+ * import SessionTimeout from '@/components/SessionTimeout';
+ * 
+ * export default function RootLayout({ children }) {
+ *   return (
+ *     <html>
+ *       <body>
+ *         <SessionTimeout 
+ *           warningTime={300}      // 5 minutes warning
+ *           autoRefresh={true}     // Auto-refresh tokens
+ *           showCountdown={true}   // Show timer
+ *         />
+ *         {children}
+ *       </body>
+ *     </html>
+ *   );
+ * }
+ * ```
+ * 
+ * 2. Or add to protected pages only:
+ * ```tsx
+ * import SessionTimeout from '@/components/SessionTimeout';
+ * 
+ * export default function DashboardPage() {
+ *   return (
+ *     <>
+ *       <SessionTimeout />
+ *       <div>Dashboard content...</div>
+ *     </>
+ *   );
+ * }
+ * ```
+ * 
+ * Configuration Options:
+ * - warningTime: Seconds before expiry to show warning (default: 300)
+ * - autoRefresh: Automatically refresh token (default: true)
+ * - showCountdown: Display countdown timer (default: true)
+ */
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';

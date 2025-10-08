@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpStatus, HttpException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpStatus, HttpException, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AgentsService } from './agents.service';
 import { CreateAgentDto } from '../dto/create-agent.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { APIResponse } from '@agentdb9/shared';
+import { RateLimitGuard, RateLimit, RateLimitWindow } from '../common/guards/rate-limit.guard';
 
 @ApiTags('agents')
 @ApiBearerAuth()
@@ -77,9 +78,13 @@ export class AgentsController {
   }
 
   @Post()
+  @UseGuards(RateLimitGuard)
+  @RateLimit(10)  // 10 agent creations
+  @RateLimitWindow(60000)  // per minute
   @ApiOperation({ summary: 'Create a new agent' })
   @ApiResponse({ status: 201, description: 'Agent created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({ status: 429, description: 'Too many agent creation attempts' })
   async create(@Body() createAgentDto: CreateAgentDto, @CurrentUser() user: any): Promise<APIResponse> {
     try {
       const agent = await this.agentsService.create(createAgentDto, user.id);
@@ -143,8 +148,12 @@ export class AgentsController {
   }
 
   @Post(':id/tasks')
+  @UseGuards(RateLimitGuard)
+  @RateLimit(30)  // 30 task executions
+  @RateLimitWindow(60000)  // per minute
   @ApiOperation({ summary: 'Execute a task with an agent' })
   @ApiResponse({ status: 200, description: 'Task executed successfully' })
+  @ApiResponse({ status: 429, description: 'Too many task execution attempts' })
   async executeTask(@Param('id') id: string, @Body() taskData: any): Promise<APIResponse> {
     try {
       const result = await this.agentsService.executeTask(id, taskData);
@@ -164,8 +173,12 @@ export class AgentsController {
   }
 
   @Post('chat')
+  @UseGuards(RateLimitGuard)
+  @RateLimit(30)  // 30 chat messages
+  @RateLimitWindow(60000)  // per minute
   @ApiOperation({ summary: 'Chat with AI agent' })
   @ApiResponse({ status: 200, description: 'Agent response generated successfully' })
+  @ApiResponse({ status: 429, description: 'Too many chat requests' })
   async chat(@Body() chatData: { message: string; context?: any }, @CurrentUser() user: any): Promise<APIResponse> {
     try {
       const result = await this.agentsService.processChat(chatData.message, {
@@ -191,8 +204,12 @@ export class AgentsController {
   }
 
   @Post(':id/chat')
+  @UseGuards(RateLimitGuard)
+  @RateLimit(30)  // 30 chat messages
+  @RateLimitWindow(60000)  // per minute
   @ApiOperation({ summary: 'Chat with specific AI agent' })
   @ApiResponse({ status: 200, description: 'Agent response generated successfully' })
+  @ApiResponse({ status: 429, description: 'Too many chat requests' })
   async chatWithAgent(
     @Param('id') agentId: string,
     @Body() chatData: { message: string; context?: any },

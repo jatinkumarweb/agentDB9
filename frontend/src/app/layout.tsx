@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import SessionTimeout from '@/components/SessionTimeout';
 
 export const metadata: Metadata = {
   title: 'AgentDB9 Coding Agent',
@@ -13,7 +14,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <SessionTimeout 
+          warningTime={300}      // Show warning 5 minutes before expiry
+          autoRefresh={true}     // Automatically refresh tokens
+          showCountdown={true}   // Display countdown timer
+        />
+        {children}
+      </body>
     </html>
   );
 }
