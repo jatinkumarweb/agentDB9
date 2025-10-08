@@ -102,6 +102,32 @@ case $FRAMEWORK in
     cd "$PROJECT_NAME"
     npm pkg set scripts.dev="next dev --turbopack -H 0.0.0.0"
     npm pkg set scripts.start="next start -H 0.0.0.0"
+    
+    # Fix next.config for static files in containers
+    cat > next.config.ts << 'EOF'
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  // Disable image optimization for development in containers
+  // This prevents 404s on static images
+  images: {
+    unoptimized: process.env.NODE_ENV === 'development',
+  },
+  
+  // Ensure static files are served correctly
+  assetPrefix: process.env.ASSET_PREFIX || '',
+  
+  // Configure for container environment
+  experimental: {
+    turbopack: {
+      resolveAlias: {},
+    },
+  },
+};
+
+export default nextConfig;
+EOF
+    
     cd ..
     echo -e "${GREEN}✅ Container configuration complete${NC}"
     ;;
@@ -124,6 +150,32 @@ case $FRAMEWORK in
     cd "$PROJECT_NAME"
     npm pkg set scripts.dev="next dev --turbopack -H 0.0.0.0"
     npm pkg set scripts.start="next start -H 0.0.0.0"
+    
+    # Fix next.config for static files in containers
+    cat > next.config.ts << 'EOF'
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  // Disable image optimization for development in containers
+  // This prevents 404s on static images
+  images: {
+    unoptimized: process.env.NODE_ENV === 'development',
+  },
+  
+  // Ensure static files are served correctly
+  assetPrefix: process.env.ASSET_PREFIX || '',
+  
+  // Configure for container environment
+  experimental: {
+    turbopack: {
+      resolveAlias: {},
+    },
+  },
+};
+
+export default nextConfig;
+EOF
+    
     cd ..
     echo -e "${GREEN}✅ Container configuration complete${NC}"
     ;;
@@ -146,6 +198,32 @@ case $FRAMEWORK in
     cd "$PROJECT_NAME"
     npm pkg set scripts.dev="next dev --turbopack -H 0.0.0.0"
     npm pkg set scripts.start="next start -H 0.0.0.0"
+    
+    # Fix next.config for static files in containers
+    cat > next.config.ts << 'EOF'
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  // Disable image optimization for development in containers
+  // This prevents 404s on static images
+  images: {
+    unoptimized: process.env.NODE_ENV === 'development',
+  },
+  
+  // Ensure static files are served correctly
+  assetPrefix: process.env.ASSET_PREFIX || '',
+  
+  // Configure for container environment
+  experimental: {
+    turbopack: {
+      resolveAlias: {},
+    },
+  },
+};
+
+export default nextConfig;
+EOF
+    
     cd ..
     echo -e "${GREEN}✅ Container configuration complete${NC}"
     ;;
