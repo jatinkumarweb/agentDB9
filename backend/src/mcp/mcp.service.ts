@@ -234,10 +234,14 @@ export class MCPService {
       
       // Convert "npm run <script>" to direct binary execution
       // This works around npm issues with spawn in shell mode
+      let isDevServer = false;
       const npmRunMatch = actualCommand.match(/^npm\s+run\s+(\S+)(.*)$/);
       if (npmRunMatch) {
         const scriptName = npmRunMatch[1];
         const extraArgs = npmRunMatch[2] || '';
+        
+        // Check if this is a dev server command
+        isDevServer = scriptName === 'dev' || scriptName === 'start' || scriptName === 'serve';
         
         // Read package.json to get the actual script command
         try {
@@ -264,6 +268,12 @@ export class MCPService {
               if (scriptCommand) {
                 actualCommand = `${scriptCommand}${extraArgs}`;
                 this.logger.log(`Converted npm run ${scriptName} to: ${actualCommand}`);
+                
+                // Run dev servers in background with nohup
+                if (isDevServer) {
+                  actualCommand = `nohup ${actualCommand} > ${workingDir}/.dev-server.log 2>&1 & echo "Dev server started in background. PID: $!" && sleep 2 && tail -20 ${workingDir}/.dev-server.log`;
+                  this.logger.log(`Running dev server in background`);
+                }
               }
             }
           }
@@ -283,7 +293,9 @@ export class MCPService {
           parameters: {
             command: actualCommand,
             cwd: workingDir,
-            timeout: 60000,
+            // Use longer timeout for potentially long-running commands
+            // Dev servers will be handled separately in the future
+            timeout: 300000, // 5 minutes
             shell: '/bin/sh'
           }
         })
