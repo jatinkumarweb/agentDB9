@@ -65,6 +65,8 @@ services:
       - LLM_SERVICE_URL=http://llm-service:9000
       - VECTOR_DB_URL=http://qdrant:6333
       - OLLAMA_HOST=http://ollama:11434
+      # MCP server is in vscode network namespace, access via vscode service
+      - MCP_SERVER_URL=http://vscode:9001
       # API keys explicitly unset to avoid validation errors
       - OPENAI_API_KEY=
       - ANTHROPIC_API_KEY=
@@ -77,7 +79,7 @@ services:
       - ./backend:/app
       - ./shared:/shared
       - backend_node_modules:/app/node_modules
-      - ./workspace:/workspace
+      - ./workspace:/workspace:cached
     command: ["npm", "run", "start:dev"]
     depends_on:
       - qdrant
@@ -199,13 +201,17 @@ services:
       dockerfile: Dockerfile
     platform: linux/amd64
     restart: unless-stopped
+    # Make IPC namespace shareable for mcp-server
+    ipc: shareable
     ports:
       - "8080:8080"
+      - "9001:9001"  # MCP server HTTP port (shared network namespace)
+      - "9002:9002"  # MCP server WebSocket port (shared network namespace)
     environment:
       - SHELL=/bin/bash
       - DISABLE_WORKSPACE_TRUST=true
     volumes:
-      - ./workspace:/home/coder/workspace
+      - ./workspace:/home/coder/workspace:cached
       - vscode-data:/home/coder/.local/share/code-server
       - vscode-extensions:/home/coder/.local/share/code-server/extensions
     command: >
@@ -259,19 +265,21 @@ services:
     build:
       context: .
       dockerfile: ./mcp-server/Dockerfile
-    ports:
-      - "9001:9001"
-      - "9002:9002"
+    # Share network namespace with vscode for localhost-speed communication
+    network_mode: "service:vscode"
+    # Share IPC namespace for better inter-process communication
+    ipc: "service:vscode"
     environment:
       - NODE_ENV=development
       - MCP_PORT=9001
-      - VSCODE_HOST=vscode
+      - VSCODE_HOST=localhost
       - VSCODE_PORT=8080
       - LLM_SERVICE_URL=http://llm-service:9000
       - BACKEND_URL=http://backend:8000
       - WORKSPACE_PATH=/workspace
     volumes:
-      - ./workspace:/workspace
+      # Use consistent workspace path and cached mount for better performance
+      - ./workspace:/workspace:cached
     depends_on:
       - vscode
       - backend
