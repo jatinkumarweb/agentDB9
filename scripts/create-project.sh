@@ -91,10 +91,11 @@ case $FRAMEWORK in
       --tailwind \
       --eslint \
       --app \
-      --src-dir \
+      --no-src-dir \
       --import-alias "@/*" \
-      --no-turbopack \
-      --use-$PACKAGE_MANAGER
+      --turbopack \
+      --use-$PACKAGE_MANAGER \
+      --yes
     ;;
   
   nextjs-js)
@@ -104,10 +105,11 @@ case $FRAMEWORK in
       --tailwind \
       --eslint \
       --app \
-      --src-dir \
+      --no-src-dir \
       --import-alias "@/*" \
-      --no-turbopack \
-      --use-$PACKAGE_MANAGER
+      --turbopack \
+      --use-$PACKAGE_MANAGER \
+      --yes
     ;;
   
   nextjs-minimal)
@@ -119,8 +121,9 @@ case $FRAMEWORK in
       --app \
       --no-src-dir \
       --import-alias "@/*" \
-      --no-turbopack \
-      --use-$PACKAGE_MANAGER
+      --turbopack \
+      --use-$PACKAGE_MANAGER \
+      --yes
     ;;
   
   react)

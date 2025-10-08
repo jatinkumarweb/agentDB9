@@ -20,23 +20,26 @@ npx create-next-app demo --typescript
 
 ### ✅ CORRECT (Current):
 ```bash
-# Option 1: Use --yes flag (uses defaults)
+# Option 1: Use --yes flag (uses defaults) - RECOMMENDED
 npx create-next-app@latest demo --yes
 
-# Option 2: Specify all options explicitly (RECOMMENDED)
+# Option 2: Specify all options explicitly with --yes
 npx create-next-app@latest demo \
   --typescript \
   --tailwind \
   --eslint \
   --app \
-  --src-dir \
+  --no-src-dir \
   --import-alias "@/*" \
-  --no-turbopack \
-  --use-npm
+  --turbopack \
+  --use-npm \
+  --yes
 
 # Option 3: Use helper script
 /workspaces/agentDB9/scripts/create-project.sh nextjs demo
 ```
+
+**IMPORTANT:** Always include `--yes` flag to avoid the Turbopack prompt!
 
 ### Available Flags:
 - `--typescript` or `--javascript` - Language choice
@@ -271,7 +274,7 @@ export DEBIAN_FRONTEND=noninteractive
 | Task | Correct Command |
 |------|----------------|
 | Next.js | `npx create-next-app@latest demo --yes` |
-| Next.js (full) | `npx create-next-app@latest demo --typescript --tailwind --eslint --app --src-dir --import-alias "@/*" --no-turbopack --use-npm` |
+| Next.js (full) | `npx create-next-app@latest demo --typescript --tailwind --eslint --app --no-src-dir --import-alias "@/*" --turbopack --use-npm --yes` |
 | React | `npx create-react-app demo --template typescript` |
 | Vite React | `npm create vite@latest demo -- --template react-ts` |
 | Express | `/workspaces/agentDB9/scripts/create-project.sh express demo` |
