@@ -210,16 +210,17 @@ export class TerminalTools {
       // Use workspace directory if no cwd specified
       const workingDir = cwd || process.env.WORKSPACE_PATH || '/workspace';
       
+      // Prepare environment variables
+      const env = { ...process.env };
+      // Remove PORT to avoid conflicts with Next.js
+      delete env.PORT;
+      // Set proper Node environment
+      env.NODE_ENV = 'development';
+      
       const options: any = {
         cwd: workingDir,
         shell: true,
-        env: {
-          ...process.env,
-          // Remove PORT to avoid conflicts with Next.js
-          PORT: undefined,
-          // Set proper Node environment
-          NODE_ENV: 'development'
-        }
+        env
       };
 
       logger.info(`Executing command: ${command}`, { cwd: options.cwd });

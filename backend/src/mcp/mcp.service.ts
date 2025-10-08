@@ -232,6 +232,47 @@ export class MCPService {
         this.logger.log(`Parsed cd command: dir=${workingDir}, command=${actualCommand}`);
       }
       
+      // Convert "npm run <script>" to direct binary execution
+      // This works around npm issues with spawn in shell mode
+      const npmRunMatch = actualCommand.match(/^npm\s+run\s+(\S+)(.*)$/);
+      if (npmRunMatch) {
+        const scriptName = npmRunMatch[1];
+        const extraArgs = npmRunMatch[2] || '';
+        
+        // Read package.json to get the actual script command
+        try {
+          const packageJsonPath = `${workingDir}/package.json`;
+          const packageJsonResponse = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              tool: 'fs_read_file',
+              parameters: {
+                path: packageJsonPath
+              }
+            })
+          });
+          
+          if (packageJsonResponse.ok) {
+            const packageJsonResult = await packageJsonResponse.json();
+            if (packageJsonResult.success) {
+              const packageJson = JSON.parse(packageJsonResult.result.content);
+              const scriptCommand = packageJson.scripts?.[scriptName];
+              
+              if (scriptCommand) {
+                actualCommand = `${scriptCommand}${extraArgs}`;
+                this.logger.log(`Converted npm run ${scriptName} to: ${actualCommand}`);
+              }
+            }
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to convert npm run command: ${error.message}`);
+          // Continue with original command
+        }
+      }
+      
       const response = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
         method: 'POST',
         headers: {
