@@ -195,6 +195,16 @@ export class MCPService {
 
   private async executeCommand(command: string): Promise<any> {
     try {
+      // Detect long-running commands that should run in VSCode terminal
+      const isLongRunning = this.isLongRunningCommand(command);
+      
+      if (isLongRunning) {
+        this.logger.log(`Executing long-running command in VSCode terminal: ${command}`);
+        return await this.executeInVSCodeTerminal(command);
+      }
+      
+      // Execute short commands locally in backend container
+      this.logger.log(`Executing command locally: ${command}`);
       const { stdout, stderr } = await this.execAsync(command, {
         cwd: this.workspaceRoot,
         timeout: 30000
@@ -211,6 +221,90 @@ export class MCPService {
         stderr: error.message,
         exitCode: error.code || 1,
         command
+      };
+    }
+  }
+
+  /**
+   * Check if command is long-running and should execute in VSCode terminal
+   */
+  private isLongRunningCommand(command: string): boolean {
+    const longRunningPatterns = [
+      'npm run dev',
+      'npm start',
+      'npm run start',
+      'yarn dev',
+      'yarn start',
+      'pnpm dev',
+      'pnpm start',
+      'next dev',
+      'vite',
+      'webpack serve',
+      'webpack-dev-server',
+      'nodemon',
+      'watch',
+      'serve',
+      'http-server'
+    ];
+    
+    return longRunningPatterns.some(pattern => command.includes(pattern));
+  }
+
+  /**
+   * Execute command in VSCode container terminal via MCP Server
+   */
+  private async executeInVSCodeTerminal(command: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.mcpServerUrl}/api/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tool: 'terminal_execute',
+          parameters: {
+            command,
+            cwd: '/home/coder/workspace',
+            timeout: 60000, // Longer timeout for dev servers
+            shell: '/bin/bash'
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`MCP Server returned ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Terminal execution failed');
+      }
+
+      // Format result to match expected structure
+      return {
+        stdout: result.result?.output || '',
+        stderr: result.result?.error || '',
+        exitCode: result.result?.exitCode || 0,
+        command,
+        terminal: true, // Flag to indicate this ran in terminal
+        message: 'Command executed in VSCode terminal. Check the terminal for output.'
+      };
+    } catch (error) {
+      this.logger.error(`Failed to execute in VSCode terminal: ${error.message}`);
+      
+      // Fallback to local execution
+      this.logger.warn('Falling back to local execution');
+      const { stdout, stderr } = await this.execAsync(command, {
+        cwd: this.workspaceRoot,
+        timeout: 30000
+      });
+      return {
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+        exitCode: 0,
+        command,
+        fallback: true
       };
     }
   }

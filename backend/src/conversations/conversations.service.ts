@@ -558,6 +558,12 @@ AVAILABLE TOOLS:
   * For Vite: Use "npm create vite@latest project-name -- --template react-ts"
   * NEVER use "npm init -y --name" (this tries to run create-name package)
   * To set package name after init: "npm pkg set name=project-name"
+  
+  COMMAND EXECUTION:
+  * Long-running commands (npm run dev, npm start, dev servers) execute in VSCode terminal
+  * User can see output and interact with the process in their terminal
+  * Short commands (ls, git, npm install) execute immediately and return output
+  * When starting dev servers, inform user: "Dev server started in terminal. Check VSCode terminal for output."
 - write_file: Write complete file content. Args: {"path": "file.js", "content": "full content"}
 - read_file: Read file contents. Args: {"path": "file.js"}
 - create_directory: Create directory. Args: {"path": "dirname"}
