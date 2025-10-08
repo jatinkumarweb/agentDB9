@@ -1,5 +1,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as pty from 'node-pty';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { MCPTool, CommandResult, TerminalInfo } from '@agentdb9/shared';
 import { logger } from '../utils/logger';
 
@@ -14,6 +16,44 @@ export interface Terminal {
 export class TerminalTools {
   private terminals = new Map<string, Terminal>();
   private nextTerminalId = 1;
+  private terminalLogPath = '/workspace/.agent-terminal.log';
+  private terminalLogStream: fs.FileHandle | null = null;
+  private terminalLogInitialized = false;
+
+  private async ensureTerminalLogInitialized(): Promise<void> {
+    if (this.terminalLogInitialized) {
+      return;
+    }
+
+    try {
+      // Check if file exists
+      try {
+        await fs.access(this.terminalLogPath);
+        this.terminalLogInitialized = true;
+        return;
+      } catch {
+        // File doesn't exist, create it
+      }
+
+      const header = 
+        '\x1b[1;35m' +
+        '╔════════════════════════════════════════════════════════════════════════════════╗\n' +
+        '║                           🤖 AGENT TERMINAL LOG                               ║\n' +
+        '║                                                                                ║\n' +
+        '║  This file shows all commands executed by the AI agent.                       ║\n' +
+        '║  Commands are executed in the MCP server container with access to workspace.  ║\n' +
+        '║  Output is streamed in real-time as commands execute.                         ║\n' +
+        '╚════════════════════════════════════════════════════════════════════════════════╝\n' +
+        '\x1b[0m\n' +
+        `\x1b[1;90mLog started: ${new Date().toISOString()}\x1b[0m\n\n`;
+      
+      await fs.writeFile(this.terminalLogPath, header);
+      this.terminalLogInitialized = true;
+      logger.info(`Initialized agent terminal log at ${this.terminalLogPath}`);
+    } catch (error) {
+      logger.error('Failed to initialize terminal log:', error);
+    }
+  }
 
   public getTools(): MCPTool[] {
     return [
@@ -124,6 +164,35 @@ export class TerminalTools {
     ];
   }
 
+  private async logToTerminal(message: string): Promise<void> {
+    try {
+      const logPath = this.terminalLogPath;
+      await fs.appendFile(logPath, message);
+    } catch (error) {
+      logger.error('Failed to write to terminal log:', error);
+    }
+  }
+
+  private formatTerminalHeader(command: string, cwd: string): string {
+    const timestamp = new Date().toISOString();
+    const separator = '═'.repeat(80);
+    return `\n${separator}\n` +
+           `\x1b[1;36m[${timestamp}]\x1b[0m \x1b[1;32mAgent Terminal\x1b[0m\n` +
+           `\x1b[1;33mCommand:\x1b[0m ${command}\n` +
+           `\x1b[1;33mDirectory:\x1b[0m ${cwd}\n` +
+           `${separator}\n\n`;
+  }
+
+  private formatTerminalFooter(exitCode: number, duration: number): string {
+    const separator = '─'.repeat(80);
+    const status = exitCode === 0 
+      ? '\x1b[1;32m✓ SUCCESS\x1b[0m' 
+      : `\x1b[1;31m✗ FAILED (exit code: ${exitCode})\x1b[0m`;
+    return `\n${separator}\n` +
+           `${status} \x1b[1;90m(${duration}ms)\x1b[0m\n` +
+           `${separator}\n\n`;
+  }
+
   public async executeCommand(
     command: string, 
     cwd?: string, 
@@ -132,19 +201,34 @@ export class TerminalTools {
   ): Promise<CommandResult> {
     const startTime = Date.now();
     
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       let output = '';
       let error = '';
       let exitCode = 0;
       let timedOut = false;
 
+      // Use workspace directory if no cwd specified
+      const workingDir = cwd || process.env.WORKSPACE_PATH || '/workspace';
+      
       const options: any = {
-        cwd: cwd || process.cwd(),
+        cwd: workingDir,
         shell: true,
-        env: { ...process.env }
+        env: {
+          ...process.env,
+          // Remove PORT to avoid conflicts with Next.js
+          PORT: undefined,
+          // Set proper Node environment
+          NODE_ENV: 'development'
+        }
       };
 
       logger.info(`Executing command: ${command}`, { cwd: options.cwd });
+
+      // Ensure terminal log is initialized
+      await this.ensureTerminalLogInitialized();
+
+      // Log command start to terminal log
+      await this.logToTerminal(this.formatTerminalHeader(command, workingDir));
 
       const child: ChildProcess = spawn(shell, ['-c', command], options);
 
@@ -162,19 +246,32 @@ export class TerminalTools {
       }, timeout);
 
       child.stdout?.on('data', (data) => {
-        output += data.toString();
+        const text = data.toString();
+        output += text;
+        // Stream to terminal log in real-time
+        this.logToTerminal(text).catch(err => 
+          logger.error('Failed to stream stdout to terminal log:', err)
+        );
       });
 
       child.stderr?.on('data', (data) => {
-        error += data.toString();
+        const text = data.toString();
+        error += text;
+        // Stream stderr with red color
+        this.logToTerminal(`\x1b[1;31m${text}\x1b[0m`).catch(err => 
+          logger.error('Failed to stream stderr to terminal log:', err)
+        );
       });
 
-      child.on('close', (code) => {
+      child.on('close', async (code) => {
         clearTimeout(timeoutHandle);
         exitCode = code || 0;
         
         const duration = Date.now() - startTime;
         const success = !timedOut && exitCode === 0;
+        
+        // Log command completion to terminal log
+        await this.logToTerminal(this.formatTerminalFooter(exitCode, duration));
         
         const result: CommandResult = {
           success,

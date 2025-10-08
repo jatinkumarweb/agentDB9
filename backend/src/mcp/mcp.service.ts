@@ -23,6 +23,7 @@ export class MCPService {
   private readonly workspaceRoot = process.env.VSCODE_WORKSPACE || '/workspace';
   private readonly execAsync = promisify(exec);
   private readonly COMMAND_LOG = '/home/coder/workspace/.agent-commands.log';
+  private readonly TERMINAL_LOG = '/workspace/.agent-terminal.log';
 
   constructor() {}
 
@@ -257,7 +258,8 @@ export class MCPService {
         exitCode,
         command,
         logFile: this.COMMAND_LOG,
-        message: `Command executed. View details in VSCode: ${this.COMMAND_LOG}`
+        terminalLog: this.TERMINAL_LOG,
+        message: `Command executed. View real-time output in VSCode: ${this.TERMINAL_LOG}`
       };
     } catch (error) {
       this.logger.error(`Failed to execute command in VSCode container: ${error.message}`);
@@ -273,7 +275,13 @@ export class MCPService {
       try {
         const { stdout, stderr } = await this.execAsync(command, {
           cwd: this.workspaceRoot,
-          timeout: 30000
+          timeout: 30000,
+          env: {
+            ...process.env,
+            // Remove PORT to avoid conflicts with Next.js and other dev servers
+            PORT: undefined,
+            NODE_ENV: 'development'
+          }
         });
         
         // Log fallback execution
