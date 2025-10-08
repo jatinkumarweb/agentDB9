@@ -204,9 +204,10 @@ services:
     # Make IPC namespace shareable for mcp-server
     ipc: shareable
     ports:
-      - "8080:8080"
-      - "9001:9001"  # MCP server HTTP port (shared network namespace)
-      - "9002:9002"  # MCP server WebSocket port (shared network namespace)
+      - "8080:8080"   # VSCode web interface
+      - "9001:9001"   # MCP server HTTP port (shared network namespace)
+      - "9002:9002"   # MCP server WebSocket port (shared network namespace)
+      - "3000:3000"   # User dev servers (Next.js, React, etc.)
     environment:
       - SHELL=/bin/bash
       - DISABLE_WORKSPACE_TRUST=true
