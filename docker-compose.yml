@@ -210,6 +210,7 @@ services:
     environment:
       - SHELL=/bin/bash
       - DISABLE_WORKSPACE_TRUST=true
+      - VSCODE_PROXY=true  # Enable proxy mode for dev servers
     volumes:
       - ./workspace:/home/coder/workspace:cached
       - vscode-data:/home/coder/.local/share/code-server
