@@ -510,9 +510,13 @@ Would you like help setting up external API access?`;
       const agentMessage = this.messagesRepository.create(agentMessageData);
       const savedMessage = await this.messagesRepository.save(agentMessage);
       
-      // Add timeout for local environments where Ollama might not be available
+      // Add timeout for streaming responses
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minute timeout for streaming (longer for tool calls)
+      const STREAMING_TIMEOUT = 60000; // 60 second timeout
+      const timeoutId = setTimeout(() => {
+        console.error(`⏱️ Streaming timeout after ${STREAMING_TIMEOUT/1000}s - aborting`);
+        controller.abort();
+      }, STREAMING_TIMEOUT);
       
       // Register this generation for potential stopping
       this.activeGenerations.set(savedMessage.id, {
@@ -774,17 +778,27 @@ NOTE: You have no workspace tools available. You can only provide suggestions an
       try {
         let hasReceivedData = false;
         const startTime = Date.now();
+        let chunkCount = 0;
+        
+        console.log(`🚀 Starting streaming response for conversation ${conversation.id}`);
         
         while (true) {
           const { done, value } = await reader.read();
           
           if (done) {
-            console.log('Streaming completed, total content length:', fullContent.length);
+            const duration = Date.now() - startTime;
+            console.log(`✅ Streaming completed in ${duration}ms, total content length: ${fullContent.length}, chunks: ${chunkCount}`);
             break;
           }
           
+          chunkCount++;
           const chunk = decoder.decode(value, { stream: true });
           const lines = chunk.split('\n').filter(line => line.trim());
+          
+          if (chunkCount % 10 === 0) {
+            const elapsed = Date.now() - startTime;
+            console.log(`📊 Streaming progress: ${chunkCount} chunks, ${fullContent.length} chars, ${elapsed}ms elapsed`);
+          }
           
           for (const line of lines) {
             try {
@@ -794,7 +808,7 @@ NOTE: You have no workspace tools available. You can only provide suggestions an
               
               // Handle tool calls from Ollama
               if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
-                console.log('Received tool calls from Ollama:', data.message.tool_calls);
+                console.log(`🔧 Received ${data.message.tool_calls.length} tool call(s) from Ollama:`, JSON.stringify(data.message.tool_calls, null, 2));
                 
                 for (const toolCall of data.message.tool_calls) {
                   const toolName = toolCall.function?.name;
@@ -1144,22 +1158,29 @@ Would you like help setting up external API access?`;
    * Parse and execute tool calls from model response
    */
   private async parseAndExecuteToolCalls(content: string, conversation: any, message: any): Promise<void> {
+    console.log(`🔍 Parsing tool calls from content (length: ${content.length})`);
+    console.log(`📝 Content preview: ${content.substring(0, 200)}...`);
+    
     // Parse XML-style tool calls from the response
     // Try standard format first: <tool_call><tool_name>...</tool_name><arguments>...</arguments></tool_call>
     let toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/gs;
     let matches = [...content.matchAll(toolCallRegex)];
     
+    console.log(`🔎 Standard format matches: ${matches.length}`);
+    
     // If no matches, try alternative format: <tool_call><execute_command>...</execute_command><arguments>...</arguments></tool_call>
     if (matches.length === 0) {
       toolCallRegex = /<tool_call>\s*<(\w+)>.*?<\/\1>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/gs;
       matches = [...content.matchAll(toolCallRegex)];
+      console.log(`🔎 Alternative format matches: ${matches.length}`);
     }
     
     if (matches.length === 0) {
+      console.log(`⚠️ No tool calls found in content`);
       return; // No tool calls found
     }
     
-    console.log(`Found ${matches.length} tool call(s) in response`);
+    console.log(`✅ Found ${matches.length} tool call(s) in response`);
     
     // Remove tool call XML from content for cleaner display
     let cleanContent = content.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();

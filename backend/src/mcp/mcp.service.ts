@@ -31,18 +31,34 @@ export class MCPService {
    * Execute an MCP tool call for an agent
    */
   async executeTool(toolCall: MCPToolCall): Promise<MCPToolResult> {
+    const startTime = Date.now();
+    this.logger.log(`🔧 Executing MCP tool: ${toolCall.name} with args:`, JSON.stringify(toolCall.arguments));
+    
     try {
-      this.logger.log(`Executing MCP tool: ${toolCall.name}`);
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error(`Tool execution timeout after 30s`)), 30000);
+      });
       
-      // Execute tool directly on the file system
-      const result = await this.executeToolDirectly(toolCall);
+      // Execute tool with timeout
+      const result = await Promise.race([
+        this.executeToolDirectly(toolCall),
+        timeoutPromise
+      ]);
+      
+      const duration = Date.now() - startTime;
+      this.logger.log(`✅ Tool ${toolCall.name} completed in ${duration}ms`);
       
       return {
         success: true,
         result
       };
     } catch (error) {
-      this.logger.error(`Failed to execute MCP tool ${toolCall.name}:`, error);
+      const duration = Date.now() - startTime;
+      this.logger.error(`❌ Failed to execute MCP tool ${toolCall.name} after ${duration}ms:`, error.message);
+      this.logger.error(`Tool arguments:`, JSON.stringify(toolCall.arguments));
+      this.logger.error(`Error stack:`, error.stack);
+      
       return {
         success: false,
         error: error.message
@@ -108,37 +124,64 @@ export class MCPService {
   private async executeToolDirectly(toolCall: MCPToolCall): Promise<any> {
     const { name, arguments: args } = toolCall;
     
+    this.logger.log(`📂 Executing tool directly: ${name}`);
+    
     try {
+      let result;
       switch (name) {
         case 'read_file':
-          return await this.readFile(args.path);
+          this.logger.log(`📖 Reading file: ${args.path}`);
+          result = await this.readFile(args.path);
+          this.logger.log(`✅ Read file success, size: ${result.size} bytes`);
+          return result;
           
         case 'write_file':
-          return await this.writeFile(args.path, args.content);
+          this.logger.log(`✍️ Writing file: ${args.path}`);
+          result = await this.writeFile(args.path, args.content);
+          this.logger.log(`✅ Write file success`);
+          return result;
           
         case 'list_files':
-          return await this.listFiles(args.path || '.');
+          this.logger.log(`📋 Listing files in: ${args.path || '.'}`);
+          result = await this.listFiles(args.path || '.');
+          this.logger.log(`✅ List files success: ${result.total} items (${result.files.length} files, ${result.directories.length} dirs)`);
+          return result;
           
         case 'execute_command':
-          return await this.executeCommand(args.command);
+          this.logger.log(`⚡ Executing command: ${args.command}`);
+          result = await this.executeCommand(args.command);
+          this.logger.log(`✅ Command executed, exit code: ${result.exitCode}`);
+          return result;
           
         case 'git_status':
-          return await this.getGitStatus();
+          this.logger.log(`🔍 Getting git status`);
+          result = await this.getGitStatus();
+          this.logger.log(`✅ Git status retrieved`);
+          return result;
           
         case 'git_commit':
-          return await this.gitCommit(args.message, args.files);
+          this.logger.log(`💾 Git commit: ${args.message}`);
+          result = await this.gitCommit(args.message, args.files);
+          this.logger.log(`✅ Git commit success`);
+          return result;
           
         case 'create_directory':
-          return await this.createDirectory(args.path);
+          this.logger.log(`📁 Creating directory: ${args.path}`);
+          result = await this.createDirectory(args.path);
+          this.logger.log(`✅ Directory created`);
+          return result;
           
         case 'delete_file':
-          return await this.deleteFile(args.path);
+          this.logger.log(`🗑️ Deleting file: ${args.path}`);
+          result = await this.deleteFile(args.path);
+          this.logger.log(`✅ File deleted`);
+          return result;
           
         default:
           throw new Error(`Unknown tool: ${name}`);
       }
     } catch (error) {
-      this.logger.error(`Tool execution failed for ${name}:`, error);
+      this.logger.error(`❌ Tool execution failed for ${name}:`, error.message);
       throw error;
     }
   }
