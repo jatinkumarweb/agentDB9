@@ -68,6 +68,11 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingMessageId, setGeneratingMessageId] = useState<string | null>(null);
   
+  // Response time tracking
+  const [responseStartTime, setResponseStartTime] = useState<number | null>(null);
+  const [responseTime, setResponseTime] = useState<number | null>(null);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  
   // WebSocket integration
   const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff } = useWebSocket();
   
@@ -87,6 +92,18 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentConversation?.messages]);
+
+  // Live timer update
+  useEffect(() => {
+    if (!isTimerRunning) return;
+    
+    const interval = setInterval(() => {
+      // Force re-render to update timer display
+      setResponseStartTime(prev => prev);
+    }, 100); // Update every 100ms
+    
+    return () => clearInterval(interval);
+  }, [isTimerRunning]);
 
   // Debug: Log when conversation messages change
   useEffect(() => {
@@ -319,6 +336,15 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
             streaming: updatedMsg?.metadata?.streaming
           });
           
+          // Stop timer when response is complete
+          if (!data.streaming && responseStartTime) {
+            const elapsed = Date.now() - responseStartTime;
+            setResponseTime(elapsed);
+            setIsTimerRunning(false);
+            setResponseStartTime(null);
+            console.log(`⏱️ Response completed in ${(elapsed / 1000).toFixed(2)}s`);
+          }
+          
           return newConversation;
         });
       });
@@ -459,6 +485,12 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     const messageContent = newMessage.trim();
     setNewMessage('');
     setIsLoading(true);
+    
+    // Start response timer
+    const startTime = Date.now();
+    setResponseStartTime(startTime);
+    setIsTimerRunning(true);
+    setResponseTime(null);
 
     try {
       // Get or create conversation
@@ -490,6 +522,10 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       }
     } catch (error) {
       console.error('Failed to send message:', error);
+      
+      // Stop timer on error
+      setIsTimerRunning(false);
+      setResponseStartTime(null);
       
       // Restore the message content
       setNewMessage(messageContent);
@@ -844,6 +880,23 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                 {/* Scroll anchor */}
                 <div ref={messagesEndRef} />
               </div>
+
+              {/* Response Timer */}
+              {(isTimerRunning || responseTime) && (
+                <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {isTimerRunning ? '⏱️ Generating response...' : '✅ Response completed'}
+                    </span>
+                    <span className="font-mono text-gray-700 dark:text-gray-300">
+                      {isTimerRunning 
+                        ? `${((Date.now() - (responseStartTime || 0)) / 1000).toFixed(1)}s`
+                        : `${(responseTime! / 1000).toFixed(2)}s`
+                      }
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Agent Selection */}
               <div className="p-4 border-t border-gray-200 dark:border-gray-700">

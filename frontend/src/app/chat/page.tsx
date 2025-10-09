@@ -30,6 +30,11 @@ export default function ChatPage({}: ChatPageProps) {
   const [generatingMessageId, setGeneratingMessageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Response time tracking
+  const [responseStartTime, setResponseStartTime] = useState<number | null>(null);
+  const [responseTime, setResponseTime] = useState<number | null>(null);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
 
   // WebSocket and caching hooks
   const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff, error: wsError } = useWebSocket();
@@ -103,6 +108,18 @@ export default function ChatPage({}: ChatPageProps) {
     currentConversationRef.current = currentConversation;
   }, [currentConversation]);
 
+  // Live timer update
+  useEffect(() => {
+    if (!isTimerRunning) return;
+    
+    const interval = setInterval(() => {
+      // Force re-render to update timer display
+      setResponseStartTime(prev => prev);
+    }, 100); // Update every 100ms
+    
+    return () => clearInterval(interval);
+  }, [isTimerRunning]);
+
   useEffect(() => {
     cacheRef.current = cache;
   }, [cache]);
@@ -174,6 +191,16 @@ export default function ChatPage({}: ChatPageProps) {
         _forceUpdate: Date.now() // Force React to detect change
       };
       console.log('📝 Updated conversation with', sortedMessages.length, 'messages');
+      
+      // Stop timer when response is complete
+      if (!data.streaming && responseStartTime) {
+        const elapsed = Date.now() - responseStartTime;
+        setResponseTime(elapsed);
+        setIsTimerRunning(false);
+        setResponseStartTime(null);
+        console.log(`⏱️ Response completed in ${(elapsed / 1000).toFixed(2)}s`);
+      }
+      
       return newConversation;
       });
     });
@@ -451,6 +478,12 @@ if (cachedMessages) {
     setMessage('');
     setIsLoading(true);
     setError(null);
+    
+    // Start response timer
+    const startTime = Date.now();
+    setResponseStartTime(startTime);
+    setIsTimerRunning(true);
+    setResponseTime(null);
 
     try {
       const response = await fetchWithAuth(`/api/conversations/${currentConversation.id}/messages`, {
@@ -860,6 +893,23 @@ if (cachedMessages) {
 
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Response Timer */}
+            {(isTimerRunning || responseTime) && (
+              <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-600">
+                    {isTimerRunning ? '⏱️ Generating response...' : '✅ Response completed'}
+                  </span>
+                  <span className="font-mono text-gray-700">
+                    {isTimerRunning 
+                      ? `${((Date.now() - (responseStartTime || 0)) / 1000).toFixed(1)}s`
+                      : `${(responseTime! / 1000).toFixed(2)}s`
+                    }
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Error Display */}
             {error && (
