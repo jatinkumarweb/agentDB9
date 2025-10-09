@@ -4,11 +4,13 @@ import { AgentsController } from './agents.controller';
 import { AgentsService } from './agents.service';
 import { Agent } from '../entities/agent.entity';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
+import { ContextModule } from '../context/context.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Agent]),
     KnowledgeModule,
+    ContextModule,
   ],
   controllers: [AgentsController],
   providers: [AgentsService],

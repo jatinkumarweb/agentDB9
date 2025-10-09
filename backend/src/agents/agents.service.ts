@@ -5,6 +5,7 @@ import { Agent } from '../entities/agent.entity';
 import { CreateAgentDto } from '../dto/create-agent.dto';
 import { generateId } from '@agentdb9/shared';
 import { KnowledgeService } from '../knowledge/knowledge.service';
+import { ContextService } from '../context/context.service';
 
 @Injectable()
 export class AgentsService {
@@ -14,6 +15,7 @@ export class AgentsService {
     @InjectRepository(Agent)
     private agentsRepository: Repository<Agent>,
     private knowledgeService: KnowledgeService,
+    private contextService: ContextService,
   ) {}
 
   async findAll(userId?: string): Promise<Agent[]> {
@@ -186,11 +188,24 @@ export class AgentsService {
         }
       }
 
+      // Get project context for workspace awareness
+      let projectContext: any = null;
+      if (context.workspaceId) {
+        try {
+          projectContext = await this.contextService.getProjectSummary(context.workspaceId);
+          if (projectContext) {
+            this.logger.log(`Retrieved project context for workspace ${context.workspaceId}`);
+          }
+        } catch (error: any) {
+          this.logger.warn(`Failed to retrieve project context: ${error.message}`);
+        }
+      }
+
       // Analyze the message to determine if it requires code actions
       const actions = await this.analyzeMessage(message, context);
       
-      // Generate response using the specific agent's configuration and knowledge context
-      const response = await this.generateAgentResponse(agent, message, context, actions, knowledgeContext);
+      // Generate response using the specific agent's configuration, knowledge context, and project context
+      const response = await this.generateAgentResponse(agent, message, context, actions, knowledgeContext, projectContext);
       
       // Update agent status to coding if actions are required
       if (actions.length > 0) {
@@ -294,10 +309,10 @@ export class AgentsService {
     return `I'll help you with that! I'm going to: ${actionDescriptions}. Let me work on this in your VS Code workspace.`;
   }
 
-  private async generateAgentResponse(agent: Agent, message: string, context: any, actions: any[], knowledgeContext?: any): Promise<string> {
+  private async generateAgentResponse(agent: Agent, message: string, context: any, actions: any[], knowledgeContext?: any, projectContext?: any): Promise<string> {
     try {
       // Call LLM service for intelligent response generation
-      const llmResponse = await this.callLLMService(agent, message, context, actions, knowledgeContext);
+      const llmResponse = await this.callLLMService(agent, message, context, actions, knowledgeContext, projectContext);
       return llmResponse;
     } catch (error) {
       console.error('Failed to get LLM response, falling back to simple response:', error);
@@ -312,12 +327,12 @@ export class AgentsService {
     }
   }
 
-  private async callLLMService(agent: Agent, message: string, context: any, actions: any[], knowledgeContext?: any): Promise<string> {
+  private async callLLMService(agent: Agent, message: string, context: any, actions: any[], knowledgeContext?: any, projectContext?: any): Promise<string> {
     try {
       const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://llm-service:9000';
       
       // Prepare the prompt for the LLM
-      const systemPrompt = this.buildSystemPrompt(agent, actions, knowledgeContext);
+      const systemPrompt = this.buildSystemPrompt(agent, actions, knowledgeContext, projectContext);
       const userPrompt = this.buildUserPrompt(message, context);
       
       const response = await fetch(`${llmServiceUrl}/api/chat`, {
@@ -350,7 +365,7 @@ export class AgentsService {
     }
   }
 
-  private buildSystemPrompt(agent: Agent, actions: any[], knowledgeContext?: any): string {
+  private buildSystemPrompt(agent: Agent, actions: any[], knowledgeContext?: any, projectContext?: any): string {
     const actionsText = actions.length > 0 
       ? `\n\nPlanned Actions: ${actions.map(a => `${a.type} - ${a.description}`).join(', ')}`
       : '';
@@ -362,14 +377,27 @@ export class AgentsService {
       ).join('\n\n')}`;
     }
 
+    let projectText = '';
+    if (projectContext) {
+      projectText = `\n\nProject Context:
+- Name: ${projectContext.name}
+- Type: ${projectContext.type}
+- Primary Framework: ${projectContext.primaryFramework?.name || 'None'} ${projectContext.primaryFramework?.version || ''}
+- Primary Language: ${projectContext.primaryLanguage?.name || 'Unknown'}
+- Structure: ${projectContext.structure.layout} (${projectContext.structure.files} files, ${projectContext.structure.directories} directories)
+- Major Dependencies: ${projectContext.majorDependencies.slice(0, 5).map((d: any) => d.name).join(', ')}
+- Entry Points: ${projectContext.entryPoints.join(', ')}
+- Available Scripts: ${projectContext.availableScripts.join(', ')}`;
+    }
+
     return `You are ${agent.name}, an AI coding assistant. ${agent.description || 'You help developers with coding tasks.'}
 
 Your capabilities include:
 ${agent.capabilities?.map(cap => `- ${cap.type}: ${cap.enabled ? 'enabled' : 'disabled'}`).join('\n') || '- General coding assistance'}
 
-You work in a VS Code environment and can execute development tasks through MCP tools.${actionsText}${knowledgeText}
+You work in a VS Code environment and can execute development tasks through MCP tools.${actionsText}${knowledgeText}${projectText}
 
-Respond in a helpful, professional manner. Be specific about what you'll do and how you'll help. Keep responses concise but informative.${knowledgeContext ? ' Use the knowledge base context provided above to give more accurate and informed responses.' : ''}`;
+Respond in a helpful, professional manner. Be specific about what you'll do and how you'll help. Keep responses concise but informative.${knowledgeContext ? ' Use the knowledge base context provided above to give more accurate and informed responses.' : ''}${projectContext ? ' Use the project context to understand the codebase structure and make informed suggestions.' : ''}`;
   }
 
   private buildUserPrompt(message: string, context: any): string {
