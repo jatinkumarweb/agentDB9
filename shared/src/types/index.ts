@@ -187,5 +187,6 @@ export * from './conversation-manager';
 export * from './websocket-bridge';
 export * from './knowledge-base';
 export * from './project-context';
+export * from './memory';
 export * from './mcp';
 export * from './api';

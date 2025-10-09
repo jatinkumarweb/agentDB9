@@ -6,6 +6,7 @@ import { CreateAgentDto } from '../dto/create-agent.dto';
 import { generateId } from '@agentdb9/shared';
 import { KnowledgeService } from '../knowledge/knowledge.service';
 import { ContextService } from '../context/context.service';
+import { MemoryService } from '../memory/memory.service';
 
 @Injectable()
 export class AgentsService {
@@ -16,6 +17,7 @@ export class AgentsService {
     private agentsRepository: Repository<Agent>,
     private knowledgeService: KnowledgeService,
     private contextService: ContextService,
+    private memoryService: MemoryService,
   ) {}
 
   async findAll(userId?: string): Promise<Agent[]> {
@@ -201,11 +203,52 @@ export class AgentsService {
         }
       }
 
+      // Get memory context for continuous learning
+      let memoryContext: any = null;
+      if (context.sessionId) {
+        try {
+          memoryContext = await this.memoryService.getMemoryContext(
+            agentId,
+            context.sessionId,
+            message,
+          );
+          if (memoryContext) {
+            this.logger.log(`Retrieved memory context: ${memoryContext.summary}`);
+          }
+        } catch (error: any) {
+          this.logger.warn(`Failed to retrieve memory context: ${error.message}`);
+        }
+      }
+
       // Analyze the message to determine if it requires code actions
       const actions = await this.analyzeMessage(message, context);
       
-      // Generate response using the specific agent's configuration, knowledge context, and project context
-      const response = await this.generateAgentResponse(agent, message, context, actions, knowledgeContext, projectContext);
+      // Store interaction in short-term memory
+      if (context.sessionId) {
+        try {
+          await this.memoryService.createMemory({
+            agentId,
+            sessionId: context.sessionId,
+            category: 'interaction',
+            content: `User: ${message}`,
+            importance: 0.5,
+            metadata: {
+              workspaceId: context.workspaceId,
+              userId: context.userId,
+              tags: ['chat', 'interaction'],
+              keywords: this.extractKeywords(message),
+              confidence: 0.8,
+              relevance: 0.7,
+              source: 'chat',
+            },
+          });
+        } catch (error: any) {
+          this.logger.warn(`Failed to store interaction in memory: ${error.message}`);
+        }
+      }
+
+      // Generate response using the specific agent's configuration, knowledge context, project context, and memory
+      const response = await this.generateAgentResponse(agent, message, context, actions, knowledgeContext, projectContext, memoryContext);
       
       // Update agent status to coding if actions are required
       if (actions.length > 0) {
@@ -309,10 +352,10 @@ export class AgentsService {
     return `I'll help you with that! I'm going to: ${actionDescriptions}. Let me work on this in your VS Code workspace.`;
   }
 
-  private async generateAgentResponse(agent: Agent, message: string, context: any, actions: any[], knowledgeContext?: any, projectContext?: any): Promise<string> {
+  private async generateAgentResponse(agent: Agent, message: string, context: any, actions: any[], knowledgeContext?: any, projectContext?: any, memoryContext?: any): Promise<string> {
     try {
       // Call LLM service for intelligent response generation
-      const llmResponse = await this.callLLMService(agent, message, context, actions, knowledgeContext, projectContext);
+      const llmResponse = await this.callLLMService(agent, message, context, actions, knowledgeContext, projectContext, memoryContext);
       return llmResponse;
     } catch (error) {
       console.error('Failed to get LLM response, falling back to simple response:', error);
@@ -327,12 +370,12 @@ export class AgentsService {
     }
   }
 
-  private async callLLMService(agent: Agent, message: string, context: any, actions: any[], knowledgeContext?: any, projectContext?: any): Promise<string> {
+  private async callLLMService(agent: Agent, message: string, context: any, actions: any[], knowledgeContext?: any, projectContext?: any, memoryContext?: any): Promise<string> {
     try {
       const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://llm-service:9000';
       
       // Prepare the prompt for the LLM
-      const systemPrompt = this.buildSystemPrompt(agent, actions, knowledgeContext, projectContext);
+      const systemPrompt = this.buildSystemPrompt(agent, actions, knowledgeContext, projectContext, memoryContext);
       const userPrompt = this.buildUserPrompt(message, context);
       
       const response = await fetch(`${llmServiceUrl}/api/chat`, {
@@ -365,7 +408,7 @@ export class AgentsService {
     }
   }
 
-  private buildSystemPrompt(agent: Agent, actions: any[], knowledgeContext?: any, projectContext?: any): string {
+  private buildSystemPrompt(agent: Agent, actions: any[], knowledgeContext?: any, projectContext?: any, memoryContext?: any): string {
     const actionsText = actions.length > 0 
       ? `\n\nPlanned Actions: ${actions.map(a => `${a.type} - ${a.description}`).join(', ')}`
       : '';
@@ -390,14 +433,52 @@ export class AgentsService {
 - Available Scripts: ${projectContext.availableScripts.join(', ')}`;
     }
 
+    let memoryText = '';
+    if (memoryContext && memoryContext.totalMemories > 0) {
+      memoryText = `\n\nMemory Context (${memoryContext.summary}):`;
+      
+      if (memoryContext.relevantLessons.length > 0) {
+        memoryText += `\n\nLearned Lessons:`;
+        memoryContext.relevantLessons.slice(0, 3).forEach((lesson: any, idx: number) => {
+          memoryText += `\n[${idx + 1}] ${lesson.summary}`;
+        });
+      }
+      
+      if (memoryContext.relevantChallenges.length > 0) {
+        memoryText += `\n\nResolved Challenges:`;
+        memoryContext.relevantChallenges.slice(0, 3).forEach((challenge: any, idx: number) => {
+          memoryText += `\n[${idx + 1}] ${challenge.summary}`;
+        });
+      }
+      
+      if (memoryContext.relevantFeedback.length > 0) {
+        memoryText += `\n\nUser Feedback:`;
+        memoryContext.relevantFeedback.slice(0, 2).forEach((feedback: any, idx: number) => {
+          memoryText += `\n[${idx + 1}] ${feedback.summary}`;
+        });
+      }
+    }
+
     return `You are ${agent.name}, an AI coding assistant. ${agent.description || 'You help developers with coding tasks.'}
 
 Your capabilities include:
 ${agent.capabilities?.map(cap => `- ${cap.type}: ${cap.enabled ? 'enabled' : 'disabled'}`).join('\n') || '- General coding assistance'}
 
-You work in a VS Code environment and can execute development tasks through MCP tools.${actionsText}${knowledgeText}${projectText}
+You work in a VS Code environment and can execute development tasks through MCP tools.${actionsText}${knowledgeText}${projectText}${memoryText}
 
-Respond in a helpful, professional manner. Be specific about what you'll do and how you'll help. Keep responses concise but informative.${knowledgeContext ? ' Use the knowledge base context provided above to give more accurate and informed responses.' : ''}${projectContext ? ' Use the project context to understand the codebase structure and make informed suggestions.' : ''}`;
+Respond in a helpful, professional manner. Be specific about what you'll do and how you'll help. Keep responses concise but informative.${knowledgeContext ? ' Use the knowledge base context provided above to give more accurate and informed responses.' : ''}${projectContext ? ' Use the project context to understand the codebase structure and make informed suggestions.' : ''}${memoryContext ? ' Learn from past interactions and apply lessons learned to provide better assistance.' : ''}`;
+  }
+
+  /**
+   * Extract keywords from message for memory tagging
+   */
+  private extractKeywords(message: string): string[] {
+    const words = message.toLowerCase().split(/\s+/);
+    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'can']);
+    
+    return words
+      .filter(word => word.length > 3 && !stopWords.has(word))
+      .slice(0, 10);
   }
 
   private buildUserPrompt(message: string, context: any): string {

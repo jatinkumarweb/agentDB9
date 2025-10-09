@@ -1,6 +1,6 @@
 // Model management utilities
 
-import { ModelConfig, ModelProvider, ModelMetrics } from '../types/index';
+import { ModelConfig, ModelProvider, ModelMetrics } from '../types';
 import { CodeTask, PerformanceRequirements } from '../types/models';
 
 export const OLLAMA_MODELS: Record<string, ModelConfig> = {
