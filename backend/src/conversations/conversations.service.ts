@@ -555,12 +555,21 @@ Would you like help setting up external API access?`;
       let systemPrompt = '';
       
       if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
-        systemPrompt = `You are a coding assistant${workspaceConfig.enableActions || workspaceConfig.enableContext ? ' with workspace tools' : ''}. When you need to perform actions, use tool calls.
+        systemPrompt = `You are a coding assistant with workspace tools. Use tools ONLY when explicitly needed to fulfill the user's request.
+
+IMPORTANT GUIDELINES:
+- If user asks to "describe" or "show" workspace, use list_files tool
+- If user asks to "read" or "view" a file, use read_file tool
+- If user asks to "create", "modify", or "delete" files, use appropriate tools
+- If user asks to "run" or "execute" commands, use execute_command tool
+- DO NOT execute commands unless explicitly requested
+- DO NOT create projects unless explicitly requested
+- Answer questions directly when tools are not needed
 
 TOOL CALL FORMAT (use this exact XML structure):
 <tool_call>
-<tool_name>execute_command</tool_name>
-<arguments>{"command": "mkdir demo && cd demo && npm init -y"}</arguments>
+<tool_name>list_files</tool_name>
+<arguments>{"path": "."}</arguments>
 </tool_call>
 
 AVAILABLE TOOLS:`;
@@ -758,7 +767,8 @@ IMPORTANT:
                     });
                     
                     // Add tool result to content
-                    const toolResultText = `\n\n**Tool Result (${toolName}):**\n\`\`\`json\n${JSON.stringify(toolResult.result, null, 2)}\n\`\`\`\n`;
+                    const resultToShow = toolResult.result !== undefined ? toolResult.result : { error: 'No result returned' };
+                    const toolResultText = `\n\n**Tool Executed: ${toolName}**\n\`\`\`json\n${JSON.stringify(resultToShow, null, 2)}\n\`\`\`\n`;
                     fullContent += toolResultText;
                   }
                 }
@@ -1130,7 +1140,8 @@ Would you like help setting up external API access?`;
         });
         
         // Append tool result to clean content
-        const toolResultText = `\n\n**Tool Executed: ${toolName}**\n\`\`\`json\n${JSON.stringify(toolResult.result, null, 2)}\n\`\`\`\n`;
+        const resultToShow = toolResult.result !== undefined ? toolResult.result : { error: 'No result returned' };
+        const toolResultText = `\n\n**Tool Executed: ${toolName}**\n\`\`\`json\n${JSON.stringify(resultToShow, null, 2)}\n\`\`\`\n`;
         cleanContent += toolResultText;
         
         // Update message with clean content and tool result
