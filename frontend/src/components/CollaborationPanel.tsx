@@ -871,7 +871,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                         <option value="">Choose an agent...</option>
                         {availableAgents.map(agent => (
                           <option key={agent.id} value={agent.id}>
-                            {agent.name} ({agent.configuration.model})
+                            {agent.name} ({agent.configuration?.model || 'No model'})
                           </option>
                         ))}
                       </>
