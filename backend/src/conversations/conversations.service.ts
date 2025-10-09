@@ -557,21 +557,46 @@ Would you like help setting up external API access?`;
       if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
         systemPrompt = `You are a coding assistant with workspace tools.
 
-CRITICAL RULES - FOLLOW EXACTLY:
+CRITICAL RULES - FOLLOW EXACTLY:`;
+
+        // Add context tool rules only if enabled
+        if (workspaceConfig.enableContext) {
+          systemPrompt += `
 1. When user asks about workspace/files/directories → ALWAYS use list_files first
 2. When user asks to read/view a file → ALWAYS use read_file
-3. When user asks about git status → ALWAYS use git_status
-4. When user asks to create/modify files → use write_file (only if explicitly requested)
-5. When user asks to run commands → use execute_command (only if explicitly requested)
-6. NEVER execute commands or create files unless user explicitly asks
+3. When user asks about git status → ALWAYS use git_status`;
+        }
 
-EXAMPLES:
+        // Add action tool rules only if enabled
+        if (workspaceConfig.enableActions) {
+          const ruleStart = workspaceConfig.enableContext ? 4 : 1;
+          systemPrompt += `
+${ruleStart}. When user asks to create/modify files → use write_file (only if explicitly requested)
+${ruleStart + 1}. When user asks to run commands → use execute_command (only if explicitly requested)
+${ruleStart + 2}. NEVER execute commands or create files unless user explicitly asks`;
+        }
+
+        systemPrompt += `
+
+EXAMPLES:`;
+
+        // Add context tool examples only if enabled
+        if (workspaceConfig.enableContext) {
+          systemPrompt += `
 User: "describe the workspace" → <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
 User: "what files are here" → <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
 User: "show me the code" → <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
-User: "read package.json" → <tool_call><tool_name>read_file</tool_name><arguments>{"path": "package.json"}</arguments></tool_call>
+User: "read package.json" → <tool_call><tool_name>read_file</tool_name><arguments>{"path": "package.json"}</arguments></tool_call>`;
+        }
+
+        // Add action tool examples only if enabled
+        if (workspaceConfig.enableActions) {
+          systemPrompt += `
 User: "create a new file" → <tool_call><tool_name>write_file</tool_name><arguments>{"path": "file.js", "content": "..."}</arguments></tool_call>
-User: "run npm install" → <tool_call><tool_name>execute_command</tool_name><arguments>{"command": "npm install"}</arguments></tool_call>
+User: "run npm install" → <tool_call><tool_name>execute_command</tool_name><arguments>{"command": "npm install"}</arguments></tool_call>`;
+        }
+
+        systemPrompt += `
 
 TOOL CALL FORMAT (use this exact XML structure):
 <tool_call>
@@ -675,8 +700,25 @@ IMPORTANT:
 - Tool calls will be executed automatically
 - You'll see results, then provide your response to the user
 - Don't explain the tool call to the user, just use it`;
+
+        // Add note about disabled permissions
+        if (!workspaceConfig.enableContext && !workspaceConfig.enableActions) {
+          systemPrompt += `
+
+NOTE: You have no workspace tools enabled. You can only provide suggestions and guidance.`;
+        } else if (!workspaceConfig.enableContext) {
+          systemPrompt += `
+
+NOTE: Workspace context is disabled. You cannot read files or list directories. You can only perform actions when explicitly requested.`;
+        } else if (!workspaceConfig.enableActions) {
+          systemPrompt += `
+
+NOTE: Workspace actions are disabled. You can read files and explore the workspace, but cannot modify files or execute commands.`;
+        }
       } else {
-        systemPrompt = `You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.`;
+        systemPrompt = `You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.
+
+NOTE: You have no workspace tools available. You can only provide suggestions and code examples.`;
       }
 
       const response = await fetch(apiUrl, {
