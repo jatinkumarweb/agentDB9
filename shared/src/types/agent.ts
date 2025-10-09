@@ -25,6 +25,21 @@ export interface AgentConfiguration {
   autoFormat: boolean;
   autoTest: boolean;
   knowledgeBase?: KnowledgeBaseConfiguration;
+  memory?: MemoryConfiguration;
+}
+
+export interface MemoryConfiguration {
+  enabled: boolean;
+  shortTerm: {
+    enabled: boolean;
+    maxMessages: number;
+    retentionHours: number;
+  };
+  longTerm: {
+    enabled: boolean;
+    consolidationThreshold: number;
+    importanceThreshold: number;
+  };
 }
 
 export interface KnowledgeBaseConfiguration {

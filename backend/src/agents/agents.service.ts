@@ -47,8 +47,85 @@ export class AgentsService {
       { type: 'documentation' as const, enabled: true, confidence: 0.7 },
     ];
 
+    // Default configuration values
+    const defaultConfiguration = {
+      llmProvider: 'ollama' as const,
+      model: '',
+      temperature: 0.7,
+      maxTokens: 2048,
+      systemPrompt: 'You are a helpful coding assistant. You provide clear, concise, and accurate code solutions.',
+      codeStyle: {
+        indentSize: 2,
+        indentType: 'spaces' as const,
+        lineLength: 100,
+        semicolons: true,
+        quotes: 'single' as const,
+        trailingCommas: true,
+        bracketSpacing: true,
+        arrowParens: 'always' as const,
+      },
+      autoSave: true,
+      autoFormat: true,
+      autoTest: false,
+      knowledgeBase: {
+        enabled: false,
+        embeddingProvider: 'ollama' as const,
+        embeddingModel: 'nomic-embed-text',
+        vectorStore: 'chroma' as const,
+        chunkSize: 1000,
+        chunkOverlap: 200,
+        retrievalTopK: 5,
+        sources: [],
+        autoUpdate: false,
+      },
+      memory: {
+        enabled: true,
+        shortTerm: {
+          enabled: true,
+          maxMessages: 50,
+          retentionHours: 24,
+        },
+        longTerm: {
+          enabled: true,
+          consolidationThreshold: 10,
+          importanceThreshold: 0.7,
+        },
+      },
+    };
+
+    // Merge user configuration with defaults
+    const mergedConfiguration = {
+      ...defaultConfiguration,
+      ...createAgentDto.configuration,
+      codeStyle: {
+        ...defaultConfiguration.codeStyle,
+        ...(createAgentDto.configuration?.codeStyle || {}),
+      },
+      knowledgeBase: createAgentDto.configuration?.knowledgeBase 
+        ? {
+            ...defaultConfiguration.knowledgeBase,
+            ...createAgentDto.configuration.knowledgeBase,
+          }
+        : defaultConfiguration.knowledgeBase,
+      memory: createAgentDto.configuration?.memory
+        ? {
+            ...defaultConfiguration.memory,
+            ...createAgentDto.configuration.memory,
+            shortTerm: {
+              ...defaultConfiguration.memory.shortTerm,
+              ...(createAgentDto.configuration.memory.shortTerm || {}),
+            },
+            longTerm: {
+              ...defaultConfiguration.memory.longTerm,
+              ...(createAgentDto.configuration.memory.longTerm || {}),
+            },
+          }
+        : defaultConfiguration.memory,
+    };
+
     const agent = this.agentsRepository.create({
       ...createAgentDto,
+      configuration: mergedConfiguration,
       userId: userId,
       status: 'idle',
       capabilities: defaultCapabilities,
@@ -58,9 +135,9 @@ export class AgentsService {
     const finalAgent = Array.isArray(savedAgent) ? savedAgent[0] : savedAgent;
 
     // Process knowledge base configuration if enabled
-    if (createAgentDto.configuration?.knowledgeBase?.enabled) {
+    if (mergedConfiguration.knowledgeBase?.enabled) {
       this.logger.log(`Processing knowledge base for agent ${finalAgent.id}`);
-      await this.processKnowledgeBaseSetup(finalAgent.id, createAgentDto.configuration.knowledgeBase);
+      await this.processKnowledgeBaseSetup(finalAgent.id, mergedConfiguration.knowledgeBase);
     }
 
     return finalAgent;

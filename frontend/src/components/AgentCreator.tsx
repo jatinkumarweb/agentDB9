@@ -2,7 +2,7 @@
 import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
 import { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { CreateAgentRequest } from '@agentdb9/shared';
 import ModelSelector from './ModelSelector';
 
@@ -14,6 +14,7 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [formData, setFormData] = useState<CreateAgentRequest>({
     name: '',
     description: '',
@@ -22,6 +23,10 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
       model: '',
       temperature: 0.7,
       maxTokens: 2048,
+      systemPrompt: '',
+      autoSave: true,
+      autoFormat: true,
+      autoTest: false,
     },
   });
 
@@ -57,8 +62,13 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
             model: '',
             temperature: 0.7,
             maxTokens: 2048,
+            systemPrompt: '',
+            autoSave: true,
+            autoFormat: true,
+            autoTest: false,
           },
         });
+        setShowAdvanced(false);
         onAgentCreated();
       } else {
         setError(data.error || 'Failed to create agent');
@@ -103,7 +113,7 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Create New Agent</h2>
           <button
@@ -185,6 +195,83 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
               max="8192"
               required
             />
+          </div>
+
+          {/* Advanced Settings Section */}
+          <div className="border-t border-gray-200 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center justify-between w-full text-left text-sm font-medium text-gray-700 hover:text-gray-900"
+            >
+              <span>Advanced Settings (Optional)</span>
+              {showAdvanced ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    System Prompt
+                  </label>
+                  <textarea
+                    value={formData.configuration.systemPrompt || ''}
+                    onChange={(e) => handleInputChange('configuration.systemPrompt', e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Define the agent's role and behavior (optional - defaults will be used if empty)"
+                    rows={3}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Leave empty to use default: "You are a helpful coding assistant..."
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Automation Settings
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={formData.configuration.autoSave ?? true}
+                        onChange={(e) => handleInputChange('configuration.autoSave', e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">Auto-save files after modifications</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={formData.configuration.autoFormat ?? true}
+                        onChange={(e) => handleInputChange('configuration.autoFormat', e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">Auto-format code</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={formData.configuration.autoTest ?? false}
+                        onChange={(e) => handleInputChange('configuration.autoTest', e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">Auto-run tests</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                  <p className="text-xs text-blue-800">
+                    💡 <strong>Tip:</strong> You can configure code style, knowledge base, and memory settings after creating the agent in the Settings page.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {error && (
