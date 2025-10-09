@@ -22,7 +22,7 @@ export class MCPService {
   private readonly mcpServerUrl = process.env.MCP_SERVER_URL || 'http://mcp-server:9001';
   private readonly workspaceRoot = process.env.VSCODE_WORKSPACE || '/workspace';
   private readonly execAsync = promisify(exec);
-  private readonly COMMAND_LOG = '/home/coder/workspace/.agent-commands.log';
+  private readonly COMMAND_LOG = '/workspace/.agent-commands.log';
   private readonly TERMINAL_LOG = '/workspace/.agent-terminal.log';
 
   constructor() {}
