@@ -119,10 +119,12 @@ export class ConversationsService {
     });
   }
 
-  async findOne(id: string): Promise<Conversation> {
+  async findOne(id: string, includeMessages: boolean = true): Promise<Conversation> {
+    const relations = includeMessages ? ['messages', 'agent'] : ['agent'];
+    
     const conversation = await this.conversationsRepository.findOne({
       where: { id },
-      relations: ['messages', 'agent'],
+      relations,
     });
     
     if (!conversation) {
@@ -151,8 +153,8 @@ export class ConversationsService {
   }
 
   async addMessage(messageData: { conversationId: string; role: string; content: string; metadata?: Record<string, any> }): Promise<Message> {
-    // Verify conversation exists
-    const conversation = await this.findOne(messageData.conversationId);
+    // Verify conversation exists and load agent (but not all messages for performance)
+    const conversation = await this.findOne(messageData.conversationId, false);
     
     const message = this.messagesRepository.create(messageData);
     const savedMessage = await this.messagesRepository.save(message);
@@ -684,11 +686,15 @@ CONTEXT TOOLS (Read-only, safe to use anytime):
 - read_file: Read file contents. Args: {"path": "file.js"}
   * Use when user asks to see/read/view a file
   * Use to understand code before making changes
+  * WAIT for results before responding
 - list_files: List directory contents. Args: {"path": "."}
   * ALWAYS use when user asks about workspace/files/structure
   * Use to explore project before answering questions
+  * ONLY respond after seeing the actual file list
+  * DO NOT make up or guess file names
 - git_status: Check git status. Args: {}
-  * Use when user asks about git/changes/commits`;
+  * Use when user asks about git/changes/commits
+  * WAIT for actual status before responding`;
         }
 
         systemPrompt += `
@@ -697,9 +703,11 @@ CONTEXT TOOLS (Read-only, safe to use anytime):
 IMPORTANT:
 - Use <tool_name> tag (not the tool name as tag)
 - Provide valid JSON in <arguments>
-- Tool calls will be executed automatically
-- You'll see results, then provide your response to the user
-- Don't explain the tool call to the user, just use it`;
+- ONLY output the tool call, nothing else
+- DO NOT provide an answer before using the tool
+- DO NOT make up or hallucinate information
+- Wait for tool results before responding
+- After seeing tool results, provide your answer based on the actual data`;
 
         // Add note about disabled permissions
         if (!workspaceConfig.enableContext && !workspaceConfig.enableActions) {
