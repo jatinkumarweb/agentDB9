@@ -43,8 +43,13 @@ SET configuration = '{
 }'::jsonb
 WHERE configuration IS NULL;
 
+-- Fix null capabilities
+UPDATE agents 
+SET capabilities = '[]'::jsonb
+WHERE capabilities IS NULL;
+
 -- Show how many were updated
-SELECT COUNT(*) as updated_agents FROM agents WHERE configuration IS NOT NULL;
+SELECT COUNT(*) as updated_agents FROM agents WHERE configuration IS NOT NULL AND capabilities IS NOT NULL;
 EOF
 
 echo ""

@@ -44,20 +44,28 @@ async function fixAgentConfigs() {
       }
     };
     
-    const result = await dataSource.query(
+    const configResult = await dataSource.query(
       `UPDATE agents 
        SET configuration = $1::jsonb
        WHERE configuration IS NULL`,
       [JSON.stringify(defaultConfig)]
     );
     
-    console.log(`✅ Updated ${result[1]} agents with default configuration`);
+    console.log(`✅ Updated ${configResult[1]} agents with default configuration`);
     
-    const count = await dataSource.query(
-      `SELECT COUNT(*) as total FROM agents WHERE configuration IS NOT NULL`
+    const capabilitiesResult = await dataSource.query(
+      `UPDATE agents 
+       SET capabilities = '[]'::jsonb
+       WHERE capabilities IS NULL`
     );
     
-    console.log(`Total agents with configuration: ${count[0].total}`);
+    console.log(`✅ Updated ${capabilitiesResult[1]} agents with default capabilities`);
+    
+    const count = await dataSource.query(
+      `SELECT COUNT(*) as total FROM agents WHERE configuration IS NOT NULL AND capabilities IS NOT NULL`
+    );
+    
+    console.log(`Total agents with valid data: ${count[0].total}`);
     
     await dataSource.destroy();
     console.log('Done!');

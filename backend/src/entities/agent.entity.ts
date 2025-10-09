@@ -44,15 +44,19 @@ export class Agent implements CodingAgent {
   })
   status: AgentStatus;
 
-  @Column('text', { transformer: {
-    to: (value: AgentCapability[]) => JSON.stringify(value),
-    from: (value: any) => {
-      if (typeof value === 'string') {
-        return parseJSON(value) || [];
+  @Column('text', { 
+    nullable: true,
+    default: null,
+    transformer: {
+      to: (value: AgentCapability[]) => JSON.stringify(value),
+      from: (value: any) => {
+        if (typeof value === 'string') {
+          return parseJSON(value) || [];
+        }
+        return value;
       }
-      return value;
     }
-  }})
+  })
   capabilities: AgentCapability[];
 
   @CreateDateColumn()

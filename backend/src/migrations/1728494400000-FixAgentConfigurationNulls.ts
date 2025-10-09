@@ -30,6 +30,13 @@ export class FixAgentConfigurationNulls1728494400000 implements MigrationInterfa
             }'::jsonb
             WHERE configuration IS NULL
         `);
+        
+        // Set default capabilities for any agents with null capabilities
+        await queryRunner.query(`
+            UPDATE agents 
+            SET capabilities = '[]'::jsonb
+            WHERE capabilities IS NULL
+        `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {

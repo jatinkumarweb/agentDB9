@@ -1,10 +1,11 @@
 # Database Management Scripts
 
-## Quick Fix for Configuration Migration Issue
+## Quick Fix for Migration Issues
 
-If you're getting the error:
+If you're getting errors like:
 ```
 column "configuration" of relation "agents" contains null values
+column "capabilities" of relation "agents" contains null values
 ```
 
 ### Option 1: Fix Existing Data (Recommended)
@@ -77,6 +78,11 @@ SET configuration = '{
     }
 }'::jsonb
 WHERE configuration IS NULL;
+
+-- Fix null capabilities
+UPDATE agents 
+SET capabilities = '[]'::jsonb
+WHERE capabilities IS NULL;
 ```
 
 ## Starting the Database
