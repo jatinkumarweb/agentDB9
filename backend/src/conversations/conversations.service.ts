@@ -3,9 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Conversation } from '../entities/conversation.entity';
 import { Message } from '../entities/message.entity';
+import { Agent } from '../entities/agent.entity';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
 import { WebSocketGateway } from '../websocket/websocket.gateway';
 import { MCPService } from '../mcp/mcp.service';
+import { ReActAgentService } from './react-agent.service';
 import { parseJSON } from '../common/utils/json-parser.util';
 // CreateMessageDto import removed - using plain object type instead
 
@@ -41,6 +43,7 @@ export class ConversationsService {
     @Inject(forwardRef(() => WebSocketGateway))
     private websocketGateway: WebSocketGateway,
     private mcpService: MCPService,
+    private reactAgentService: ReActAgentService,
   ) {
     // Initialize batch update timer
     this.startBatchUpdateTimer();
@@ -272,9 +275,16 @@ export class ConversationsService {
         
         if (isOllamaHealthy && availableModels.length > 0) {
           try {
-            // Use streaming API which handles message creation internally
-            await this.callOllamaAPIStreaming(userMessage, actualModel, conversation);
-            return; // Exit early since streaming handles message creation
+            // Use ReAct for tool-based queries, streaming for simple queries
+            if (this.shouldUseReAct(userMessage)) {
+              console.log('🔄 Using ReAct pattern for tool-based query');
+              await this.callOllamaAPIWithReAct(userMessage, actualModel, conversation);
+              return;
+            } else {
+              // Use streaming API which handles message creation internally
+              await this.callOllamaAPIStreaming(userMessage, actualModel, conversation);
+              return; // Exit early since streaming handles message creation
+            }
           } catch (error) {
             console.log('Ollama streaming API call failed despite health check passing, using fallback');
             agentResponse = this.getOllamaUnavailableMessage(userMessage);
@@ -459,6 +469,94 @@ This agent is configured to use "${model}" which requires external API access.
       this.ollamaAvailable = false;
       this.lastOllamaCheck = now;
       return false;
+    }
+  }
+
+  private buildSystemPrompt(agent: Agent): string {
+    let systemPrompt = agent.configuration?.systemPrompt || 'You are a helpful AI assistant.';
+    
+    // Add ReAct pattern instructions for tool usage
+    systemPrompt += '\n\n## ReAct Pattern Instructions\n';
+    systemPrompt += 'You have access to workspace tools. Use the ReAct (Reasoning + Acting) pattern:\n';
+    systemPrompt += '1. **Think**: Reason about what information you need\n';
+    systemPrompt += '2. **Act**: Use a tool to gather that information\n';
+    systemPrompt += '3. **Observe**: Analyze the tool result\n';
+    systemPrompt += '4. **Repeat**: Continue until you have enough information to answer\n\n';
+    
+    systemPrompt += '**Available Tools**: read_file, list_directory, execute_command, write_file\n';
+    
+    systemPrompt += '\n**Tool Usage Format**:\n';
+    systemPrompt += '```json\n{\n  "thought": "I need to check what files exist in the project",\n  "action": "list_directory",\n  "action_input": "."\n}\n```\n';
+    systemPrompt += '\n**Final Answer Format**:\n';
+    systemPrompt += 'When you have enough information, provide your answer directly without JSON formatting.\n';
+    systemPrompt += '\n**Important**: Always explain your reasoning in the "thought" field. Use tools iteratively to build understanding.';
+    
+    return systemPrompt;
+  }
+
+  private shouldUseReAct(userMessage: string): boolean {
+    // Detect queries that likely need tool usage
+    const toolKeywords = [
+      'workspace', 'file', 'directory', 'folder', 'code', 'project',
+      'read', 'write', 'create', 'delete', 'list', 'show me',
+      'what files', 'what is in', 'tell me about', 'analyze',
+      'git', 'commit', 'branch', 'status'
+    ];
+    
+    const lowerMessage = userMessage.toLowerCase();
+    return toolKeywords.some(keyword => lowerMessage.includes(keyword));
+  }
+
+  private async callOllamaAPIWithReAct(
+    userMessage: string,
+    model: string,
+    conversation: Conversation,
+  ): Promise<void> {
+    const isVerbose = process.env.VERBOSE_LOGGING === 'true';
+    
+    try {
+      // Get system prompt
+      const systemPrompt = this.buildSystemPrompt(conversation.agent);
+      
+      // Get conversation history
+      const messages = await this.messagesRepository.find({
+        where: { conversationId: conversation.id },
+        order: { id: 'ASC' },
+        take: 20,
+      });
+      
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+      
+      // Get Ollama URL
+      const ollamaUrl = process.env.OLLAMA_API_URL || 'http://localhost:11434';
+      
+      // Execute ReAct loop
+      const result = await this.reactAgentService.executeReActLoop(
+        userMessage,
+        systemPrompt,
+        model,
+        ollamaUrl,
+        conversationHistory,
+      );
+      
+      // Create assistant message with final response
+      const assistantMessage = this.messagesRepository.create({
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: result.finalAnswer,
+        metadata: { model, toolsUsed: result.toolsUsed, steps: result.steps },
+      });
+      await this.messagesRepository.save(assistantMessage);
+      
+      if (isVerbose) {
+        console.log(`✅ ReAct completed with ${result.toolsUsed.length} tools used`);
+      }
+    } catch (error) {
+      console.error('❌ ReAct execution failed:', error);
+      throw error;
     }
   }
 
