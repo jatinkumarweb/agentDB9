@@ -482,6 +482,11 @@ Would you like help setting up external API access?`;
   }
 
   private async callOllamaAPIStreaming(userMessage: string, model: string, conversation: any): Promise<string> {
+    // Get workspace configuration from agent
+    const workspaceConfig = conversation.agent?.configuration?.workspace || {
+      enableActions: true,
+      enableContext: true
+    };
     try {
       const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
       const apiUrl = `${ollamaUrl}/api/chat`;
@@ -516,7 +521,23 @@ Would you like help setting up external API access?`;
       // Get available MCP tools for tool calling
       // Only enable tools for models that support function calling
       const modelSupportsTools = this.modelSupportsToolCalling(model);
-      const availableTools = modelSupportsTools ? await this.mcpService.getAvailableTools() : [];
+      let availableTools = modelSupportsTools ? await this.mcpService.getAvailableTools() : [];
+      
+      // Filter tools based on workspace configuration
+      if (availableTools.length > 0) {
+        const actionTools = ['execute_command', 'write_file', 'create_directory', 'git_commit', 'delete_file'];
+        const contextTools = ['read_file', 'list_files', 'git_status'];
+        
+        availableTools = availableTools.filter(tool => {
+          if (actionTools.includes(tool)) {
+            return workspaceConfig.enableActions;
+          }
+          if (contextTools.includes(tool)) {
+            return workspaceConfig.enableContext;
+          }
+          return true; // Allow other tools
+        });
+      }
       const toolsForOllama = availableTools.map(toolName => ({
         type: 'function',
         function: {
@@ -528,19 +549,13 @@ Would you like help setting up external API access?`;
 
       // Log tool configuration for debugging
       console.log(`Model: ${model}, Supports tools: ${modelSupportsTools} (using prompt-based tool calling)`);
+      console.log(`Workspace config - Actions: ${workspaceConfig.enableActions}, Context: ${workspaceConfig.enableContext}`);
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            {
-              role: 'system',
-              content: modelSupportsTools 
-                ? `You are a coding assistant with workspace tools. When you need to perform actions, use tool calls.
+      // Build system prompt based on workspace configuration
+      let systemPrompt = '';
+      
+      if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
+        systemPrompt = `You are a coding assistant${workspaceConfig.enableActions || workspaceConfig.enableContext ? ' with workspace tools' : ''}. When you need to perform actions, use tool calls.
 
 TOOL CALL FORMAT (use this exact XML structure):
 <tool_call>
@@ -548,7 +563,11 @@ TOOL CALL FORMAT (use this exact XML structure):
 <arguments>{"command": "mkdir demo && cd demo && npm init -y"}</arguments>
 </tool_call>
 
-AVAILABLE TOOLS:
+AVAILABLE TOOLS:`;
+
+        // Add action tools if enabled
+        if (workspaceConfig.enableActions) {
+          systemPrompt += `
 - execute_command: Run shell commands in the VSCode workspace. Args: {"command": "your command here"}
   * ALL commands execute in the VSCode container where the user works
   * For npm projects: Use "mkdir project-name && cd project-name && npm init -y"
@@ -611,20 +630,43 @@ EOF"
   * Dev servers (npm run dev, npm start) run in the background
   * User can access dev servers at the specified ports
 - write_file: Write complete file content. Args: {"path": "file.js", "content": "full content"}
-- read_file: Read file contents. Args: {"path": "file.js"}
 - create_directory: Create directory. Args: {"path": "dirname"}
-- list_files: List directory contents. Args: {"path": "."}
-- git_status: Check git status. Args: {}
 - git_commit: Commit changes. Args: {"message": "msg", "files": ["file1"]}
-- delete_file: Delete file. Args: {"path": "file.js"}
+- delete_file: Delete file. Args: {"path": "file.js"}`;
+        }
+
+        // Add context tools if enabled
+        if (workspaceConfig.enableContext) {
+          systemPrompt += `
+- read_file: Read file contents. Args: {"path": "file.js"}
+- list_files: List directory contents. Args: {"path": "."}
+- git_status: Check git status. Args: {}`;
+        }
+
+        systemPrompt += `
+
 
 IMPORTANT:
 - Use <tool_name> tag (not the tool name as tag)
 - Provide valid JSON in <arguments>
 - Tool calls will be executed automatically
 - You'll see results, then provide your response to the user
-- Don't explain the tool call to the user, just use it`
-                : `You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.`
+- Don't explain the tool call to the user, just use it`;
+      } else {
+        systemPrompt = `You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.`;
+      }
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
             },
             {
               role: 'user',

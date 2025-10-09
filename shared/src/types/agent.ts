@@ -26,6 +26,12 @@ export interface AgentConfiguration {
   autoTest: boolean;
   knowledgeBase?: KnowledgeBaseConfiguration;
   memory?: MemoryConfiguration;
+  workspace?: WorkspaceConfiguration;
+}
+
+export interface WorkspaceConfiguration {
+  enableActions: boolean;
+  enableContext: boolean;
 }
 
 export interface MemoryConfiguration {

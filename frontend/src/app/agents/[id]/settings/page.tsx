@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Settings, Brain, Database, Code, Zap, ArrowLeft, Save } from 'lucide-react';
+import { Settings, Brain, Database, Code, Zap, ArrowLeft, Save, FolderOpen } from 'lucide-react';
 import { fetchWithAuth } from '@/utils/fetch-with-auth';
 import toast from 'react-hot-toast';
 import ProtectedRoute, { protectionLevels } from '@/components/ProtectedRoute';
@@ -14,8 +14,9 @@ import CodeStyleTab from '@/components/agent-settings/CodeStyleTab';
 import AutomationTab from '@/components/agent-settings/AutomationTab';
 import KnowledgeBaseTab from '@/components/agent-settings/KnowledgeBaseTab';
 import MemorySettingsTab from '@/components/agent-settings/MemorySettingsTab';
+import WorkspaceSettingsTab from '@/components/agent-settings/WorkspaceSettingsTab';
 
-type TabType = 'basic' | 'advanced' | 'codeStyle' | 'automation' | 'knowledge' | 'memory';
+type TabType = 'basic' | 'advanced' | 'codeStyle' | 'automation' | 'workspace' | 'knowledge' | 'memory';
 
 interface Agent {
   id: string;
@@ -123,6 +124,7 @@ function AgentSettingsContent() {
     { id: 'advanced' as TabType, label: 'Advanced', icon: Zap },
     { id: 'codeStyle' as TabType, label: 'Code Style', icon: Code },
     { id: 'automation' as TabType, label: 'Automation', icon: Zap },
+    { id: 'workspace' as TabType, label: 'Workspace', icon: FolderOpen },
     { id: 'knowledge' as TabType, label: 'Knowledge Base', icon: Database },
     { id: 'memory' as TabType, label: 'Memory', icon: Brain },
   ];
@@ -224,6 +226,12 @@ function AgentSettingsContent() {
           )}
           {activeTab === 'automation' && (
             <AutomationTab
+              configuration={agent.configuration}
+              onChange={handleConfigChange}
+            />
+          )}
+          {activeTab === 'workspace' && (
+            <WorkspaceSettingsTab
               configuration={agent.configuration}
               onChange={handleConfigChange}
             />

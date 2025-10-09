@@ -27,6 +27,10 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
       autoSave: true,
       autoFormat: true,
       autoTest: false,
+      workspace: {
+        enableActions: true,
+        enableContext: true,
+      },
     },
   });
 
@@ -66,6 +70,10 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
             autoSave: true,
             autoFormat: true,
             autoTest: false,
+            workspace: {
+              enableActions: true,
+              enableContext: true,
+            },
           },
         });
         setShowAdvanced(false);
@@ -82,7 +90,20 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
   };
 
   const handleInputChange = (field: string, value: any) => {
-    if (field.startsWith('configuration.')) {
+    if (field.startsWith('configuration.workspace.')) {
+      const workspaceField = field.replace('configuration.workspace.', '');
+      setFormData(prev => ({
+        ...prev,
+        configuration: {
+          ...prev.configuration,
+          workspace: {
+            enableActions: prev.configuration.workspace?.enableActions ?? true,
+            enableContext: prev.configuration.workspace?.enableContext ?? true,
+            [workspaceField]: value,
+          },
+        },
+      }));
+    } else if (field.startsWith('configuration.')) {
       const configField = field.replace('configuration.', '');
       setFormData(prev => ({
         ...prev,
@@ -263,6 +284,35 @@ export default function AgentCreator({ onAgentCreated }: AgentCreatorProps) {
                       <span className="ml-2 text-sm text-gray-700">Auto-run tests</span>
                     </label>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Workspace Permissions
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={formData.configuration.workspace?.enableActions ?? true}
+                        onChange={(e) => handleInputChange('configuration.workspace.enableActions', e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">Enable workspace actions (file operations, commands, git)</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={formData.configuration.workspace?.enableContext ?? true}
+                        onChange={(e) => handleInputChange('configuration.workspace.enableContext', e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">Enable workspace context (read project structure, files)</span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Control what the agent can access and modify in your workspace
+                  </p>
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
