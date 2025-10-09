@@ -25,7 +25,7 @@ export class ProjectContextEntity {
   @Column({ type: 'text' })
   data: string; // JSON stringified ProjectContext
 
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'datetime' })
   scannedAt: Date;
 
   @CreateDateColumn()
