@@ -11,6 +11,10 @@ const nextConfig = {
   },
   // Disable SWC minifier if it causes issues
   swcMinify: true,
+  // Treat ESLint warnings as warnings, not errors during build
+  eslint: {
+    ignoreDuringBuilds: false,
+  },
   // Removed rewrites to use proper API routes instead
 }
 

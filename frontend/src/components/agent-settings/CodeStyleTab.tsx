@@ -101,8 +101,8 @@ export default function CodeStyleTab({ codeStyle = {}, onChange }: CodeStyleTabP
             onChange={(e) => handleChange('quotes', e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            <option value="single">Single Quotes (')</option>
-            <option value="double">Double Quotes (")</option>
+            <option value="single">Single Quotes (&apos;)</option>
+            <option value="double">Double Quotes (&quot;)</option>
           </select>
         </div>
 

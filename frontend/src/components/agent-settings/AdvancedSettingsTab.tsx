@@ -17,7 +17,7 @@ export default function AdvancedSettingsTab({ configuration, onChange }: Advance
       <div>
         <h3 className="text-lg font-medium text-gray-900 mb-4">Advanced Settings</h3>
         <p className="text-sm text-gray-500 mb-6">
-          Fine-tune the model's behavior and response characteristics.
+          Fine-tune the model&apos;s behavior and response characteristics.
         </p>
       </div>
 
@@ -90,7 +90,7 @@ export default function AdvancedSettingsTab({ configuration, onChange }: Advance
             rows={8}
           />
           <p className="mt-1 text-xs text-gray-500">
-            Instructions that define the agent's behavior and personality. Leave empty to use the default prompt.
+            Instructions that define the agent&apos;s behavior and personality. Leave empty to use the default prompt.
           </p>
         </div>
       </div>

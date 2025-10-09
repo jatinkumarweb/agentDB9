@@ -259,7 +259,7 @@ function AgentSettingsContent() {
 
 export default function AgentSettingsPage() {
   return (
-    <ProtectedRoute level={protectionLevels.AUTHENTICATED}>
+    <ProtectedRoute requireAuth={true}>
       <AgentSettingsContent />
     </ProtectedRoute>
   );

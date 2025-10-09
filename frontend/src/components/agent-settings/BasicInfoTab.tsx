@@ -81,7 +81,7 @@ export default function BasicInfoTab({ agent, onChange }: BasicInfoTabProps) {
             className="w-full"
           />
           <p className="mt-1 text-xs text-gray-500">
-            The AI model that powers this agent's responses
+            The AI model that powers this agent&apos;s responses
           </p>
         </div>
       </div>
