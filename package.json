@@ -14,7 +14,7 @@
   "scripts": {
     "install:all": "npm install && npm run install:workspaces",
     "install:workspaces": "npm install --workspaces",
-    "postinstall": "npm run build --workspace=shared --if-present",
+    "postinstall": "npm run build --workspace=shared --if-present && ./scripts/link-shared.sh",
     "cleanup:symlinks": "rm -f backend/node_modules/jsonrepair || true",
     "build": "npm run build:shared && npm run build:services",
     "build:shared": "npm run build --workspace=shared",
