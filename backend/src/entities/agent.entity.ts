@@ -23,7 +23,8 @@ export class Agent implements CodingAgent {
   user: User;
 
   @Column('text', { 
-    nullable: false,
+    nullable: true,
+    default: null,
     transformer: {
       to: (value: AgentConfiguration) => JSON.stringify(value),
       from: (value: any) => {
