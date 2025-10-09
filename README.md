@@ -178,9 +178,32 @@ npm run clean:db
 npm run clean:db:deep
 ```
 
-### Database Cleanup
+### Database Management
 
-If you encounter database migration errors (e.g., "column contains null values"), use the database cleanup script:
+#### Database Reset (Schema Changes)
+
+When you add or modify database entities, use the database reset script:
+
+```bash
+# Reset database only (recommended)
+npm run db:reset
+
+# Full reset (database + Redis + Qdrant)
+npm run db:reset:full
+```
+
+This script safely:
+- Removes existing database
+- Temporarily enables schema synchronization
+- Creates all tables from entities
+- Seeds default data
+- Restores production-safe configuration
+
+See [Database Reset Guide](./docs/DATABASE_RESET.md) for detailed information.
+
+#### Database Cleanup (Migration Issues)
+
+If you encounter database migration errors (e.g., "column contains null values"):
 
 ```bash
 # Standard cleanup (recommended)

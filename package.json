@@ -40,6 +40,8 @@
     "clean": "npm run clean --workspaces && ./scripts/docker-setup.sh down -v",
     "clean:db": "./scripts/clean-db.sh",
     "clean:db:deep": "./scripts/clean-db.sh --deep",
+    "db:reset": "./scripts/db-reset.sh",
+    "db:reset:full": "./scripts/db-reset.sh --full",
     "clean:docker": "./scripts/docker-cleanup.sh",
     "clean:docker:deep": "./scripts/docker-deep-cleanup.sh",
     "monitor:storage": "./scripts/docker-storage-monitor.sh",
