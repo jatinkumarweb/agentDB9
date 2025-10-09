@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { KnowledgeSource as KnowledgeSourceType, LoadedDocument, DocumentSection, CodeBlock } from '@agentdb9/shared';
-import * as cheerio from 'cheerio';
+import { load } from 'cheerio';
 
 @Injectable()
 export class DocumentLoaderService {
@@ -64,7 +64,7 @@ export class DocumentLoaderService {
     }
 
     const html = await this.fetchContent(source.url);
-    const $ = cheerio.load(html);
+    const $ = load(html);
 
     // Remove script and style tags
     $('script, style, nav, footer, header').remove();

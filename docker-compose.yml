@@ -61,7 +61,7 @@ services:
       - DB_USERNAME=postgres
       - DB_PASSWORD=password
       - DB_NAME=coding_agent
-      - DB_SYNCHRONIZE=false
+      - DB_SYNCHRONIZE=true
       - LLM_SERVICE_URL=http://llm-service:9000
       - VECTOR_DB_URL=http://qdrant:6333
       - OLLAMA_HOST=http://ollama:11434
