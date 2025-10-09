@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Database, Plus, FileText, Globe, Github, Book, Trash2, RefreshCw, Upload, Link as LinkIcon } from 'lucide-react';
 import { fetchWithAuth } from '@/utils/fetch-with-auth';
 import toast from 'react-hot-toast';
+import { KnowledgeSource } from '@agentdb9/shared';
 import FileUploader from '../knowledge/FileUploader';
 import KnowledgeSourceCard from '../knowledge/KnowledgeSourceCard';
 import AddSourceModal from '../knowledge/AddSourceModal';
@@ -22,22 +23,6 @@ interface KnowledgeBaseTabProps {
     updateFrequency?: string;
   };
   onChange: (config: any) => void;
-}
-
-interface KnowledgeSource {
-  id: string;
-  type: string;
-  url?: string;
-  metadata: {
-    title: string;
-    description?: string;
-    tags: string[];
-    chunkCount?: number;
-    tokenCount?: number;
-  };
-  status: string;
-  lastIndexed?: string;
-  error?: string;
 }
 
 export default function KnowledgeBaseTab({ agentId, configuration = {}, onChange }: KnowledgeBaseTabProps) {

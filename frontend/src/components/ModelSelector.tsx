@@ -109,7 +109,10 @@ export default function ModelSelector({
     return `${statusIcon} ${model.name} (${model.provider})`;
   };
 
-  const getModelTooltip = (model: ModelOption) => {
+  const getModelTooltip = (model?: ModelOption) => {
+    if (!model) {
+      return 'Select a model';
+    }
     if (model.status === 'disabled' && model.requiresApiKey && !model.apiKeyConfigured) {
       return `API key required for ${model.provider}`;
     }
@@ -150,7 +153,9 @@ export default function ModelSelector({
     : models;
   
   // Get unique providers
-  const providers = [...new Set(models.map(m => m.provider))].sort();
+  const providers = models && models.length > 0 
+    ? [...new Set(models.map(m => m.provider))].sort() 
+    : [];
 
   const handleRefreshModels = async () => {
     try {
@@ -244,7 +249,7 @@ export default function ModelSelector({
         onChange={(e) => onModelChange(e.target.value)}
         disabled={disabled || availableModels.length === 0}
         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-        title={selectedModel ? getModelTooltip(models.find(m => m.id === selectedModel) || models[0]) : 'Select a model'}
+        title={selectedModel ? getModelTooltip(models.find(m => m.id === selectedModel)) : 'Select a model'}
       >
         {availableModels.length === 0 && (
           <option value="" disabled>No models available</option>

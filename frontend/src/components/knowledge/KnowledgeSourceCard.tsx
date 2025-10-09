@@ -1,22 +1,7 @@
 'use client';
 
 import { FileText, Globe, Github, Trash2, RefreshCw } from 'lucide-react';
-
-interface KnowledgeSource {
-  id: string;
-  type: 'pdf' | 'markdown' | 'website' | 'api' | 'github' | 'documentation';
-  url?: string;
-  content?: string;
-  metadata: {
-    title: string;
-    description?: string;
-    tags: string[];
-    chunkCount?: number;
-  };
-  status: 'pending' | 'processing' | 'indexed' | 'failed';
-  lastIndexed?: Date;
-  error?: string;
-}
+import { KnowledgeSource } from '@agentdb9/shared';
 
 interface KnowledgeSourceCardProps {
   source: KnowledgeSource;
