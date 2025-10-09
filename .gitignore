@@ -127,8 +127,6 @@ test-results.xml
 
 # Symlinks for hoisted packages (auto-created by postinstall)
 backend/node_modules/jsonrepair
-backend/node_modules/cheerio
-backend/node_modules/@types/cheerio
 .vscode-server/
 shared/tsconfig.tsbuildinfo
 !workspace/AGENT_TERMINAL_LOG.md
