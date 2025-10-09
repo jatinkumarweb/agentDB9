@@ -555,16 +555,23 @@ Would you like help setting up external API access?`;
       let systemPrompt = '';
       
       if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
-        systemPrompt = `You are a coding assistant with workspace tools. Use tools ONLY when explicitly needed to fulfill the user's request.
+        systemPrompt = `You are a coding assistant with workspace tools.
 
-IMPORTANT GUIDELINES:
-- If user asks to "describe" or "show" workspace, use list_files tool
-- If user asks to "read" or "view" a file, use read_file tool
-- If user asks to "create", "modify", or "delete" files, use appropriate tools
-- If user asks to "run" or "execute" commands, use execute_command tool
-- DO NOT execute commands unless explicitly requested
-- DO NOT create projects unless explicitly requested
-- Answer questions directly when tools are not needed
+CRITICAL RULES - FOLLOW EXACTLY:
+1. When user asks about workspace/files/directories → ALWAYS use list_files first
+2. When user asks to read/view a file → ALWAYS use read_file
+3. When user asks about git status → ALWAYS use git_status
+4. When user asks to create/modify files → use write_file (only if explicitly requested)
+5. When user asks to run commands → use execute_command (only if explicitly requested)
+6. NEVER execute commands or create files unless user explicitly asks
+
+EXAMPLES:
+User: "describe the workspace" → <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
+User: "what files are here" → <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
+User: "show me the code" → <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
+User: "read package.json" → <tool_call><tool_name>read_file</tool_name><arguments>{"path": "package.json"}</arguments></tool_call>
+User: "create a new file" → <tool_call><tool_name>write_file</tool_name><arguments>{"path": "file.js", "content": "..."}</arguments></tool_call>
+User: "run npm install" → <tool_call><tool_name>execute_command</tool_name><arguments>{"command": "npm install"}</arguments></tool_call>
 
 TOOL CALL FORMAT (use this exact XML structure):
 <tool_call>
@@ -647,9 +654,16 @@ EOF"
         // Add context tools if enabled
         if (workspaceConfig.enableContext) {
           systemPrompt += `
+
+CONTEXT TOOLS (Read-only, safe to use anytime):
 - read_file: Read file contents. Args: {"path": "file.js"}
+  * Use when user asks to see/read/view a file
+  * Use to understand code before making changes
 - list_files: List directory contents. Args: {"path": "."}
-- git_status: Check git status. Args: {}`;
+  * ALWAYS use when user asks about workspace/files/structure
+  * Use to explore project before answering questions
+- git_status: Check git status. Args: {}
+  * Use when user asks about git/changes/commits`;
         }
 
         systemPrompt += `
