@@ -300,7 +300,7 @@ export function extractFileReferences(content: string): string[] {
     references.push(match[1]);
   }
   
-  return [...new Set(references)]; // Remove duplicates
+  return Array.from(new Set(references)); // Remove duplicates
 }
 
 export function sanitizeMessageContent(content: string, maxLength: number = 100000): string {

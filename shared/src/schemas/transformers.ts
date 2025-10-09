@@ -171,7 +171,7 @@ export function deepMerge<T extends object>(target: T, ...sources: Partial<T>[])
       } else if (sourceValue instanceof Array) {
         (target as any)[key] = deepClone(sourceValue);
       } else if (sourceValue instanceof Object && targetValue instanceof Object) {
-        (target as any)[key] = deepMerge(targetValue, sourceValue as any);
+        (target as any)[key] = deepMerge(targetValue as object, sourceValue as object);
       } else {
         (target as any)[key] = sourceValue;
       }
