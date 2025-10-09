@@ -1,15 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Agent } from '../entities/agent.entity';
 import { CreateAgentDto } from '../dto/create-agent.dto';
 import { generateId } from '@agentdb9/shared';
+import { KnowledgeService } from '../knowledge/knowledge.service';
 
 @Injectable()
 export class AgentsService {
+  private readonly logger = new Logger(AgentsService.name);
+
   constructor(
     @InjectRepository(Agent)
     private agentsRepository: Repository<Agent>,
+    private knowledgeService: KnowledgeService,
   ) {}
 
   async findAll(userId?: string): Promise<Agent[]> {
@@ -47,14 +51,46 @@ export class AgentsService {
     });
 
     const savedAgent = await this.agentsRepository.save(agent);
-    return Array.isArray(savedAgent) ? savedAgent[0] : savedAgent;
+    const finalAgent = Array.isArray(savedAgent) ? savedAgent[0] : savedAgent;
+
+    // Process knowledge base configuration if enabled
+    if (createAgentDto.configuration?.knowledgeBase?.enabled) {
+      this.logger.log(`Processing knowledge base for agent ${finalAgent.id}`);
+      await this.processKnowledgeBaseSetup(finalAgent.id, createAgentDto.configuration.knowledgeBase);
+    }
+
+    return finalAgent;
   }
 
   async update(id: string, updateData: Partial<CreateAgentDto>): Promise<Agent> {
     const agent = await this.findOne(id);
+    const previousKnowledgeBase = agent.configuration?.knowledgeBase;
+    
     Object.assign(agent, updateData);
     const savedAgent = await this.agentsRepository.save(agent);
-    return Array.isArray(savedAgent) ? savedAgent[0] : savedAgent;
+    const finalAgent = Array.isArray(savedAgent) ? savedAgent[0] : savedAgent;
+
+    // Handle knowledge base configuration changes
+    const newKnowledgeBase = updateData.configuration?.knowledgeBase;
+    if (newKnowledgeBase) {
+      // If knowledge base was just enabled
+      if (newKnowledgeBase.enabled && !previousKnowledgeBase?.enabled) {
+        this.logger.log(`Enabling knowledge base for agent ${id}`);
+        await this.processKnowledgeBaseSetup(id, newKnowledgeBase);
+      }
+      // If knowledge base was disabled
+      else if (!newKnowledgeBase.enabled && previousKnowledgeBase?.enabled) {
+        this.logger.log(`Disabling knowledge base for agent ${id}`);
+        // Optionally clean up knowledge sources
+      }
+      // If knowledge base is enabled and sources changed
+      else if (newKnowledgeBase.enabled && previousKnowledgeBase?.enabled) {
+        this.logger.log(`Updating knowledge base for agent ${id}`);
+        await this.updateKnowledgeBaseSources(id, previousKnowledgeBase, newKnowledgeBase);
+      }
+    }
+
+    return finalAgent;
   }
 
   async remove(id: string): Promise<void> {
@@ -131,11 +167,30 @@ export class AgentsService {
       agent.status = 'thinking';
       await this.agentsRepository.save(agent);
 
+      // Retrieve relevant knowledge if knowledge base is enabled
+      let knowledgeContext: any = null;
+      if (agent.configuration?.knowledgeBase?.enabled) {
+        try {
+          const topK = agent.configuration.knowledgeBase.retrievalTopK || 5;
+          knowledgeContext = await this.knowledgeService.getAgentKnowledgeContext(
+            agentId,
+            message,
+            topK
+          );
+          if (knowledgeContext && knowledgeContext.chunks) {
+            this.logger.log(`Retrieved ${knowledgeContext.chunks.length} knowledge chunks for agent ${agentId}`);
+          }
+        } catch (error: any) {
+          this.logger.warn(`Failed to retrieve knowledge context: ${error.message}`);
+          // Continue without knowledge context
+        }
+      }
+
       // Analyze the message to determine if it requires code actions
       const actions = await this.analyzeMessage(message, context);
       
-      // Generate response using the specific agent's configuration
-      const response = await this.generateAgentResponse(agent, message, context, actions);
+      // Generate response using the specific agent's configuration and knowledge context
+      const response = await this.generateAgentResponse(agent, message, context, actions, knowledgeContext);
       
       // Update agent status to coding if actions are required
       if (actions.length > 0) {
@@ -159,7 +214,8 @@ export class AgentsService {
           id: agent.id,
           name: agent.name,
           description: agent.description
-        }
+        },
+        knowledgeUsed: knowledgeContext ? knowledgeContext.chunks.length : 0
       };
     } catch (error) {
       console.error('Error processing chat with agent:', error);
@@ -178,7 +234,8 @@ export class AgentsService {
         actions: [],
         timestamp: new Date(),
         context,
-        agent: null
+        agent: null,
+        knowledgeUsed: 0
       };
     }
   }
@@ -237,10 +294,10 @@ export class AgentsService {
     return `I'll help you with that! I'm going to: ${actionDescriptions}. Let me work on this in your VS Code workspace.`;
   }
 
-  private async generateAgentResponse(agent: Agent, message: string, context: any, actions: any[]): Promise<string> {
+  private async generateAgentResponse(agent: Agent, message: string, context: any, actions: any[], knowledgeContext?: any): Promise<string> {
     try {
       // Call LLM service for intelligent response generation
-      const llmResponse = await this.callLLMService(agent, message, context, actions);
+      const llmResponse = await this.callLLMService(agent, message, context, actions, knowledgeContext);
       return llmResponse;
     } catch (error) {
       console.error('Failed to get LLM response, falling back to simple response:', error);
@@ -255,12 +312,12 @@ export class AgentsService {
     }
   }
 
-  private async callLLMService(agent: Agent, message: string, context: any, actions: any[]): Promise<string> {
+  private async callLLMService(agent: Agent, message: string, context: any, actions: any[], knowledgeContext?: any): Promise<string> {
     try {
       const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://llm-service:9000';
       
       // Prepare the prompt for the LLM
-      const systemPrompt = this.buildSystemPrompt(agent, actions);
+      const systemPrompt = this.buildSystemPrompt(agent, actions, knowledgeContext);
       const userPrompt = this.buildUserPrompt(message, context);
       
       const response = await fetch(`${llmServiceUrl}/api/chat`, {
@@ -293,19 +350,26 @@ export class AgentsService {
     }
   }
 
-  private buildSystemPrompt(agent: Agent, actions: any[]): string {
+  private buildSystemPrompt(agent: Agent, actions: any[], knowledgeContext?: any): string {
     const actionsText = actions.length > 0 
       ? `\n\nPlanned Actions: ${actions.map(a => `${a.type} - ${a.description}`).join(', ')}`
       : '';
+
+    let knowledgeText = '';
+    if (knowledgeContext && knowledgeContext.chunks.length > 0) {
+      knowledgeText = `\n\nRelevant Knowledge Base Context:\n${knowledgeContext.chunks.map((chunk: any, idx: number) => 
+        `[${idx + 1}] ${chunk.metadata.title || 'Document'} (relevance: ${(chunk.similarity * 100).toFixed(1)}%)\n${chunk.content.substring(0, 300)}...`
+      ).join('\n\n')}`;
+    }
 
     return `You are ${agent.name}, an AI coding assistant. ${agent.description || 'You help developers with coding tasks.'}
 
 Your capabilities include:
 ${agent.capabilities?.map(cap => `- ${cap.type}: ${cap.enabled ? 'enabled' : 'disabled'}`).join('\n') || '- General coding assistance'}
 
-You work in a VS Code environment and can execute development tasks through MCP tools.${actionsText}
+You work in a VS Code environment and can execute development tasks through MCP tools.${actionsText}${knowledgeText}
 
-Respond in a helpful, professional manner. Be specific about what you'll do and how you'll help. Keep responses concise but informative.`;
+Respond in a helpful, professional manner. Be specific about what you'll do and how you'll help. Keep responses concise but informative.${knowledgeContext ? ' Use the knowledge base context provided above to give more accurate and informed responses.' : ''}`;
   }
 
   private buildUserPrompt(message: string, context: any): string {
@@ -383,5 +447,117 @@ Respond in a helpful, professional manner. Be specific about what you'll do and 
     
     const lowerModel = model.toLowerCase();
     return ollamaPatterns.some(pattern => lowerModel.includes(pattern));
+  }
+
+  /**
+   * Process knowledge base setup for a new agent
+   */
+  private async processKnowledgeBaseSetup(agentId: string, knowledgeBaseConfig: any): Promise<void> {
+    try {
+      // Add all initial knowledge sources
+      if (knowledgeBaseConfig.sources && knowledgeBaseConfig.sources.length > 0) {
+        this.logger.log(`Adding ${knowledgeBaseConfig.sources.length} knowledge sources for agent ${agentId}`);
+        
+        for (const source of knowledgeBaseConfig.sources) {
+          try {
+            await this.knowledgeService.addSource(agentId, source);
+            
+            // Trigger ingestion for each source
+            await this.knowledgeService.ingestSource({
+              agentId,
+              source,
+              options: {
+                chunkSize: knowledgeBaseConfig.chunkSize,
+                chunkOverlap: knowledgeBaseConfig.chunkOverlap,
+                extractMetadata: true,
+                generateEmbeddings: true,
+              },
+            });
+            
+            this.logger.log(`Successfully ingested source: ${source.type} - ${source.url || 'inline content'}`);
+          } catch (error) {
+            this.logger.error(`Failed to ingest source ${source.url}: ${error.message}`);
+            // Continue with other sources even if one fails
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to setup knowledge base for agent ${agentId}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Update knowledge base sources when agent configuration changes
+   */
+  private async updateKnowledgeBaseSources(
+    agentId: string,
+    previousConfig: any,
+    newConfig: any
+  ): Promise<void> {
+    try {
+      const previousSources = previousConfig.sources || [];
+      const newSources = newConfig.sources || [];
+
+      // Find sources to add (in new but not in previous)
+      const sourcesToAdd = newSources.filter((newSource: any) =>
+        !previousSources.some((prevSource: any) => 
+          prevSource.url === newSource.url && prevSource.type === newSource.type
+        )
+      );
+
+      // Find sources to remove (in previous but not in new)
+      const sourcesToRemove = previousSources.filter((prevSource: any) =>
+        !newSources.some((newSource: any) => 
+          newSource.url === prevSource.url && newSource.type === prevSource.type
+        )
+      );
+
+      // Add new sources
+      for (const source of sourcesToAdd) {
+        try {
+          await this.knowledgeService.addSource(agentId, source);
+          await this.knowledgeService.ingestSource({
+            agentId,
+            source,
+            options: {
+              chunkSize: newConfig.chunkSize,
+              chunkOverlap: newConfig.chunkOverlap,
+              extractMetadata: true,
+              generateEmbeddings: true,
+            },
+          });
+          this.logger.log(`Added new source: ${source.type} - ${source.url || 'inline content'}`);
+        } catch (error) {
+          this.logger.error(`Failed to add source ${source.url}: ${error.message}`);
+        }
+      }
+
+      // Remove old sources
+      for (const source of sourcesToRemove) {
+        try {
+          if (source.id) {
+            await this.knowledgeService.deleteSource(source.id);
+            this.logger.log(`Removed source: ${source.type} - ${source.url || 'inline content'}`);
+          }
+        } catch (error) {
+          this.logger.error(`Failed to remove source ${source.url}: ${error.message}`);
+        }
+      }
+
+      // Check if embedding configuration changed - if so, reindex all sources
+      if (
+        previousConfig.embeddingProvider !== newConfig.embeddingProvider ||
+        previousConfig.embeddingModel !== newConfig.embeddingModel ||
+        previousConfig.chunkSize !== newConfig.chunkSize ||
+        previousConfig.chunkOverlap !== newConfig.chunkOverlap
+      ) {
+        this.logger.log(`Embedding configuration changed, reindexing all sources for agent ${agentId}`);
+        await this.knowledgeService.reindexAgent(agentId);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to update knowledge base sources for agent ${agentId}: ${error.message}`);
+      throw error;
+    }
   }
 }

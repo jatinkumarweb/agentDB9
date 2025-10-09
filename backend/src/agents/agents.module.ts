@@ -3,9 +3,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentsController } from './agents.controller';
 import { AgentsService } from './agents.service';
 import { Agent } from '../entities/agent.entity';
+import { KnowledgeModule } from '../knowledge/knowledge.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Agent])],
+  imports: [
+    TypeOrmModule.forFeature([Agent]),
+    KnowledgeModule,
+  ],
   controllers: [AgentsController],
   providers: [AgentsService],
   exports: [AgentsService],

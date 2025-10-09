@@ -24,6 +24,45 @@ export interface AgentConfiguration {
   autoSave: boolean;
   autoFormat: boolean;
   autoTest: boolean;
+  knowledgeBase?: KnowledgeBaseConfiguration;
+}
+
+export interface KnowledgeBaseConfiguration {
+  enabled: boolean;
+  embeddingProvider: 'openai' | 'cohere' | 'huggingface' | 'ollama';
+  embeddingModel: string;
+  vectorStore: 'chroma' | 'pinecone' | 'weaviate' | 'qdrant';
+  chunkSize: number;
+  chunkOverlap: number;
+  retrievalTopK: number;
+  sources: KnowledgeSource[];
+  autoUpdate: boolean;
+  updateFrequency?: 'daily' | 'weekly' | 'manual';
+}
+
+export interface KnowledgeSource {
+  id: string;
+  type: 'pdf' | 'markdown' | 'website' | 'api' | 'github' | 'documentation';
+  url?: string;
+  content?: string;
+  metadata: KnowledgeSourceMetadata;
+  status: 'pending' | 'processing' | 'indexed' | 'failed';
+  lastIndexed?: Date;
+  error?: string;
+}
+
+export interface KnowledgeSourceMetadata {
+  title: string;
+  description?: string;
+  tags: string[];
+  version?: string;
+  language?: string;
+  framework?: string;
+  author?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  chunkCount?: number;
+  tokenCount?: number;
 }
 
 export interface CodeStylePreferences {
