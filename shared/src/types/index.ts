@@ -181,5 +181,10 @@ export interface ModelMetrics {
 // Re-export all types
 export * from './testing';
 export * from './agent';
+export * from './agent-profile';
+export * from './context';
+export * from './conversation-manager';
+export * from './websocket-bridge';
+export * from './knowledge-base';
 export * from './mcp';
 export * from './api';

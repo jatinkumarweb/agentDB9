@@ -154,12 +154,9 @@ export interface TerminalInfo {
   active: boolean;
 }
 
-export interface GitCommit {
-  hash: string;
-  message: string;
-  author: string;
-  date: Date;
-}
+// Import GitCommit from context to avoid duplication
+import type { GitCommit } from './context';
+export type { GitCommit };
 
 export interface FileStats {
   size: number;

@@ -318,14 +318,15 @@ export interface VSCodeCommandRequest {
   timeout?: number;
 }
 
-// WebSocket event types
-export interface WebSocketEvent {
+// Import WebSocketEvent from websocket-bridge to avoid duplication
+import type { WebSocketEvent as WSEvent } from './websocket-bridge';
+export interface APIWebSocketEvent {
   type: string;
   data: any;
   timestamp: Date;
 }
 
-export interface AgentStatusEvent extends WebSocketEvent {
+export interface AgentStatusEvent extends APIWebSocketEvent {
   type: 'agent_status';
   data: {
     agentId: string;
@@ -334,7 +335,9 @@ export interface AgentStatusEvent extends WebSocketEvent {
   };
 }
 
-export interface TaskProgressEvent extends WebSocketEvent {
+// Import from websocket-bridge to avoid duplication
+import type { TaskProgressEvent as WSTaskProgressEvent } from './websocket-bridge';
+export interface APITaskProgressEvent extends APIWebSocketEvent {
   type: 'task_progress';
   data: {
     taskId: string;
@@ -344,7 +347,7 @@ export interface TaskProgressEvent extends WebSocketEvent {
   };
 }
 
-export interface CodeGenerationEvent extends WebSocketEvent {
+export interface CodeGenerationEvent extends APIWebSocketEvent {
   type: 'code_generation';
   data: {
     taskId: string;
@@ -353,7 +356,9 @@ export interface CodeGenerationEvent extends WebSocketEvent {
   };
 }
 
-export interface FileChangeEvent extends WebSocketEvent {
+// Import from websocket-bridge to avoid duplication
+import type { FileChangeEvent as WSFileChangeEvent } from './websocket-bridge';
+export interface APIFileChangeEvent extends APIWebSocketEvent {
   type: 'file_change';
   data: {
     path: string;
