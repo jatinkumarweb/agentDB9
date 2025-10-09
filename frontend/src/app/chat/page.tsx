@@ -682,7 +682,7 @@ if (cachedMessages) {
             </option>
             {agents.map((agent) => (
               <option key={agent.id} value={agent.id}>
-                {agent.name} ({agent.configuration.model})
+                {agent.name} ({agent.configuration?.model || 'No model'})
               </option>
             ))}
           </select>
@@ -767,7 +767,7 @@ if (cachedMessages) {
                   <div>
                     <h1 className="text-lg font-semibold text-gray-900">{selectedAgent?.name}</h1>
                     <p className="text-sm text-gray-500">
-                      {selectedAgent?.configuration.model} • {selectedAgent?.status}
+                      {selectedAgent?.configuration?.model || 'No model'} • {selectedAgent?.status}
                     </p>
                   </div>
                 </div>
