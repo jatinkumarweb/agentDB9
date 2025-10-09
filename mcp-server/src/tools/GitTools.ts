@@ -337,7 +337,8 @@ export class GitTools {
         hash: commit.hash,
         message: commit.message,
         author: commit.author_name,
-        date: new Date(commit.date)
+        date: new Date(commit.date),
+        files: commit.diff?.files?.map(f => f.file) || []
       }));
     } catch (error) {
       logger.error('Failed to get git log:', error);
