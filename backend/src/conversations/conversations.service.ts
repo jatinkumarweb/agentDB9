@@ -730,7 +730,9 @@ Would you like help setting up external API access?`;
       let systemPrompt = '';
       
       if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
-        systemPrompt = `You are a helpful coding assistant with access to workspace tools.
+        systemPrompt = `You are a helpful coding assistant with REAL workspace access. You can EXECUTE commands and CREATE files.
+
+IMPORTANT: When users ask you to CREATE, BUILD, or MODIFY something, you MUST use the tools to actually do it. DO NOT just provide instructions.
 
 When you need to use a tool, respond with this XML format:
 <tool_call>
@@ -751,20 +753,25 @@ Available tools:`;
         // Add action tools if enabled
         if (workspaceConfig.enableActions) {
           systemPrompt += `
-- execute_command: Run shell commands. Args: {"command": "npm install"}
-- write_file: Write file content. Args: {"path": "file.js", "content": "..."}
-- create_directory: Create directory. Args: {"path": "dirname"}
-- git_commit: Commit changes. Args: {"message": "msg", "files": ["file1"]}
+- execute_command: Run shell commands (npm, git, etc). Args: {"command": "npm create vite@latest"}
+- write_file: Write/create file with content. Args: {"path": "src/App.jsx", "content": "..."}
+- create_directory: Create directory. Args: {"path": "src/components"}
+- git_commit: Commit changes. Args: {"message": "Initial commit", "files": ["."]}
 - delete_file: Delete file. Args: {"path": "file.js"}`;
         }
 
         systemPrompt += `
 
-Rules:
-- When user asks about files/workspace, use list_files first
-- When user asks to read a file, use read_file
-- Wait for tool results before responding
-- Don't make up information - use tools to get real data`;
+Critical Rules:
+1. When user asks to CREATE/BUILD a project → Use execute_command to run the creation command
+2. When user asks to CREATE/WRITE files → Use write_file with the actual content
+3. When user asks about existing files → Use list_files or read_file
+4. ALWAYS use tools to perform actions - NEVER just give instructions
+5. After using a tool, wait for results before responding
+6. If creating a project, use the appropriate command:
+   - Vite React: npm create vite@latest project-name -- --template react
+   - Next.js: npx create-next-app@latest project-name --yes
+   - React: npx create-react-app project-name`;
 
         // Add note about disabled permissions
         if (!workspaceConfig.enableContext && !workspaceConfig.enableActions) {
@@ -1278,10 +1285,18 @@ Would you like help setting up external API access?`;
       let systemPrompt = conversation.agent?.configuration?.systemPrompt || 'You are a helpful coding assistant.';
       
       if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
-        systemPrompt += `\n\nYou have access to workspace tools. Use them to gather information before answering.\n\n`;
-        systemPrompt += 'When you need to use a tool, respond with this XML format:\n';
-        systemPrompt += '<tool_call>\n<tool_name>tool_name_here</tool_name>\n<arguments>{"arg": "value"}</arguments>\n</tool_call>\n\n';
-        systemPrompt += 'Available tools:';
+        systemPrompt += `\n\n## IMPORTANT: You are an AI assistant with REAL workspace access. You can EXECUTE commands and CREATE files.
+
+When users ask you to CREATE, BUILD, or MODIFY something, you MUST use the tools to actually do it. DO NOT just provide instructions.
+
+## Tool Usage Format
+When you need to use a tool, respond with ONLY this XML format (no other text):
+<tool_call>
+<tool_name>tool_name_here</tool_name>
+<arguments>{"arg": "value"}</arguments>
+</tool_call>
+
+## Available Tools:`;
         
         // Add context tools if enabled
         if (workspaceConfig.enableContext) {
@@ -1292,14 +1307,29 @@ Would you like help setting up external API access?`;
 
         // Add action tools if enabled
         if (workspaceConfig.enableActions) {
-          systemPrompt += `\n- execute_command: Run shell commands. Args: {"command": "npm install"}`;
-          systemPrompt += `\n- write_file: Write file content. Args: {"path": "file.js", "content": "..."}`;
-          systemPrompt += `\n- create_directory: Create directory. Args: {"path": "dirname"}`;
-          systemPrompt += `\n- git_commit: Commit changes. Args: {"message": "msg", "files": ["file1"]}`;
+          systemPrompt += `\n- execute_command: Run shell commands (npm, git, etc). Args: {"command": "npm create vite@latest"}`;
+          systemPrompt += `\n- write_file: Write/create file with content. Args: {"path": "src/App.jsx", "content": "..."}`;
+          systemPrompt += `\n- create_directory: Create directory. Args: {"path": "src/components"}`;
+          systemPrompt += `\n- git_commit: Commit changes. Args: {"message": "Initial commit", "files": ["."]}`;
           systemPrompt += `\n- delete_file: Delete file. Args: {"path": "file.js"}`;
         }
 
-        systemPrompt += `\n\nRules:\n- When user asks about files/workspace, use list_files first\n- When user asks to read a file, use read_file\n- Wait for tool results before responding\n- Don't make up information - use tools to get real data`;
+        systemPrompt += `\n\n## Critical Rules:
+1. When user asks to CREATE/BUILD a project → Use execute_command to run the creation command
+2. When user asks to CREATE/WRITE files → Use write_file with the actual content
+3. When user asks about existing files → Use list_files or read_file
+4. ALWAYS use tools to perform actions - NEVER just give instructions
+5. After using a tool, wait for results before responding
+6. If creating a project, use the appropriate command:
+   - Vite React: npm create vite@latest project-name -- --template react
+   - Next.js: npx create-next-app@latest project-name --yes
+   - React: npx create-react-app project-name
+
+## Example Workflow:
+User: "Create a React app with Vite"
+You: <tool_call><tool_name>execute_command</tool_name><arguments>{"command": "npm create vite@latest my-app -- --template react"}</arguments></tool_call>
+[Wait for result]
+You: "Project created successfully! The React app is ready in the my-app directory."`;
       }
       
       // Get conversation history for context
