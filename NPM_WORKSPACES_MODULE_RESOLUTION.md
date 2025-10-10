@@ -285,3 +285,42 @@ TypeScript will now resolve it correctly.
 - [TypeScript Module Resolution](https://www.typescriptlang.org/docs/handbook/module-resolution.html)
 - [TypeScript Compiler Options - paths](https://www.typescriptlang.org/tsconfig#paths)
 - [npm Workspaces](https://docs.npmjs.com/cli/v8/using-npm/workspaces)
+
+## Local Development (npm run dev)
+
+### Runtime Resolution Works Automatically
+
+Node.js automatically searches parent `node_modules` directories, so hoisted packages work at runtime without additional configuration:
+
+```bash
+cd backend
+npm run start:dev  # Works! Node.js finds jsonrepair in ../node_modules
+```
+
+### Why cross-env NODE_PATH?
+
+While Node.js handles this automatically, we add `cross-env NODE_PATH=../node_modules` to npm scripts for:
+
+1. **Consistency** - Same behavior across all environments
+2. **Explicit** - Makes it clear where packages are resolved from
+3. **Docker compatibility** - Ensures Docker containers use the same resolution
+4. **Cross-platform** - Works on Windows, Mac, Linux
+
+### Verification
+
+Test that runtime resolution works:
+
+```bash
+cd backend
+node -e "const { parseJSON } = require('./dist/src/common/utils/json-parser.util.js'); console.log(parseJSON('{\"test\": \"value}'));"
+```
+
+Should output: `{ test: 'value' }`
+
+If you're getting "Cannot find module 'jsonrepair'" errors at runtime, check:
+
+1. **Is jsonrepair installed?** `ls -la node_modules/jsonrepair`
+2. **Is it hoisted?** Should be in root, not `backend/node_modules`
+3. **Did you rebuild?** `cd backend && npm run build`
+4. **Are you in the right directory?** Should run from `backend/`
+
