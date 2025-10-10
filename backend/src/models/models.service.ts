@@ -3,16 +3,18 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class ModelsService {
   
-  async getModels(userId?: number): Promise<any> {
+  async getModels(userId?: string): Promise<any> {
     try {
       const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://localhost:9000';
+      
+      console.log('[ModelsService] getModels called with userId:', userId, 'type:', typeof userId);
       
       // Add userId as query parameter if available
       const url = userId 
         ? `${llmServiceUrl}/api/models?userId=${userId}`
         : `${llmServiceUrl}/api/models`;
       
-      console.log(`Fetching models from LLM service: ${url}`);
+      console.log('[ModelsService] Fetching models from LLM service:', url);
       
       const response = await fetch(url, {
         method: 'GET',

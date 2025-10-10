@@ -19,6 +19,7 @@ export class ModelsController {
     try {
       // Get userId from authenticated user
       const userId = (req.user as any)?.id;
+      console.log('[ModelsController] getModels called, userId:', userId, 'type:', typeof userId);
       const result = await this.modelsService.getModels(userId);
       return {
         success: true,
