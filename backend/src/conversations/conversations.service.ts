@@ -520,23 +520,29 @@ Error: ${error.message}`;
     systemPrompt += 'CRITICAL: When using a tool, output ONLY the XML - NO explanations, NO plans, NO other text.\n\n';
     systemPrompt += 'EXACT TOOL FORMAT (COPY EXACTLY):\n';
     systemPrompt += '<tool_call>\n<tool_name>tool_name</tool_name>\n<arguments>{"arg": "value"}</arguments>\n</tool_call>\n\n';
-    systemPrompt += 'IMPORTANT XML RULES:\n';
+    systemPrompt += 'CRITICAL XML RULES:\n';
+    systemPrompt += '- ALWAYS use <tool_name> tag (NOT <create_directory>, NOT <list_files>, etc.)\n';
+    systemPrompt += '- Put the actual tool name INSIDE <tool_name>...</tool_name>\n';
     systemPrompt += '- Use </arguments> NOT </>\n';
     systemPrompt += '- Use </tool_name> NOT </>\n';
     systemPrompt += '- Close ALL tags with full names\n\n';
+    systemPrompt += 'WRONG XML EXAMPLES:\n';
+    systemPrompt += '❌ <tool_call><create_directory>create_directory</create_directory><arguments>...</arguments></tool_call>\n';
+    systemPrompt += '❌ <tool_call><list_files>list_files</list_files><arguments>...</arguments></tool_call>\n';
+    systemPrompt += '❌ <tool_call><tool_name>list_files</tool_name><arguments>...</></tool_call>\n\n';
+    systemPrompt += 'CORRECT XML EXAMPLES:\n';
+    systemPrompt += '✅ <tool_call><tool_name>create_directory</tool_name><arguments>{"path": "src"}</arguments></tool_call>\n';
+    systemPrompt += '✅ <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>\n';
+    systemPrompt += '✅ <tool_call><tool_name>write_file</tool_name><arguments>{"path": "app.js", "content": "..."}</arguments></tool_call>\n\n';
     systemPrompt += 'CRITICAL JSON RULES:\n';
     systemPrompt += '- ALL string values MUST have closing quotes\n';
     systemPrompt += '- ALL objects MUST have closing braces\n';
-    systemPrompt += '- Use double quotes for keys and values\n';
+    systemPrompt += '- Use double quotes for keys and values (NOT single quotes)\n';
     systemPrompt += '- No trailing commas\n\n';
-    systemPrompt += 'WRONG EXAMPLES:\n';
-    systemPrompt += '❌ <arguments>{"path": "."}</>\n';
-    systemPrompt += '❌ <arguments>{"path": "game-demo}\n';
-    systemPrompt += '❌ <arguments>{"path": \'value\'}\n\n';
-    systemPrompt += 'CORRECT EXAMPLES:\n';
-    systemPrompt += '✅ <arguments>{"path": "."}</arguments>\n';
-    systemPrompt += '✅ <arguments>{"path": "game-demo"}</arguments>\n';
-    systemPrompt += '✅ <arguments>{"command": "npm install"}</arguments>\n\n';
+    systemPrompt += 'WRONG JSON EXAMPLES:\n';
+    systemPrompt += '❌ {"path": "game-demo}  (missing closing quote)\n';
+    systemPrompt += '❌ {"path": \'value\'}  (single quotes)\n';
+    systemPrompt += '❌ {"path": ".",}  (trailing comma)\n\n';
     systemPrompt += 'Available tools:\n';
     systemPrompt += '- get_workspace_summary: Get comprehensive workspace analysis. Args: {}\n';
     systemPrompt += '- list_files: List files/folders. Args: {"path": "."}\n';
@@ -2001,9 +2007,22 @@ Example: <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.js
     let toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/s;
     let match = response.match(toolCallRegex);
     
-    // Try alternative format with malformed closing tags
+    // Try format where LLM uses <tool_name_here> instead of <tool_name>
+    // Example: <tool_call><create_directory>create_directory</create_directory><arguments>...</arguments></tool_call>
     if (!match) {
       console.log('⚠️ Standard format failed, trying alternative patterns...');
+      toolCallRegex = /<tool_call>\s*<(\w+)>\1<\/\1>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/s;
+      match = response.match(toolCallRegex);
+      
+      if (match) {
+        console.log('✅ Found LLM using tool name as tag: <' + match[1] + '>');
+        // Rearrange match to fit expected format: [full, toolName, args]
+        match = [match[0], match[1], match[2]];
+      }
+    }
+    
+    // Try alternative format with malformed closing tags
+    if (!match) {
       // Handle <arguments>...</> instead of <arguments>...</arguments>
       toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/>\s*<\/tool_call>/s;
       match = response.match(toolCallRegex);
