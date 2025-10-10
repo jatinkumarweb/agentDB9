@@ -481,18 +481,16 @@ This agent is configured to use "${model}" which requires external API access.
     // Add ReAct pattern instructions for tool usage
     systemPrompt += '\n\nYou have access to workspace tools. Use them to gather information before answering.\n\n';
     systemPrompt += 'TOOL FORMAT - Output ONLY this XML (no extra text):\n';
-    systemPrompt += '<tool_call>\n<tool_name>list_directory</tool_name>\n<arguments>{"path": "."}</arguments>\n</tool_call>\n\n';
+    systemPrompt += '<tool_call>\n<tool_name>get_workspace_summary</tool_name>\n<arguments>{}</arguments>\n</tool_call>\n\n';
     systemPrompt += 'Available tools:\n';
-    systemPrompt += '- list_directory: List files/folders. Args: {"path": "."}\n';
+    systemPrompt += '- get_workspace_summary: Get comprehensive workspace analysis (projects, tech stack, file stats). Args: {}\n';
+    systemPrompt += '- list_files: List files/folders. Args: {"path": "."}\n';
     systemPrompt += '- read_file: Read file contents. Args: {"path": "package.json"}\n';
-    systemPrompt += '- execute_command: Run commands. Args: {"command": "find . -name *.js | wc -l"}\n';
+    systemPrompt += '- execute_command: Run commands. Args: {"command": "npm test"}\n';
     systemPrompt += '- write_file: Write files. Args: {"path": "file.js", "content": "..."}\n\n';
-    systemPrompt += 'WORKSPACE ANALYSIS STRATEGY:\n';
-    systemPrompt += '1. Start with list_directory on root (".")\n';
-    systemPrompt += '2. Read key files (package.json, requirements.txt, etc.) to detect tech stack\n';
-    systemPrompt += '3. Use execute_command for file counts: find . -type f -name "*.js" | wc -l\n';
-    systemPrompt += '4. Explore subdirectories if needed\n';
-    systemPrompt += '5. Provide comprehensive summary with: projects found, tech stack, file statistics\n\n';
+    systemPrompt += 'WORKSPACE ANALYSIS:\n';
+    systemPrompt += 'For workspace summaries, use get_workspace_summary first - it provides projects, frameworks, and file statistics.\n';
+    systemPrompt += 'For specific files/details, use list_files or read_file.\n\n';
     systemPrompt += 'CRITICAL: Output ONLY the XML tool_call, nothing else. After tool results, use another tool or give final answer.';
     
     return systemPrompt;

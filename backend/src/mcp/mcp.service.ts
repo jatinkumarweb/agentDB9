@@ -80,7 +80,8 @@ export class MCPService {
         'git_status',
         'git_commit',
         'create_directory',
-        'delete_file'
+        'delete_file',
+        'get_workspace_summary'
       ];
     } catch (error) {
       this.logger.error('Failed to get available MCP tools:', error);
@@ -175,6 +176,12 @@ export class MCPService {
           this.logger.log(`🗑️ Deleting file: ${args.path}`);
           result = await this.deleteFile(args.path);
           this.logger.log(`✅ File deleted`);
+          return result;
+          
+        case 'get_workspace_summary':
+          this.logger.log(`📊 Getting workspace summary`);
+          result = await this.getWorkspaceSummary();
+          this.logger.log(`✅ Workspace summary retrieved`);
           return result;
           
         default:
@@ -620,6 +627,83 @@ export class MCPService {
     } catch (error) {
       throw new Error(`Failed to delete file ${filePath}: ${error.message}`);
     }
+  }
+
+  private async getWorkspaceSummary(): Promise<any> {
+    try {
+      // Scan workspace and provide comprehensive summary
+      const rootPath = this.workspaceRoot;
+      
+      // Get directory listing
+      const files = await fs.readdir(rootPath, { withFileTypes: true });
+      const directories = files.filter(f => f.isDirectory() && !f.name.startsWith('.')).map(f => f.name);
+      const rootFiles = files.filter(f => f.isFile()).map(f => f.name);
+      
+      // Detect projects by looking for package.json, requirements.txt, etc.
+      const projects: Array<{name: string; type: string; framework?: string; dependencies: number; devDependencies: number}> = [];
+      for (const dir of directories) {
+        const packageJsonPath = path.join(rootPath, dir, 'package.json');
+        try {
+          const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'));
+          projects.push({
+            name: dir,
+            type: 'Node.js',
+            framework: this.detectFramework(packageJson),
+            dependencies: Object.keys(packageJson.dependencies || {}).length,
+            devDependencies: Object.keys(packageJson.devDependencies || {}).length
+          });
+        } catch {
+          // Not a Node.js project, check for other types
+        }
+      }
+      
+      // Count files by extension
+      const fileStats = await this.countFilesByExtension(rootPath);
+      
+      return {
+        workspace: rootPath,
+        projects,
+        directories: directories.length,
+        rootFiles: rootFiles.length,
+        fileStatistics: fileStats,
+        detectedProjects: projects.map(p => `${p.name} (${p.framework || p.type})`).join(', ')
+      };
+    } catch (error) {
+      throw new Error(`Failed to get workspace summary: ${error.message}`);
+    }
+  }
+
+  private detectFramework(packageJson: any): string {
+    const deps = { ...packageJson.dependencies, ...packageJson.devDependencies };
+    if (deps['next']) return 'Next.js';
+    if (deps['react']) return 'React';
+    if (deps['vue']) return 'Vue.js';
+    if (deps['@angular/core']) return 'Angular';
+    if (deps['express']) return 'Express';
+    if (deps['@nestjs/core']) return 'NestJS';
+    return 'Node.js';
+  }
+
+  private async countFilesByExtension(rootPath: string): Promise<Record<string, number>> {
+    const counts: Record<string, number> = {};
+    
+    const countFiles = async (dir: string) => {
+      const files = await fs.readdir(dir, { withFileTypes: true });
+      for (const file of files) {
+        const fullPath = path.join(dir, file.name);
+        if (file.isDirectory()) {
+          if (!file.name.startsWith('.') && file.name !== 'node_modules') {
+            await countFiles(fullPath);
+          }
+        } else {
+          const ext = path.extname(file.name) || 'no-extension';
+          counts[ext] = (counts[ext] || 0) + 1;
+        }
+      }
+    };
+    
+    await countFiles(rootPath);
+    return counts;
   }
 
   /**
