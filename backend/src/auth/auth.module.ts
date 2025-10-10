@@ -15,14 +15,12 @@ import { LocalStrategy } from './strategies/local.strategy';
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => {
-        return {
-          secret: configService.get<string>('JWT_SECRET') || 'your-secret-key',
-          signOptions: {
-            expiresIn: configService.get<string>('JWT_EXPIRES_IN') || '24h',
-          },
-        };
-      },
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET') || 'your-secret-key',
+        signOptions: {
+          expiresIn: (configService.get<string>('JWT_EXPIRES_IN') || '24h') as any,
+        },
+      }),
       inject: [ConfigService],
     }),
   ],
