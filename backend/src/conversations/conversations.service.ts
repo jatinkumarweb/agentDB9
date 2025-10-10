@@ -1901,43 +1901,17 @@ You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</argum
       
       console.log(`🔄 Preparing next iteration. Tool failed: ${toolFailed}`);
       
-      // Prepare next message with tool result - encourage continuation if needed
-      if (toolFailed) {
-        currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ERROR - ${observation}\n\nThe tool failed. You MUST try a different approach:
-1. Try a different tool
-2. Try the same tool with different arguments
-3. Try to work around the error
+      // Prepare next message with tool result - use simpler prompt like Ollama
+      currentMessage = `Tool Result: ${observation}
 
-Output ONLY the XML tool call for your next action (no explanations).
-Example: <tool_call><tool_name>read_file</tool_name><arguments>{"path": "package.json"}</arguments></tool_call>`;
-      } else {
-        // Check if this looks like a complete task that needs action
-        const needsMoreWork = userMessage.toLowerCase().includes('create') || 
-                              userMessage.toLowerCase().includes('build') ||
-                              userMessage.toLowerCase().includes('make') ||
-                              userMessage.toLowerCase().includes('update') ||
-                              userMessage.toLowerCase().includes('add');
-        
-        if (needsMoreWork && iteration === 1) {
-          // For action-oriented tasks, strongly encourage continuation after first tool
-          currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ${observation}\n\nYou've gathered information. Now you MUST take action to complete the user's request.
+Original Question: ${userMessage}
 
-What's the next step to accomplish: "${userMessage}"?
+Decide your next action:
+1. Need more info or another action? → Output ONLY the XML tool call (no text before/after)
+2. Have enough info? → Provide final answer (text only, no XML)
 
-Output ONLY the XML tool call for your next action (no explanations).
-Examples:
-- <tool_call><tool_name>create_directory</tool_name><arguments>{"path": "project-name"}</arguments></tool_call>
-- <tool_call><tool_name>write_file</tool_name><arguments>{"path": "file.js", "content": "..."}</arguments></tool_call>
-- <tool_call><tool_name>execute_command</tool_name><arguments>{"command": "npm install"}</arguments></tool_call>`;
-        } else {
-          currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ${observation}\n\nDecide your next action:
-1. Need more info or another action? → Output ONLY the XML tool call (no explanations)
-2. Have enough info to answer? → Provide your final answer (text only, no XML)
-
-CRITICAL: If using a tool, output ONLY the XML - NO text before or after it.
+CRITICAL: If using a tool, output ONLY XML - NO explanations.
 Example: <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>`;
-        }
-      }
       
       // Add to conversation history
       conversationHistory.push({
