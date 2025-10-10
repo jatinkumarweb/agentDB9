@@ -8,6 +8,8 @@ import { CreateConversationDto } from '../dto/create-conversation.dto';
 import { WebSocketGateway } from '../websocket/websocket.gateway';
 import { MCPService } from '../mcp/mcp.service';
 import { ReActAgentService } from './react-agent.service';
+import { MemoryService } from '../memory/memory.service';
+import { KnowledgeService } from '../knowledge/knowledge.service';
 import { parseJSON } from '../common/utils/json-parser.util';
 // CreateMessageDto import removed - using plain object type instead
 
@@ -44,6 +46,8 @@ export class ConversationsService {
     private websocketGateway: WebSocketGateway,
     private mcpService: MCPService,
     private reactAgentService: ReActAgentService,
+    private memoryService: MemoryService,
+    private knowledgeService: KnowledgeService,
   ) {
     // Initialize batch update timer
     this.startBatchUpdateTimer();
@@ -370,6 +374,31 @@ Error: ${error.message}`;
         conversation.id,
         { updatedAt: new Date() }
       );
+      
+      // Store interaction in memory if enabled
+      if (conversation.agent?.configuration?.memory?.enabled) {
+        try {
+          await this.memoryService.createMemory({
+            agentId: conversation.agentId,
+            sessionId: conversation.id,
+            type: 'short-term',
+            category: 'interaction',
+            content: `User: ${userMessage}\nAgent: ${finalResponse}`,
+            importance: toolCalls.length > 0 ? 0.8 : 0.5, // Higher importance if tools were used
+            metadata: {
+              tags: [model, isOllamaModel ? 'ollama' : 'external'],
+              keywords: toolCalls.length > 0 ? ['tool-usage'] : ['conversation'],
+              confidence: 1.0,
+              relevance: 1.0,
+              source: 'conversation' as any
+            }
+          });
+          console.log('✅ Stored interaction in memory');
+        } catch (error) {
+          console.error('Failed to store interaction in memory:', error);
+          // Continue without storing memory
+        }
+      }
       
       console.log(`Generated agent response for conversation ${conversation.id}`);
     } catch (error) {
@@ -755,6 +784,70 @@ NOTE: Actions disabled. Can read files but cannot modify or execute commands.`;
         systemPrompt = `You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.
 
 NOTE: You have no workspace tools available. You can only provide suggestions and code examples.`;
+      }
+
+      // Add memory context if enabled
+      if (conversation.agent?.configuration?.memory?.enabled) {
+        try {
+          console.log('🧠 Fetching memory context for agent:', conversation.agentId);
+          const memoryContext = await this.memoryService.getMemoryContext(
+            conversation.agentId,
+            conversation.id,
+            userMessage
+          );
+          
+          if (memoryContext.totalMemories > 0) {
+            systemPrompt += `\n\n## Memory Context\n${memoryContext.summary}\n`;
+            
+            // Add recent interactions
+            if (memoryContext.recentInteractions.length > 0) {
+              systemPrompt += `\nRecent interactions:\n`;
+              memoryContext.recentInteractions.slice(0, 3).forEach((interaction: any) => {
+                systemPrompt += `- ${interaction.summary || interaction.content}\n`;
+              });
+            }
+            
+            // Add relevant lessons
+            if (memoryContext.relevantLessons.length > 0) {
+              systemPrompt += `\nLearned lessons:\n`;
+              memoryContext.relevantLessons.slice(0, 3).forEach((lesson: any) => {
+                systemPrompt += `- ${lesson.summary || lesson.content}\n`;
+              });
+            }
+            
+            console.log(`✅ Added ${memoryContext.totalMemories} memory items to context`);
+          }
+        } catch (error) {
+          console.error('Failed to fetch memory context:', error);
+          // Continue without memory context
+        }
+      }
+      
+      // Add knowledge base context if enabled
+      if (conversation.agent?.configuration?.knowledgeBase?.enabled) {
+        try {
+          console.log('📚 Fetching knowledge base context for query:', userMessage.substring(0, 50));
+          const kbContext = await this.knowledgeService.getAgentKnowledgeContext(
+            conversation.agentId,
+            userMessage,
+            conversation.agent.configuration.knowledgeBase.retrievalTopK || 5
+          );
+          
+          if (kbContext.relevantChunks.length > 0) {
+            systemPrompt += `\n\n## Knowledge Base Context\n`;
+            systemPrompt += `Retrieved ${kbContext.relevantChunks.length} relevant documents:\n\n`;
+            
+            kbContext.relevantChunks.forEach((chunk: any, index: number) => {
+              systemPrompt += `### Document ${index + 1}\n`;
+              systemPrompt += `${chunk.content}\n\n`;
+            });
+            
+            console.log(`✅ Added ${kbContext.relevantChunks.length} knowledge base chunks to context`);
+          }
+        } catch (error) {
+          console.error('Failed to fetch knowledge base context:', error);
+          // Continue without KB context
+        }
       }
 
       const fetchStartTime = Date.now();
@@ -1223,16 +1316,66 @@ Would you like help setting up external API access?`;
       
       // Add memory context if enabled
       if (conversation.agent?.configuration?.memory?.enabled) {
-        // TODO: Integrate memory service to get relevant context
-        // const memoryContext = await this.memoryService.getMemoryContext(conversation.agentId, conversation.id);
-        // systemPrompt += `\n\nRelevant memory:\n${memoryContext.summary}`;
+        try {
+          console.log('🧠 Fetching memory context for agent:', conversation.agentId);
+          const memoryContext = await this.memoryService.getMemoryContext(
+            conversation.agentId,
+            conversation.id,
+            userMessage
+          );
+          
+          if (memoryContext.totalMemories > 0) {
+            systemPrompt += `\n\n## Memory Context\n${memoryContext.summary}\n`;
+            
+            // Add recent interactions
+            if (memoryContext.recentInteractions.length > 0) {
+              systemPrompt += `\nRecent interactions:\n`;
+              memoryContext.recentInteractions.slice(0, 3).forEach((interaction: any) => {
+                systemPrompt += `- ${interaction.summary || interaction.content}\n`;
+              });
+            }
+            
+            // Add relevant lessons
+            if (memoryContext.relevantLessons.length > 0) {
+              systemPrompt += `\nLearned lessons:\n`;
+              memoryContext.relevantLessons.slice(0, 3).forEach((lesson: any) => {
+                systemPrompt += `- ${lesson.summary || lesson.content}\n`;
+              });
+            }
+            
+            console.log(`✅ Added ${memoryContext.totalMemories} memory items to context`);
+          }
+        } catch (error) {
+          console.error('Failed to fetch memory context:', error);
+          // Continue without memory context
+        }
       }
       
       // Add knowledge base context if enabled
       if (conversation.agent?.configuration?.knowledgeBase?.enabled) {
-        // TODO: Integrate knowledge base service to get relevant documents
-        // const kbContext = await this.knowledgeService.search(userMessage, conversation.agentId);
-        // systemPrompt += `\n\nRelevant knowledge:\n${kbContext}`;
+        try {
+          console.log('📚 Fetching knowledge base context for query:', userMessage.substring(0, 50));
+          const kbContext = await this.knowledgeService.getAgentKnowledgeContext(
+            conversation.agentId,
+            userMessage,
+            conversation.agent.configuration.knowledgeBase.retrievalTopK || 5
+          );
+          
+          if (kbContext.relevantChunks.length > 0) {
+            systemPrompt += `\n\n## Knowledge Base Context\n`;
+            systemPrompt += `Retrieved ${kbContext.relevantChunks.length} relevant documents:\n\n`;
+            
+            kbContext.relevantChunks.forEach((chunk: any, index: number) => {
+              systemPrompt += `### Document ${index + 1}\n`;
+              systemPrompt += `${chunk.content}\n\n`;
+            });
+            
+            console.log(`✅ Added ${kbContext.relevantChunks.length} knowledge base chunks to context`);
+          }
+        } catch (error) {
+          console.error('Failed to fetch knowledge base context:', error);
+          // Continue without KB context
+        }
       }
 
       const fetchStartTime = Date.now();

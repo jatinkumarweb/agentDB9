@@ -7,12 +7,16 @@ import { Conversation } from '../entities/conversation.entity';
 import { Message } from '../entities/message.entity';
 import { WebSocketModule } from '../websocket/websocket.module';
 import { MCPModule } from '../mcp/mcp.module';
+import { MemoryModule } from '../memory/memory.module';
+import { KnowledgeModule } from '../knowledge/knowledge.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Conversation, Message]),
     forwardRef(() => WebSocketModule),
     MCPModule,
+    MemoryModule,
+    KnowledgeModule,
   ],
   controllers: [ConversationsController],
   providers: [ConversationsService, ReActAgentService],

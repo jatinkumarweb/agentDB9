@@ -226,22 +226,31 @@ BACKEND_URL=http://backend:8000
 
 ## Known Limitations
 
-1. **Memory Integration**: Hooks are in place but not yet connected to memory service
-2. **Knowledge Base Integration**: Hooks are in place but not yet connected to KB service
+1. ~~**Memory Integration**: Hooks are in place but not yet connected to memory service~~ ✅ **COMPLETED**
+2. ~~**Knowledge Base Integration**: Hooks are in place but not yet connected to KB service~~ ✅ **COMPLETED**
 3. **Tool Calling Format**: Uses XML format instead of native function calling (for consistency)
 4. **Rate Limiting**: External API rate limits apply (handled by providers)
 
+## Update: Memory and Knowledge Base Integration Complete
+
+See [MEMORY_KNOWLEDGE_INTEGRATION.md](./MEMORY_KNOWLEDGE_INTEGRATION.md) for complete details on:
+- Memory service integration (STM and LTM)
+- Knowledge base service integration
+- Context enrichment for all LLM providers
+- Automatic memory storage after interactions
+- Semantic search and document retrieval
+
 ## Future Enhancements
 
-1. **Memory Service Integration**
-   - Connect memory hooks to actual memory service
-   - Add conversation context to LLM calls
-   - Implement memory consolidation
+1. ~~**Memory Service Integration**~~ ✅ **COMPLETED**
+   - ~~Connect memory hooks to actual memory service~~ ✅ Done
+   - ~~Add conversation context to LLM calls~~ ✅ Done
+   - ~~Implement memory consolidation~~ ✅ Already implemented
 
-2. **Knowledge Base Integration**
-   - Connect KB hooks to knowledge service
-   - Add relevant documents to context
-   - Implement semantic search
+2. ~~**Knowledge Base Integration**~~ ✅ **COMPLETED**
+   - ~~Connect KB hooks to knowledge service~~ ✅ Done
+   - ~~Add relevant documents to context~~ ✅ Done
+   - ~~Implement semantic search~~ ✅ Already implemented
 
 3. **Native Function Calling**
    - Support OpenAI's native function calling
