@@ -299,21 +299,16 @@ export class ConversationsService {
           agentResponse = this.getOllamaUnavailableMessage(userMessage);
         }
       } else {
-        // For non-Ollama models, provide a helpful message
-        agentResponse = `🤖 **External API Model Selected**
+        // For non-Ollama models (OpenAI, Anthropic, etc.), call LLM service
+        try {
+          console.log(`🌐 Calling external API for model: ${model}`);
+          agentResponse = await this.callExternalLLMAPI(userMessage, model, conversation);
+        } catch (error) {
+          console.error('Failed to call external LLM API:', error);
+          agentResponse = `I apologize, but I encountered an error while trying to process your message with ${model}. Please ensure your API key is configured correctly in the settings.
 
-This agent is configured to use "${model}" which requires external API access.
-
-**Your message:** "${userMessage}"
-
-**To enable this model:**
-1. Configure the appropriate API key in your environment variables
-2. Ensure the model provider service is accessible
-
-**Available in local development:**
-- Message storage and conversation history
-- Agent configuration management
-- Switch to Ollama models when available`;
+Error: ${error.message}`;
+        }
       }
       
       const responseTime = Date.now() - startTime;
@@ -1095,6 +1090,62 @@ Would you like help setting up external API access?`;
       }
       
       return `I apologize, but I encountered an error while processing your request. Please try again later. (Error: ${error.message})`;
+    }
+  }
+
+  private async callExternalLLMAPI(userMessage: string, model: string, conversation: any): Promise<string> {
+    try {
+      const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://llm-service:9000';
+      
+      // Get userId from conversation (should be available from the conversation's user)
+      const userId = conversation.userId;
+      
+      if (!userId) {
+        throw new Error('User ID not found in conversation');
+      }
+      
+      const url = `${llmServiceUrl}/api/chat?userId=${userId}`;
+      console.log('[ConversationsService] Calling LLM service:', url, 'model:', model);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.'
+            },
+            {
+              role: 'user',
+              content: userMessage
+            }
+          ],
+          stream: false,
+          temperature: 0.7,
+          max_tokens: 500
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || `LLM service error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.response || data.message || 'I apologize, but I was unable to generate a response at this time.';
+    } catch (error) {
+      console.error('Error calling external LLM API:', error);
+      throw error;
     }
   }
 
