@@ -517,8 +517,11 @@ Error: ${error.message}`;
     
     // Add ReAct pattern instructions for tool usage
     systemPrompt += '\n\nYou have access to workspace tools. Use them in a chain to complete complex tasks.\n\n';
-    systemPrompt += 'TOOL FORMAT - Output ONLY this XML (no extra text):\n';
+    systemPrompt += 'CRITICAL: When using a tool, output ONLY the XML - NO explanations, NO plans, NO other text.\n\n';
+    systemPrompt += 'TOOL FORMAT (OUTPUT ONLY THIS):\n';
     systemPrompt += '<tool_call>\n<tool_name>tool_name</tool_name>\n<arguments>{"arg": "value"}</arguments>\n</tool_call>\n\n';
+    systemPrompt += 'WRONG: "Let me create... <tool_call>..." ❌\n';
+    systemPrompt += 'CORRECT: <tool_call><tool_name>write_file</tool_name>... ✅\n\n';
     systemPrompt += 'Available tools:\n';
     systemPrompt += '- get_workspace_summary: Get comprehensive workspace analysis. Args: {}\n';
     systemPrompt += '- list_files: List files/folders. Args: {"path": "."}\n';
@@ -531,7 +534,7 @@ Error: ${error.message}`;
     systemPrompt += '2. After each tool result, decide: need more tools OR ready to answer\n';
     systemPrompt += '3. For complex tasks, use multiple tools (e.g., check workspace → create directory → write files)\n';
     systemPrompt += '4. Only provide final answer when you have all needed information\n\n';
-    systemPrompt += 'CRITICAL: Output ONLY XML for tool calls. After tool results, use another tool (XML) or give final answer (text).';
+    systemPrompt += 'REMEMBER: Tool call = XML ONLY. Final answer = text ONLY. Never mix them.';
     
     return systemPrompt;
   }
@@ -750,13 +753,22 @@ Would you like help setting up external API access?`;
       if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
         systemPrompt = `You are a helpful coding assistant with REAL workspace access. You can EXECUTE commands and CREATE files.
 
-IMPORTANT: When users ask you to CREATE, BUILD, or MODIFY something, you MUST use the tools to actually do it. DO NOT just provide instructions.
+CRITICAL RULE: When you decide to use a tool, output ONLY the XML tool call - NO explanations, NO plans, NO other text.
 
-When you need to use a tool, respond with this XML format:
+## Tool Call Format (OUTPUT ONLY THIS - NOTHING ELSE):
 <tool_call>
 <tool_name>tool_name_here</tool_name>
 <arguments>{"arg": "value"}</arguments>
 </tool_call>
+
+## WRONG Examples (DO NOT DO THIS):
+❌ "Let's start by creating... <tool_call>..."
+❌ "I'll create the components: <tool_call>..."
+❌ "First, we need to... <tool_call>..."
+
+## CORRECT Examples:
+✅ <tool_call><tool_name>execute_command</tool_name><arguments>{"command": "npm create vite@latest"}</arguments></tool_call>
+✅ <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>
 
 Available tools:`;
 
@@ -1304,16 +1316,21 @@ Would you like help setting up external API access?`;
       let systemPrompt = conversation.agent?.configuration?.systemPrompt || 'You are a helpful coding assistant.';
       
       if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
-        systemPrompt += `\n\n## IMPORTANT: You are an AI assistant with REAL workspace access. You can EXECUTE commands and CREATE files.
+        systemPrompt += `\n\n## CRITICAL: You have REAL workspace access. When you use a tool, output ONLY the XML - NO explanations.
 
-When users ask you to CREATE, BUILD, or MODIFY something, you MUST use the tools to actually do it. DO NOT just provide instructions.
-
-## Tool Usage Format
-When you need to use a tool, respond with ONLY this XML format (no other text):
+## Tool Call Format (OUTPUT ONLY THIS - NOTHING ELSE):
 <tool_call>
 <tool_name>tool_name_here</tool_name>
 <arguments>{"arg": "value"}</arguments>
 </tool_call>
+
+## WRONG (DO NOT DO):
+❌ "Let's create the components: <tool_call>..."
+❌ "I'll start by... <tool_call>..."
+❌ "First, we need to... <tool_call>..."
+
+## CORRECT:
+✅ <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>
 
 ## Available Tools:`;
         
@@ -1826,11 +1843,12 @@ You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</argum
       steps.push({ observation });
 
       // Prepare next message with tool result - encourage continuation if needed
-      currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ${observation}\n\nBased on this information, decide your next action:
-1. If you need more information or need to perform another action, use another tool
-2. If you have enough information to answer the user's question, provide your final answer
+      currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ${observation}\n\nDecide your next action:
+1. Need more info or another action? → Output ONLY the XML tool call (no explanations)
+2. Have enough info to answer? → Provide your final answer (text only, no XML)
 
-Remember: You can use multiple tools in sequence to complete complex tasks.`;
+CRITICAL: If using a tool, output ONLY the XML - NO text before or after it.
+Example: <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>`;
       
       // Add to conversation history
       conversationHistory.push({

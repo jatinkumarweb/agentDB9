@@ -229,10 +229,11 @@ DO NOT use any more tools. Provide your final answer based on this data.`;
 
 Original Question: ${originalQuestion}
 
-Based on this result, decide your next action:
-1. If you need more information or need to perform another action → Use another tool (output XML only)
-2. If you have enough information to answer the question → Provide your final answer (no XML)
+Decide your next action:
+1. Need more info or another action? → Output ONLY the XML tool call (no text before/after)
+2. Have enough info? → Provide final answer (text only, no XML)
 
-You can use multiple tools in sequence to complete complex tasks.`;
+CRITICAL: If using a tool, output ONLY XML - NO explanations.
+Example: <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>`;
   }
 }
