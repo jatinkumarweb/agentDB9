@@ -56,6 +56,12 @@ export class User {
       email?: boolean;
       browser?: boolean;
     };
+    apiKeys?: {
+      openai?: string;
+      anthropic?: string;
+      cohere?: string;
+      huggingface?: string;
+    };
   };
 
   @Column({ nullable: true })

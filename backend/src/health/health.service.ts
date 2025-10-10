@@ -75,7 +75,7 @@ export class HealthService {
     }
   }
 
-  async getModels() {
+  async getModels(userId?: string) {
     try {
       const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://localhost:9000';
       
@@ -83,7 +83,11 @@ export class HealthService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
       
-      const response = await fetch(`${llmServiceUrl}/api/models`, {
+      const url = userId 
+        ? `${llmServiceUrl}/api/models?userId=${userId}`
+        : `${llmServiceUrl}/api/models`;
+      
+      const response = await fetch(url, {
         signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',

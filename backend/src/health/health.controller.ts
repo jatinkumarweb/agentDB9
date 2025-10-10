@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, HttpStatus, HttpException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Request, HttpStatus, HttpException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthService } from './health.service';
 import { Public } from '../auth/decorators/public.decorator';
@@ -35,9 +35,10 @@ export class HealthController {
   @Get('api/models')
   @ApiOperation({ summary: 'Get available models' })
   @ApiResponse({ status: 200, description: 'Models retrieved successfully' })
-  async getModels(): Promise<APIResponse> {
+  async getModels(@Request() req): Promise<APIResponse> {
     try {
-      const models = await this.healthService.getModels();
+      const userId = req.user?.userId;
+      const models = await this.healthService.getModels(userId);
       return {
         success: true,
         data: models,

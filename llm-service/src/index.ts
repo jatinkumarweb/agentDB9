@@ -73,6 +73,43 @@ async function checkOllamaAvailability(): Promise<{available: boolean, downloade
   }
 }
 
+// Helper function to check API key status from backend
+async function checkProviderStatus(userId?: string): Promise<Record<string, boolean>> {
+  if (!userId) {
+    // No userId provided, return all as unconfigured
+    return {
+      openai: false,
+      anthropic: false,
+      cohere: false,
+      huggingface: false,
+    };
+  }
+  
+  try {
+    const backendUrl = process.env.BACKEND_URL || 'http://backend:8000';
+    const response = await fetch(`${backendUrl}/api/providers/status?userId=${userId}`, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (response.ok) {
+      const data = await response.json() as { data?: Record<string, boolean> };
+      return data.data || {};
+    }
+  } catch (error) {
+    console.error('Failed to fetch provider status from backend:', error);
+  }
+  
+  // Fallback: return all as unconfigured
+  return {
+    openai: false,
+    anthropic: false,
+    cohere: false,
+    huggingface: false,
+  };
+}
+
 // Model availability endpoint
 app.get('/api/models', async (req, res) => {
   try {
@@ -84,6 +121,10 @@ app.get('/api/models', async (req, res) => {
     // Check Ollama availability
     const ollamaStatus = await checkOllamaAvailability();
     
+    // Check provider API key status from backend (userId from query param)
+    const userId = req.query.userId as string;
+    const providerStatus = await checkProviderStatus(userId);
+    
     const models = [
       ...availableModels.map(model => {
         if (model.provider === 'ollama') {
@@ -91,6 +132,7 @@ app.get('/api/models', async (req, res) => {
           const isDownloaded = ollamaStatus.downloadedModels.includes(model.id);
           return {
             id: model.id,
+            name: model.name,
             provider: model.provider,
             status: isDownloaded ? 'available' : 'unavailable',
             reason: isDownloaded ? 'Downloaded in Ollama' : 
@@ -99,24 +141,36 @@ app.get('/api/models', async (req, res) => {
             apiKeyConfigured: true,
           };
         } else {
+          // Check API key status from backend for external providers
+          const apiKeyConfigured = providerStatus[model.provider] || false;
+          const requiresApiKey = model.availability.requiresApiKey;
+          
           return {
             id: model.id,
+            name: model.name,
             provider: model.provider,
-            status: model.availability.status,
-            reason: model.availability.reason,
-            requiresApiKey: model.availability.requiresApiKey,
-            apiKeyConfigured: model.availability.apiKeyConfigured
+            status: requiresApiKey && !apiKeyConfigured ? 'disabled' : 'unknown',
+            reason: requiresApiKey && !apiKeyConfigured ? 'API key not configured' : undefined,
+            requiresApiKey: requiresApiKey,
+            apiKeyConfigured: apiKeyConfigured
           };
         }
       }),
-      ...disabledModels.map(model => ({
-        id: model.id,
-        provider: model.provider,
-        status: model.availability.status,
-        reason: model.availability.reason,
-        requiresApiKey: model.availability.requiresApiKey,
-        apiKeyConfigured: model.availability.apiKeyConfigured
-      }))
+      ...disabledModels.map(model => {
+        // Check API key status from backend for external providers
+        const apiKeyConfigured = model.provider !== 'ollama' ? (providerStatus[model.provider] || false) : true;
+        const requiresApiKey = model.availability.requiresApiKey;
+        
+        return {
+          id: model.id,
+          name: model.name,
+          provider: model.provider,
+          status: requiresApiKey && !apiKeyConfigured ? 'disabled' : model.availability.status,
+          reason: requiresApiKey && !apiKeyConfigured ? 'API key not configured' : model.availability.reason,
+          requiresApiKey: requiresApiKey,
+          apiKeyConfigured: apiKeyConfigured
+        };
+      })
     ];
 
     const availableCount = models.filter(m => m.status === 'available').length;
@@ -124,10 +178,12 @@ app.get('/api/models', async (req, res) => {
 
     res.json({
       success: true,
-      models,
-      available: availableCount,
-      disabled: disabledCount,
-      timestamp: new Date().toISOString()
+      data: {
+        models,
+        available: availableCount,
+        disabled: disabledCount,
+        timestamp: new Date().toISOString()
+      }
     });
   } catch (error) {
     res.status(500).json({

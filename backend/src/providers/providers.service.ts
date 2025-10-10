@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../entities/user.entity';
 
 interface ProviderConfig {
   name: string;
@@ -13,16 +14,23 @@ interface ProviderConfig {
 
 @Injectable()
 export class ProvidersService {
-  private readonly configPath = path.join(process.cwd(), '.env.local');
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
 
-  async getProviderConfigs(): Promise<ProviderConfig[]> {
+  async getProviderConfigs(userId: string): Promise<ProviderConfig[]> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const apiKeys = user?.preferences?.apiKeys || {};
+    
+
     const providers = [
       {
         name: 'openai',
         displayName: 'OpenAI',
         apiKeyLabel: 'OpenAI API Key',
         apiKeyPlaceholder: 'sk-...',
-        configured: !!process.env.OPENAI_API_KEY,
+        configured: !!apiKeys.openai && apiKeys.openai.length > 0,
         models: []
       },
       {
@@ -30,7 +38,7 @@ export class ProvidersService {
         displayName: 'Anthropic',
         apiKeyLabel: 'Anthropic API Key',
         apiKeyPlaceholder: 'sk-ant-...',
-        configured: !!process.env.ANTHROPIC_API_KEY,
+        configured: !!apiKeys.anthropic && apiKeys.anthropic.length > 0,
         models: []
       },
       {
@@ -38,7 +46,7 @@ export class ProvidersService {
         displayName: 'Cohere',
         apiKeyLabel: 'Cohere API Key',
         apiKeyPlaceholder: 'co-...',
-        configured: !!process.env.COHERE_API_KEY,
+        configured: !!apiKeys.cohere && apiKeys.cohere.length > 0,
         models: []
       },
       {
@@ -46,7 +54,7 @@ export class ProvidersService {
         displayName: 'Hugging Face',
         apiKeyLabel: 'Hugging Face API Key',
         apiKeyPlaceholder: 'hf_...',
-        configured: !!process.env.HUGGINGFACE_API_KEY,
+        configured: !!apiKeys.huggingface && apiKeys.huggingface.length > 0,
         models: []
       }
     ];
@@ -54,7 +62,25 @@ export class ProvidersService {
     return providers;
   }
 
-  async updateProviderConfig(provider: string, apiKey: string): Promise<any> {
+  async getProviderStatus(userId: string): Promise<Record<string, boolean>> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const apiKeys = user?.preferences?.apiKeys || {};
+    
+    return {
+      openai: !!apiKeys.openai && apiKeys.openai.length > 0,
+      anthropic: !!apiKeys.anthropic && apiKeys.anthropic.length > 0,
+      cohere: !!apiKeys.cohere && apiKeys.cohere.length > 0,
+      huggingface: !!apiKeys.huggingface && apiKeys.huggingface.length > 0,
+    };
+  }
+
+  async getApiKey(userId: string, provider: string): Promise<string | null> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const apiKeys = user?.preferences?.apiKeys || {};
+    return apiKeys[provider] || null;
+  }
+
+  async updateProviderConfig(userId: string, provider: string, apiKey: string): Promise<any> {
     try {
       if (!this.isValidProvider(provider)) {
         throw new Error(`Invalid provider: ${provider}`);
@@ -73,8 +99,21 @@ export class ProvidersService {
         throw new Error(`Invalid API key for ${provider}`);
       }
 
-      // Update environment variable
-      await this.updateEnvironmentVariable(provider, apiKey);
+      // Update user preferences
+      const user = await this.userRepository.findOne({ where: { id: userId } });
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      if (!user.preferences) {
+        user.preferences = {};
+      }
+      if (!user.preferences.apiKeys) {
+        user.preferences.apiKeys = {};
+      }
+
+      user.preferences.apiKeys[provider] = apiKey;
+      await this.userRepository.save(user);
 
       return {
         provider,
@@ -184,63 +223,6 @@ export class ProvidersService {
       return response.ok;
     } catch (error) {
       return false;
-    }
-  }
-
-  private async updateEnvironmentVariable(provider: string, apiKey: string): Promise<void> {
-    const envVarName = this.getEnvVarName(provider);
-    
-    // Update the current process environment
-    process.env[envVarName] = apiKey;
-
-    // Also try to update .env.local file for persistence
-    try {
-      await this.updateEnvFile(envVarName, apiKey);
-    } catch (error) {
-      console.warn('Could not update .env.local file:', error.message);
-      // Don't throw error here as the environment variable is still set for current session
-    }
-  }
-
-  private getEnvVarName(provider: string): string {
-    const envVarMap = {
-      openai: 'OPENAI_API_KEY',
-      anthropic: 'ANTHROPIC_API_KEY',
-      cohere: 'COHERE_API_KEY',
-      huggingface: 'HUGGINGFACE_API_KEY'
-    };
-    return envVarMap[provider];
-  }
-
-  private async updateEnvFile(envVarName: string, value: string): Promise<void> {
-    try {
-      let envContent = '';
-      
-      // Read existing .env.local file if it exists
-      if (fs.existsSync(this.configPath)) {
-        envContent = fs.readFileSync(this.configPath, 'utf8');
-      }
-
-      // Update or add the environment variable
-      const lines = envContent.split('\n');
-      let found = false;
-      
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith(`${envVarName}=`)) {
-          lines[i] = `${envVarName}=${value}`;
-          found = true;
-          break;
-        }
-      }
-      
-      if (!found) {
-        lines.push(`${envVarName}=${value}`);
-      }
-      
-      // Write back to file
-      fs.writeFileSync(this.configPath, lines.join('\n'));
-    } catch (error) {
-      throw new Error(`Failed to update environment file: ${error.message}`);
     }
   }
 }
