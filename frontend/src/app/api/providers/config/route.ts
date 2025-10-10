@@ -5,21 +5,11 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
 export async function GET(request: NextRequest) {
   try {
-    // Forward Authorization header from client request
-    const authHeader = request.headers.get('authorization');
-    const headers = {
-      ...createBackendHeaders(request),
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-    };
-    
-    // Ensure Authorization header is included if present
-    if (authHeader && !headers['Authorization']) {
-      headers['Authorization'] = authHeader;
-    }
-    
     const response = await fetch(`${BACKEND_URL}/api/providers/config`, {
       cache: 'no-store',
-      headers,
+      headers: createBackendHeaders(request, {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      }),
     });
     
     const data = await response.json();
@@ -45,18 +35,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Forward Authorization header from client request
-    const authHeader = request.headers.get('authorization');
-    const headers = createBackendHeaders(request);
-    
-    // Ensure Authorization header is included if present
-    if (authHeader && !headers['Authorization']) {
-      headers['Authorization'] = authHeader;
-    }
-    
     const response = await fetch(`${BACKEND_URL}/api/providers/config`, {
       method: 'POST',
-      headers,
+      headers: createBackendHeaders(request),
       body: JSON.stringify(body),
     });
     

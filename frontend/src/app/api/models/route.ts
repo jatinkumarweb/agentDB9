@@ -8,21 +8,11 @@ export async function GET(request: NextRequest) {
     // Check if client requests fresh data
     const forceRefresh = request.nextUrl.searchParams.get('refresh') === 'true';
     
-    // Forward Authorization header from client request
-    const authHeader = request.headers.get('authorization');
-    const headers = {
-      ...createBackendHeaders(request),
-      ...(forceRefresh && { 'Cache-Control': 'no-cache' }),
-    };
-    
-    // Ensure Authorization header is included if present
-    if (authHeader && !headers['Authorization']) {
-      headers['Authorization'] = authHeader;
-    }
-    
     const response = await fetch(`${BACKEND_URL}/api/models`, {
       cache: forceRefresh ? 'no-store' : 'default',
-      headers,
+      headers: createBackendHeaders(request, {
+        ...(forceRefresh && { 'Cache-Control': 'no-cache' }),
+      }),
     });
     const data = await response.json();
     

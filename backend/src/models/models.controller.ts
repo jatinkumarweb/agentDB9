@@ -1,11 +1,13 @@
-import { Controller, Get, Post, Delete, Body, HttpStatus, HttpException, Req } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, HttpStatus, HttpException, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ModelsService } from './models.service';
 import type { APIResponse } from '@agentdb9/shared';
 import { Request } from 'express';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('models')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('api/models')
 export class ModelsController {
   constructor(private readonly modelsService: ModelsService) {}

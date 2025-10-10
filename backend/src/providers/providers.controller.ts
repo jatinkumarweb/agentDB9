@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Delete, Body, Query, HttpStatus, HttpException, Request, Param } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Query, HttpStatus, HttpException, Request, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ProvidersService } from './providers.service';
 import type { APIResponse } from '@agentdb9/shared';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('providers')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('api/providers')
 export class ProvidersController {
   constructor(private readonly providersService: ProvidersService) {}

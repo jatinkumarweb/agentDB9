@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
+import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
 interface ModelOption {
   id: string;
@@ -51,24 +52,12 @@ export function useModelCache(options: ModelCacheOptions = {}) {
     setError(null);
 
     try {
-      // Get auth token from localStorage (zustand persist storage)
-      const authStorage = localStorage.getItem('auth-storage');
-      const token = authStorage ? JSON.parse(authStorage)?.state?.token : null;
-      
-      const headers: Record<string, string> = {
-        'Cache-Control': 'no-cache',
-      };
-      
-      // Add Authorization header if token exists
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const response = await fetch('/api/models', {
+      const response = await fetchWithAuth('/api/models', {
         // Disable browser caching for fresh data
         cache: 'no-store',
-        credentials: 'include', // Include cookies for authentication
-        headers,
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
       });
 
       if (!response.ok) {
