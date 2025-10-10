@@ -1813,6 +1813,7 @@ You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</argum
       }
 
       // Call external LLM with current context
+      console.log(`📤 Sending to LLM - Iteration ${iteration}, Message length: ${currentMessage.length}`);
       const llmResponse = await this.callExternalLLMForReAct(
         systemPrompt,
         currentMessage,
@@ -1822,21 +1823,31 @@ You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</argum
         userId
       );
 
+      console.log(`📥 LLM Response received - Length: ${llmResponse.length}`);
       console.log(`💭 External LLM Response: ${llmResponse.substring(0, 200)}...`);
 
       // Parse response for tool calls
+      console.log(`🔍 Parsing response for tool calls...`);
       const toolCall = this.parseToolCall(llmResponse);
 
       if (!toolCall) {
         // No tool call found - this is the final answer
-        console.log(`✅ Final answer received (no tool call)`);
+        console.log(`✅ Final answer received (no tool call) - Ending loop at iteration ${iteration}`);
         steps.push({ answer: llmResponse });
+        
+        // Send final progress update
+        if (progressCallback) {
+          progressCallback(`✅ Analysis complete!\n\n${llmResponse}`);
+        }
+        
         return {
           finalAnswer: llmResponse,
           steps,
           toolsUsed
         };
       }
+
+      console.log(`🔧 Tool call found: ${toolCall.name} - Continuing loop`);
 
       // Tool call found - execute it
       console.log(`🔧 Tool call detected: ${toolCall.name}`);
@@ -1889,12 +1900,32 @@ You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</argum
 Output ONLY the XML tool call for your next action (no explanations).
 Example: <tool_call><tool_name>read_file</tool_name><arguments>{"path": "package.json"}</arguments></tool_call>`;
       } else {
-        currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ${observation}\n\nDecide your next action:
+        // Check if this looks like a complete task that needs action
+        const needsMoreWork = userMessage.toLowerCase().includes('create') || 
+                              userMessage.toLowerCase().includes('build') ||
+                              userMessage.toLowerCase().includes('make') ||
+                              userMessage.toLowerCase().includes('update') ||
+                              userMessage.toLowerCase().includes('add');
+        
+        if (needsMoreWork && iteration === 1) {
+          // For action-oriented tasks, strongly encourage continuation after first tool
+          currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ${observation}\n\nYou've gathered information. Now you MUST take action to complete the user's request.
+
+What's the next step to accomplish: "${userMessage}"?
+
+Output ONLY the XML tool call for your next action (no explanations).
+Examples:
+- <tool_call><tool_name>create_directory</tool_name><arguments>{"path": "project-name"}</arguments></tool_call>
+- <tool_call><tool_name>write_file</tool_name><arguments>{"path": "file.js", "content": "..."}</arguments></tool_call>
+- <tool_call><tool_name>execute_command</tool_name><arguments>{"command": "npm install"}</arguments></tool_call>`;
+        } else {
+          currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ${observation}\n\nDecide your next action:
 1. Need more info or another action? → Output ONLY the XML tool call (no explanations)
 2. Have enough info to answer? → Provide your final answer (text only, no XML)
 
 CRITICAL: If using a tool, output ONLY the XML - NO text before or after it.
 Example: <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>`;
+        }
       }
       
       // Add to conversation history
@@ -1902,6 +1933,9 @@ Example: <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.js
         role: 'assistant',
         content: `Tool: ${toolCall.name}\nResult: ${observation}`
       });
+      
+      console.log(`🔄 End of iteration ${iteration}. Continuing to next iteration...`);
+      console.log(`📊 Current state: ${toolsUsed.length} tools used, ${steps.length} steps taken`);
     }
 
     // Max iterations reached
