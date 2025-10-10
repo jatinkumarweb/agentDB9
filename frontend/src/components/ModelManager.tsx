@@ -44,9 +44,10 @@ export default function ModelManager() {
       const response = await fetchWithAuth('/api/models');
       const data = await response.json();
       
-      if (data.success && data.data && data.data.models) {
-        setModels(data.data.models);
-      }
+      // Handle double-wrapped response from backend
+      // Backend returns: { success: true, data: { success: true, data: { models: [...] } } }
+      const modelsData = data.data?.data?.models || data.data?.models || [];
+      setModels(modelsData);
     } catch (error) {
       console.error('Failed to fetch models:', error);
     } finally {

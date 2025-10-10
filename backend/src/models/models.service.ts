@@ -3,6 +3,43 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class ModelsService {
   
+  async getModels(): Promise<any> {
+    try {
+      const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://localhost:9000';
+      
+      console.log(`Fetching models from LLM service: ${llmServiceUrl}/api/models`);
+      
+      const response = await fetch(`${llmServiceUrl}/api/models`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`LLM Service error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      console.log('LLM Service response structure:', JSON.stringify(result).substring(0, 200));
+      
+      // Return just the data portion to avoid double wrapping
+      // LLM service returns { success: true, data: { models: [...], ... } }
+      // We want to return { models: [...], ... }
+      if (result.success && result.data) {
+        console.log('Returning result.data');
+        return result.data;
+      }
+      
+      console.log('Returning fallback');
+      return result.data || result;
+    } catch (error) {
+      console.error('Failed to fetch models from LLM service:', error);
+      throw new Error(`Failed to fetch models: ${error.message}`);
+    }
+  }
+  
   async downloadModel(modelId: string): Promise<any> {
     try {
       const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';

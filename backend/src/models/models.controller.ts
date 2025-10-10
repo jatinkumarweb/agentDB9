@@ -9,6 +9,27 @@ import type { APIResponse } from '@agentdb9/shared';
 export class ModelsController {
   constructor(private readonly modelsService: ModelsService) {}
 
+  @Get()
+  @ApiOperation({ summary: 'Get all available models' })
+  @ApiResponse({ status: 200, description: 'List of all models' })
+  async getModels(): Promise<APIResponse> {
+    try {
+      const result = await this.modelsService.getModels();
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   @Post('download')
   @ApiOperation({ summary: 'Download a model' })
   @ApiResponse({ status: 200, description: 'Model download initiated' })
