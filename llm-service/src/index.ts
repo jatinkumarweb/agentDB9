@@ -75,8 +75,10 @@ async function checkOllamaAvailability(): Promise<{available: boolean, downloade
 
 // Helper function to check API key status from backend
 async function checkProviderStatus(userId?: string): Promise<Record<string, boolean>> {
+  console.log('[LLM Service] checkProviderStatus called with userId:', userId);
+  
   if (!userId) {
-    // No userId provided, return all as unconfigured
+    console.log('[LLM Service] No userId provided, returning all as unconfigured');
     return {
       openai: false,
       anthropic: false,
@@ -87,21 +89,31 @@ async function checkProviderStatus(userId?: string): Promise<Record<string, bool
   
   try {
     const backendUrl = process.env.BACKEND_URL || 'http://backend:8000';
-    const response = await fetch(`${backendUrl}/api/providers/status?userId=${userId}`, {
+    const url = `${backendUrl}/api/providers/status?userId=${userId}`;
+    console.log('[LLM Service] Fetching provider status from:', url);
+    
+    const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
       },
     });
     
+    console.log('[LLM Service] Provider status response status:', response.status);
+    
     if (response.ok) {
       const data = await response.json() as { data?: Record<string, boolean> };
+      console.log('[LLM Service] Provider status data:', JSON.stringify(data));
       return data.data || {};
+    } else {
+      const errorText = await response.text();
+      console.error('[LLM Service] Provider status request failed:', response.status, errorText);
     }
   } catch (error) {
-    console.error('Failed to fetch provider status from backend:', error);
+    console.error('[LLM Service] Failed to fetch provider status from backend:', error);
   }
   
   // Fallback: return all as unconfigured
+  console.log('[LLM Service] Falling back to all providers unconfigured');
   return {
     openai: false,
     anthropic: false,
@@ -123,7 +135,10 @@ app.get('/api/models', async (req, res) => {
     
     // Check provider API key status from backend (userId from query param)
     const userId = req.query.userId as string;
+    console.log('[LLM Service] /api/models called with userId:', userId);
+    
     const providerStatus = await checkProviderStatus(userId);
+    console.log('[LLM Service] Provider status received:', JSON.stringify(providerStatus));
     
     const models = [
       ...availableModels.map(model => {

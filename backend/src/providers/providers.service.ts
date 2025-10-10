@@ -78,15 +78,23 @@ export class ProvidersService {
   }
 
   async getProviderStatus(userId: string): Promise<Record<string, boolean>> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    const apiKeys = user?.preferences?.apiKeys || {};
+    console.log('[ProvidersService] getProviderStatus called with userId:', userId);
     
-    return {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    console.log('[ProvidersService] User found:', !!user, 'has preferences:', !!user?.preferences);
+    
+    const apiKeys = user?.preferences?.apiKeys || {};
+    console.log('[ProvidersService] API keys:', JSON.stringify(Object.keys(apiKeys)));
+    
+    const status = {
       openai: !!apiKeys.openai && apiKeys.openai.length > 0,
       anthropic: !!apiKeys.anthropic && apiKeys.anthropic.length > 0,
       cohere: !!apiKeys.cohere && apiKeys.cohere.length > 0,
       huggingface: !!apiKeys.huggingface && apiKeys.huggingface.length > 0,
     };
+    
+    console.log('[ProvidersService] Returning status:', JSON.stringify(status));
+    return status;
   }
 
   async getApiKey(userId: string, provider: string): Promise<string | null> {

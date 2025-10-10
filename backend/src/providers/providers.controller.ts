@@ -53,9 +53,15 @@ export class ProvidersController {
   @ApiResponse({ status: 200, description: 'Provider status retrieved' })
   async getProviderStatus(@Request() req, @Query('userId') queryUserId?: string): Promise<APIResponse> {
     try {
+      console.log('[ProvidersController] getProviderStatus called with queryUserId:', queryUserId, 'req.user?.id:', req.user?.id);
+      
       // Allow userId from query param (for internal service calls) or from auth token
       const userId = queryUserId || req.user?.id;
+      
+      console.log('[ProvidersController] Using userId:', userId);
+      
       if (!userId) {
+        console.error('[ProvidersController] No userId provided');
         throw new HttpException(
           {
             success: false,
@@ -64,12 +70,16 @@ export class ProvidersController {
           HttpStatus.BAD_REQUEST,
         );
       }
+      
       const status = await this.providersService.getProviderStatus(userId);
+      console.log('[ProvidersController] Provider status result:', JSON.stringify(status));
+      
       return {
         success: true,
         data: status,
       };
     } catch (error) {
+      console.error('[ProvidersController] Error in getProviderStatus:', error);
       // Re-throw HttpExceptions as-is
       if (error instanceof HttpException) {
         throw error;
