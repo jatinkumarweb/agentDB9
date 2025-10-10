@@ -302,7 +302,20 @@ export class ConversationsService {
         // For non-Ollama models (OpenAI, Anthropic, etc.), call LLM service
         try {
           console.log(`🌐 Calling external API for model: ${model}`);
-          agentResponse = await this.callExternalLLMAPI(userMessage, model, conversation);
+          
+          // Check if we should use ReACT pattern for external LLMs
+          const useReAct = this.shouldUseReAct(userMessage);
+          console.log(`🔍 Query analysis for external LLM: "${userMessage.substring(0, 50)}..." -> ReAct: ${useReAct}`);
+          
+          if (useReAct) {
+            console.log('🔄 Using ReAct pattern for external LLM tool-based query');
+            await this.callExternalLLMAPIWithReAct(userMessage, model, conversation);
+            return; // Exit early since ReAct handles message creation
+          } else {
+            // Use streaming API which handles message creation internally
+            await this.callExternalLLMAPIStreaming(userMessage, model, conversation);
+            return; // Exit early since streaming handles message creation
+          }
         } catch (error) {
           console.error('Failed to call external LLM API:', error);
           agentResponse = `I apologize, but I encountered an error while trying to process your message with ${model}. Please ensure your API key is configured correctly in the settings.
@@ -1094,10 +1107,21 @@ Would you like help setting up external API access?`;
   }
 
   private async callExternalLLMAPI(userMessage: string, model: string, conversation: any): Promise<string> {
+    // Use streaming version for better UX
+    await this.callExternalLLMAPIStreaming(userMessage, model, conversation);
+    return ''; // Streaming handles message creation
+  }
+
+  private async callExternalLLMAPIStreaming(userMessage: string, model: string, conversation: any): Promise<void> {
+    const workspaceConfig = conversation.agent?.configuration?.workspace || {
+      enableActions: true,
+      enableContext: true
+    };
+    
     try {
       const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://llm-service:9000';
       
-      // Get userId from conversation (should be available from the conversation's user)
+      // Get userId from conversation
       const userId = conversation.userId;
       
       if (!userId) {
@@ -1105,10 +1129,114 @@ Would you like help setting up external API access?`;
       }
       
       const url = `${llmServiceUrl}/api/chat?userId=${userId}`;
-      console.log('[ConversationsService] Calling LLM service:', url, 'model:', model);
+      console.log('[ConversationsService] Calling external LLM service (streaming):', url, 'model:', model);
       
+      // Create initial agent message that will be updated
+      const agentMessageData = {
+        conversationId: conversation.id,
+        role: 'agent',
+        content: '🤖 *Thinking...*',
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          model: model,
+          provider: 'external',
+          streaming: true
+        }
+      };
+
+      const agentMessage = this.messagesRepository.create(agentMessageData);
+      const savedMessage = await this.messagesRepository.save(agentMessage);
+      
+      // Add timeout for streaming responses
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout
+      const STREAMING_TIMEOUT = 120000; // 120 second timeout
+      const timeoutId = setTimeout(() => {
+        console.error(`⏱️ External LLM streaming timeout after ${STREAMING_TIMEOUT/1000}s - aborting`);
+        controller.abort();
+      }, STREAMING_TIMEOUT);
+      
+      // Register this generation for potential stopping
+      this.activeGenerations.set(savedMessage.id, {
+        abortController: controller,
+        messageId: savedMessage.id
+      });
+      
+      // Get available MCP tools for tool calling
+      const modelSupportsTools = this.modelSupportsToolCalling(model);
+      let availableTools = modelSupportsTools ? await this.mcpService.getAvailableTools() : [];
+      
+      // Filter tools based on workspace configuration
+      if (availableTools.length > 0) {
+        const actionTools = ['execute_command', 'write_file', 'create_directory', 'git_commit', 'delete_file'];
+        const contextTools = ['read_file', 'list_files', 'git_status'];
+        
+        availableTools = availableTools.filter(tool => {
+          if (actionTools.includes(tool)) {
+            return workspaceConfig.enableActions;
+          }
+          if (contextTools.includes(tool)) {
+            return workspaceConfig.enableContext;
+          }
+          return true;
+        });
+      }
+
+      // Build system prompt based on workspace configuration and agent settings
+      let systemPrompt = conversation.agent?.configuration?.systemPrompt || 'You are a helpful coding assistant.';
+      
+      if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
+        systemPrompt += `\n\nYou have access to workspace tools. Use them to gather information before answering.\n\n`;
+        systemPrompt += 'When you need to use a tool, respond with this XML format:\n';
+        systemPrompt += '<tool_call>\n<tool_name>tool_name_here</tool_name>\n<arguments>{"arg": "value"}</arguments>\n</tool_call>\n\n';
+        systemPrompt += 'Available tools:';
+        
+        // Add context tools if enabled
+        if (workspaceConfig.enableContext) {
+          systemPrompt += `\n- read_file: Read file contents. Args: {"path": "file.js"}`;
+          systemPrompt += `\n- list_files: List directory contents. Args: {"path": "."}`;
+          systemPrompt += `\n- git_status: Check git status. Args: {}`;
+        }
+
+        // Add action tools if enabled
+        if (workspaceConfig.enableActions) {
+          systemPrompt += `\n- execute_command: Run shell commands. Args: {"command": "npm install"}`;
+          systemPrompt += `\n- write_file: Write file content. Args: {"path": "file.js", "content": "..."}`;
+          systemPrompt += `\n- create_directory: Create directory. Args: {"path": "dirname"}`;
+          systemPrompt += `\n- git_commit: Commit changes. Args: {"message": "msg", "files": ["file1"]}`;
+          systemPrompt += `\n- delete_file: Delete file. Args: {"path": "file.js"}`;
+        }
+
+        systemPrompt += `\n\nRules:\n- When user asks about files/workspace, use list_files first\n- When user asks to read a file, use read_file\n- Wait for tool results before responding\n- Don't make up information - use tools to get real data`;
+      }
+      
+      // Get conversation history for context
+      const messages = await this.messagesRepository.find({
+        where: { conversationId: conversation.id },
+        order: { id: 'ASC' },
+        take: 20,
+      });
+      
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role === 'agent' ? 'assistant' : msg.role,
+        content: msg.content,
+      }));
+      
+      // Add memory context if enabled
+      if (conversation.agent?.configuration?.memory?.enabled) {
+        // TODO: Integrate memory service to get relevant context
+        // const memoryContext = await this.memoryService.getMemoryContext(conversation.agentId, conversation.id);
+        // systemPrompt += `\n\nRelevant memory:\n${memoryContext.summary}`;
+      }
+      
+      // Add knowledge base context if enabled
+      if (conversation.agent?.configuration?.knowledgeBase?.enabled) {
+        // TODO: Integrate knowledge base service to get relevant documents
+        // const kbContext = await this.knowledgeService.search(userMessage, conversation.agentId);
+        // systemPrompt += `\n\nRelevant knowledge:\n${kbContext}`;
+      }
+
+      const fetchStartTime = Date.now();
+      console.log(`📡 Sending streaming request to external LLM at ${new Date().toISOString()}`);
       
       const response = await fetch(url, {
         method: 'POST',
@@ -1120,20 +1248,24 @@ Would you like help setting up external API access?`;
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.'
+              content: systemPrompt
             },
+            ...conversationHistory,
             {
               role: 'user',
               content: userMessage
             }
           ],
-          stream: false,
-          temperature: 0.7,
-          max_tokens: 500
+          stream: true,
+          temperature: conversation.agent?.configuration?.temperature || 0.7,
+          max_tokens: conversation.agent?.configuration?.maxTokens || 1000
         }),
         signal: controller.signal,
       });
 
+      const fetchDuration = Date.now() - fetchStartTime;
+      console.log(`📡 Received response headers from external LLM in ${fetchDuration}ms`);
+      
       clearTimeout(timeoutId);
 
       if (!response.ok) {
@@ -1141,10 +1273,176 @@ Would you like help setting up external API access?`;
         throw new Error(errorData.error || errorData.message || `LLM service error: ${response.status}`);
       }
 
-      const data = await response.json();
-      return data.response || data.message || 'I apologize, but I was unable to generate a response at this time.';
+      let fullContent = '';
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
+
+      try {
+        let hasReceivedData = false;
+        const startTime = Date.now();
+        let chunkCount = 0;
+        
+        console.log(`🚀 Starting streaming response for conversation ${conversation.id}`);
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            const duration = Date.now() - startTime;
+            console.log(`✅ External LLM streaming completed in ${duration}ms, total content length: ${fullContent.length}, chunks: ${chunkCount}`);
+            break;
+          }
+          
+          chunkCount++;
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n').filter(line => line.trim());
+          
+          if (chunkCount === 1) {
+            const timeToFirstChunk = Date.now() - startTime;
+            console.log(`⚡ First chunk received after ${timeToFirstChunk}ms`);
+          }
+          
+          for (const line of lines) {
+            try {
+              // Handle SSE format
+              if (line.startsWith('data: ')) {
+                const data = parseJSON(line.substring(6));
+                if (!data) continue;
+                hasReceivedData = true;
+                
+                if (data.content) {
+                  fullContent += data.content;
+                  
+                  // Always emit WebSocket updates for real-time streaming
+                  this.websocketGateway.broadcastMessageUpdate(
+                    conversation.id,
+                    savedMessage.id,
+                    fullContent,
+                    !data.done,
+                    {
+                      ...agentMessageData.metadata,
+                      streaming: !data.done,
+                      lastUpdate: new Date().toISOString()
+                    }
+                  );
+                  
+                  // Queue database updates for batch processing
+                  const shouldQueueUpdate = fullContent.length % 1000 === 0 || data.done;
+                  
+                  if (shouldQueueUpdate) {
+                    try {
+                      await this.messagesRepository.update(savedMessage.id, {
+                        content: fullContent,
+                        metadata: {
+                          ...agentMessageData.metadata,
+                          streaming: !data.done,
+                          lastUpdate: new Date().toISOString()
+                        } as Record<string, any>
+                      });
+                    } catch (updateError) {
+                      console.log('Direct update failed, queuing for batch:', updateError.message);
+                      this.queueMessageUpdate(
+                        savedMessage.id,
+                        fullContent,
+                        {
+                          ...agentMessageData.metadata,
+                          streaming: !data.done,
+                          lastUpdate: new Date().toISOString()
+                        }
+                      );
+                    }
+                  }
+                }
+                
+                if (data.done) {
+                  console.log('Received done signal, finalizing response');
+                  const finalContent = fullContent || 'I apologize, but I was unable to generate a response at this time.';
+                  const finalMetadata = {
+                    ...agentMessageData.metadata,
+                    streaming: false,
+                    completed: true,
+                    responseTime: Date.now() - startTime,
+                    finalUpdate: new Date().toISOString()
+                  };
+                  
+                  // Emit final WebSocket update immediately
+                  this.websocketGateway.broadcastMessageUpdate(
+                    conversation.id,
+                    savedMessage.id,
+                    finalContent,
+                    false,
+                    finalMetadata
+                  );
+                  
+                  // Direct final database update
+                  try {
+                    await this.messagesRepository.update(savedMessage.id, {
+                      content: finalContent,
+                      metadata: finalMetadata as Record<string, any>
+                    });
+                  } catch (updateError) {
+                    console.log('Final direct update failed, queuing:', updateError.message);
+                    this.queueMessageUpdate(savedMessage.id, finalContent, finalMetadata);
+                    await this.processPendingUpdates();
+                  }
+                  
+                  // Parse and execute tool calls from the response
+                  await this.parseAndExecuteToolCalls(finalContent, conversation, savedMessage);
+                  
+                  return;
+                }
+              }
+            } catch (parseError) {
+              console.log('Failed to parse streaming chunk:', line);
+            }
+          }
+        }
+        
+        // If we exit the loop without done=true, finalize anyway
+        if (fullContent) {
+          const finalMetadata = {
+            ...agentMessageData.metadata,
+            streaming: false,
+            completed: true,
+            responseTime: Date.now() - startTime,
+            finalUpdate: new Date().toISOString()
+          };
+          
+          // Emit final WebSocket update
+          this.websocketGateway.broadcastMessageUpdate(
+            conversation.id,
+            savedMessage.id,
+            fullContent,
+            false,
+            finalMetadata
+          );
+          
+          // Direct final database update
+          try {
+            await this.messagesRepository.update(savedMessage.id, {
+              content: fullContent,
+              metadata: finalMetadata as Record<string, any>
+            });
+          } catch (updateError) {
+            console.log('Final fallback update failed, queuing:', updateError.message);
+            this.queueMessageUpdate(savedMessage.id, fullContent, finalMetadata);
+            await this.processPendingUpdates();
+          }
+          
+          // Parse and execute tool calls
+          await this.parseAndExecuteToolCalls(fullContent, conversation, savedMessage);
+        }
+      } finally {
+        reader.releaseLock();
+        // Clean up the active generation
+        this.activeGenerations.delete(savedMessage.id);
+      }
     } catch (error) {
-      console.error('Error calling external LLM API:', error);
+      console.error('Error calling external LLM streaming API:', error);
       throw error;
     }
   }
@@ -1152,6 +1450,268 @@ Would you like help setting up external API access?`;
   async remove(id: string): Promise<void> {
     const conversation = await this.findOne(id);
     await this.conversationsRepository.remove(conversation);
+  }
+
+  /**
+   * Call external LLM API with ReAct pattern for tool-based queries
+   */
+  private async callExternalLLMAPIWithReAct(
+    userMessage: string,
+    model: string,
+    conversation: any,
+  ): Promise<void> {
+    const isVerbose = process.env.VERBOSE_LOGGING === 'true';
+    console.log(`🤖 ReAct (External LLM): Starting for message: "${userMessage.substring(0, 100)}..."`);
+    
+    try {
+      // Get system prompt
+      const systemPrompt = this.buildSystemPrompt(conversation.agent);
+      console.log(`📝 ReAct (External LLM): System prompt length: ${systemPrompt.length} chars`);
+      
+      // Get conversation history
+      const messages = await this.messagesRepository.find({
+        where: { conversationId: conversation.id },
+        order: { id: 'ASC' },
+        take: 20,
+      });
+      
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role === 'agent' ? 'assistant' : msg.role,
+        content: msg.content,
+      }));
+      
+      // Get LLM service URL
+      const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://llm-service:9000';
+      const userId = conversation.userId;
+      
+      if (!userId) {
+        throw new Error('User ID not found in conversation');
+      }
+      
+      console.log(`🌐 ReAct (External LLM): Using LLM service at ${llmServiceUrl}`);
+      
+      // Create a temporary message to show progress
+      const tempMessage = this.messagesRepository.create({
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: '🔄 Analyzing workspace...',
+        metadata: { model, streaming: true, provider: 'external' },
+      });
+      const savedTempMessage = await this.messagesRepository.save(tempMessage);
+      
+      // Execute ReAct loop with external LLM
+      console.log(`⚙️ ReAct (External LLM): Starting ReAct loop with model ${model}`);
+      const result = await this.executeExternalReActLoop(
+        userMessage,
+        systemPrompt,
+        model,
+        llmServiceUrl,
+        userId,
+        conversationHistory,
+        conversation.id,
+        (status: string) => {
+          // Broadcast progress via WebSocket
+          this.websocketGateway.broadcastMessageUpdate(
+            conversation.id,
+            savedTempMessage.id,
+            status,
+            true,
+            { streaming: true, progress: true, provider: 'external' }
+          );
+        }
+      );
+      
+      // Update the temporary message with final response
+      console.log(`💾 ReAct (External LLM): Saving final answer (${result.finalAnswer.length} chars, ${result.toolsUsed.length} tools used)`);
+      await this.messagesRepository.update(savedTempMessage.id, {
+        content: result.finalAnswer,
+        metadata: { model, toolsUsed: result.toolsUsed, steps: result.steps, streaming: false, provider: 'external' } as any,
+      });
+      
+      // Broadcast final update
+      this.websocketGateway.broadcastMessageUpdate(
+        conversation.id,
+        savedTempMessage.id,
+        result.finalAnswer,
+        false,
+        { model, toolsUsed: result.toolsUsed, streaming: false, provider: 'external' }
+      );
+      
+      console.log(`✅ ReAct (External LLM) completed successfully with ${result.toolsUsed.length} tools used`);
+      if (isVerbose) {
+        console.log(`📊 ReAct (External LLM) details:`, { toolsUsed: result.toolsUsed, stepsCount: result.steps.length });
+      }
+    } catch (error) {
+      console.error('❌ ReAct (External LLM) execution failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Execute ReAct loop with external LLM
+   */
+  private async executeExternalReActLoop(
+    userMessage: string,
+    systemPrompt: string,
+    model: string,
+    llmServiceUrl: string,
+    userId: string,
+    conversationHistory: any[] = [],
+    conversationId?: string,
+    progressCallback?: (status: string) => void
+  ): Promise<{ finalAnswer: string; steps: any[]; toolsUsed: string[] }> {
+    const steps: any[] = [];
+    const toolsUsed: string[] = [];
+    let iteration = 0;
+    const MAX_ITERATIONS = 3;
+    let currentMessage = userMessage;
+
+    console.log(`🔄 Starting external ReAct loop for: "${userMessage.substring(0, 50)}..."`);
+
+    while (iteration < MAX_ITERATIONS) {
+      iteration++;
+      console.log(`\n🔁 External ReAct Iteration ${iteration}/${MAX_ITERATIONS}`);
+      
+      // Send progress update
+      if (progressCallback) {
+        progressCallback(`🔄 Analyzing... (step ${iteration}/${MAX_ITERATIONS})`);
+      }
+
+      // Call external LLM with current context
+      const llmResponse = await this.callExternalLLMForReAct(
+        systemPrompt,
+        currentMessage,
+        conversationHistory,
+        model,
+        llmServiceUrl,
+        userId
+      );
+
+      console.log(`💭 External LLM Response: ${llmResponse.substring(0, 200)}...`);
+
+      // Parse response for tool calls
+      const toolCall = this.parseToolCall(llmResponse);
+
+      if (!toolCall) {
+        // No tool call found - this is the final answer
+        console.log(`✅ Final answer received (no tool call)`);
+        steps.push({ answer: llmResponse });
+        return {
+          finalAnswer: llmResponse,
+          steps,
+          toolsUsed
+        };
+      }
+
+      // Tool call found - execute it
+      console.log(`🔧 Tool call detected: ${toolCall.name}`);
+      
+      // Send progress update
+      if (progressCallback) {
+        progressCallback(`🔧 Executing: ${toolCall.name}...`);
+      }
+      
+      steps.push({
+        thought: `Using ${toolCall.name}...`,
+        action: toolCall.name,
+        actionInput: toolCall.arguments
+      });
+      toolsUsed.push(toolCall.name);
+
+      // Execute tool
+      const toolResult = await this.mcpService.executeTool({
+        name: toolCall.name,
+        arguments: toolCall.arguments
+      });
+
+      const observation = toolResult.success
+        ? JSON.stringify(toolResult.result, null, 2)
+        : `Error: ${toolResult.error}`;
+
+      console.log(`👁️ Observation: ${observation.substring(0, 200)}...`);
+      steps.push({ observation });
+
+      // Prepare next message with tool result
+      currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ${observation}\n\nBased on this information, provide your final answer to the user's question.`;
+      
+      // Add to conversation history
+      conversationHistory.push({
+        role: 'assistant',
+        content: `Tool: ${toolCall.name}\nResult: ${observation}`
+      });
+    }
+
+    // Max iterations reached
+    console.warn(`⚠️ Max iterations (${MAX_ITERATIONS}) reached for external ReAct`);
+    return {
+      finalAnswer: 'I apologize, but I reached the maximum number of steps while processing your request. Please try rephrasing your question.',
+      steps,
+      toolsUsed
+    };
+  }
+
+  /**
+   * Call external LLM for ReAct (non-streaming)
+   */
+  private async callExternalLLMForReAct(
+    systemPrompt: string,
+    userMessage: string,
+    history: any[],
+    model: string,
+    llmServiceUrl: string,
+    userId: string
+  ): Promise<string> {
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...history,
+      { role: 'user', content: userMessage }
+    ];
+
+    const url = `${llmServiceUrl}/api/chat?userId=${userId}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        temperature: 0.3,
+        max_tokens: 1024
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || `External LLM API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.response || data.message || '';
+  }
+
+  /**
+   * Parse tool call from LLM response
+   */
+  private parseToolCall(response: string): { name: string; arguments: any } | null {
+    // Try to parse XML-style tool call
+    const toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/s;
+    const match = response.match(toolCallRegex);
+    
+    if (match) {
+      const toolName = match[1].trim();
+      const argsJson = match[2].trim();
+      
+      try {
+        const args = parseJSON(argsJson);
+        if (args) {
+          return { name: toolName, arguments: args };
+        }
+      } catch (error) {
+        console.error('Failed to parse tool arguments:', error);
+      }
+    }
+    
+    return null;
   }
 
 

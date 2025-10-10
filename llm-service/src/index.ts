@@ -111,6 +111,18 @@ async function callExternalAPI(provider: string, model: string, messages: any[],
   }
 }
 
+// Helper function to call external APIs with streaming
+async function callExternalAPIStreaming(provider: string, model: string, messages: any[], apiKey: string, options: any): Promise<ReadableStream> {
+  switch (provider) {
+    case 'openai':
+      return await callOpenAIStreaming(model, messages, apiKey, options);
+    case 'anthropic':
+      return await callAnthropicStreaming(model, messages, apiKey, options);
+    default:
+      throw new Error(`Provider ${provider} not supported for streaming`);
+  }
+}
+
 // Call OpenAI API
 async function callOpenAI(model: string, messages: any[], apiKey: string, options: any): Promise<any> {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -145,6 +157,31 @@ async function callOpenAI(model: string, messages: any[], apiKey: string, option
       total_tokens: data.usage?.total_tokens || 0
     }
   };
+}
+
+// Call OpenAI API with streaming
+async function callOpenAIStreaming(model: string, messages: any[], apiKey: string, options: any): Promise<ReadableStream> {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: options.temperature || 0.7,
+      max_tokens: options.max_tokens || 500,
+      stream: true
+    })
+  });
+  
+  if (!response.ok) {
+    const error = await response.json() as any;
+    throw new Error(error.error?.message || 'OpenAI API error');
+  }
+  
+  return response.body!;
 }
 
 // Call Anthropic API
@@ -187,6 +224,37 @@ async function callAnthropic(model: string, messages: any[], apiKey: string, opt
       total_tokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)
     }
   };
+}
+
+// Call Anthropic API with streaming
+async function callAnthropicStreaming(model: string, messages: any[], apiKey: string, options: any): Promise<ReadableStream> {
+  // Convert messages format for Anthropic
+  const systemMessage = messages.find(m => m.role === 'system');
+  const userMessages = messages.filter(m => m.role !== 'system');
+  
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model,
+      messages: userMessages,
+      system: systemMessage?.content,
+      max_tokens: options.max_tokens || 500,
+      temperature: options.temperature || 0.7,
+      stream: true
+    })
+  });
+  
+  if (!response.ok) {
+    const error = await response.json() as any;
+    throw new Error(error.error?.message || 'Anthropic API error');
+  }
+  
+  return response.body!;
 }
 
 // Helper function to check API key status from backend
@@ -582,7 +650,7 @@ app.post('/api/chat', async (req, res) => {
     const userId = req.query.userId as string;
     const { getModelById } = await import('@agentdb9/shared');
     
-    console.log('[LLM Service] /api/chat called with model:', model, 'userId:', userId);
+    console.log('[LLM Service] /api/chat called with model:', model, 'userId:', userId, 'stream:', stream);
     
     // Get model info
     const modelInfo = getModelById(model || 'codellama:7b');
@@ -663,12 +731,82 @@ app.post('/api/chat', async (req, res) => {
     
     // Call the appropriate external API
     try {
-      const externalResponse = await callExternalAPI(modelInfo.provider, model, messages, apiKey, {
-        temperature,
-        max_tokens
-      });
-      
-      return res.json(externalResponse);
+      if (stream) {
+        // Set up streaming response
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        
+        const streamBody = await callExternalAPIStreaming(modelInfo.provider, model, messages, apiKey, {
+          temperature,
+          max_tokens
+        });
+        
+        const reader = streamBody.getReader();
+        const decoder = new TextDecoder();
+        
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) {
+              res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+              break;
+            }
+            
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.trim());
+            
+            for (const line of lines) {
+              // Handle SSE format from external APIs
+              if (line.startsWith('data: ')) {
+                const data = line.substring(6);
+                if (data === '[DONE]') {
+                  res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+                  continue;
+                }
+                
+                try {
+                  const parsed = JSON.parse(data);
+                  
+                  // Transform to our format
+                  let content = '';
+                  if (modelInfo.provider === 'openai') {
+                    content = parsed.choices?.[0]?.delta?.content || '';
+                  } else if (modelInfo.provider === 'anthropic') {
+                    if (parsed.type === 'content_block_delta') {
+                      content = parsed.delta?.text || '';
+                    }
+                  }
+                  
+                  if (content) {
+                    res.write(`data: ${JSON.stringify({ 
+                      content, 
+                      done: false,
+                      model: model
+                    })}\n\n`);
+                  }
+                } catch (parseError) {
+                  console.error('Failed to parse streaming chunk:', data);
+                }
+              }
+            }
+          }
+          
+          res.end();
+        } finally {
+          reader.releaseLock();
+        }
+      } else {
+        // Non-streaming response
+        const externalResponse = await callExternalAPI(modelInfo.provider, model, messages, apiKey, {
+          temperature,
+          max_tokens
+        });
+        
+        return res.json(externalResponse);
+      }
     } catch (apiError: any) {
       console.error(`${modelInfo.provider} API error:`, apiError);
       return res.status(500).json({
