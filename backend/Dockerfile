@@ -30,11 +30,8 @@ WORKDIR /app
 # Copy package files
 COPY backend/package*.json ./
 
-# Install dependencies
-RUN npm install
-
-# Install jsonrepair explicitly (it may be hoisted in local dev but needs to be here for Docker)
-RUN npm install jsonrepair
+# Install dependencies locally (no hoisting, isolated container)
+RUN npm install --omit=dev
 
 # Rebuild native modules for the container architecture
 RUN npm rebuild sqlite3

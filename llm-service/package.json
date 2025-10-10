@@ -4,9 +4,9 @@
   "description": "LLM Service for AgentDB9 Coding Agent",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "cross-env NODE_PATH=../node_modules ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
-    "start": "cross-env NODE_PATH=../node_modules node dist/index.js",
+    "start": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint src/**/*.ts",

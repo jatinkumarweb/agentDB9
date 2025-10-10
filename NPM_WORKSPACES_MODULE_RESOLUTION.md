@@ -48,9 +48,15 @@ error TS2307: Cannot find module 'cheerio' or its corresponding type declaration
   - Inconsistent with rest of codebase
   - Not a real solution
 
-## ✅ Robust Solution: Two-Part Approach
+## ✅ Simple Solution: TypeScript Path Mappings + Isolated Docker Builds
 
-### Part 1: TypeScript Compilation (Build Time)
+### The Real Problem
+
+npm workspaces hoists dependencies to the root, which causes TypeScript compilation errors in workspace packages. However:
+- **Node.js runtime works fine** - it automatically searches parent directories for modules
+- **Docker containers should be isolated** - each container installs its own dependencies
+
+### Solution Part 1: TypeScript Compilation (Local Development)
 
 Configure TypeScript to look in parent node_modules using the `paths` compiler option.
 
@@ -71,87 +77,81 @@ Add specific path mappings to `tsconfig.json` for hoisted packages:
 
 **Important:** Use specific package names, NOT wildcards like `"*"`. Wildcards can break module resolution for other packages.
 
-### Part 2: Runtime Resolution (Node.js)
+### Solution Part 2: Docker Builds (Isolated Dependencies)
 
-Configure Node.js to find hoisted packages at runtime using `NODE_PATH` and volume mounts.
+Each Docker container should install its own dependencies locally, avoiding the hoisting issue entirely.
 
-#### docker-compose.yml
+#### Dockerfile Pattern
 
-For each service, add:
+```dockerfile
+WORKDIR /app
 
-```yaml
-services:
-  backend:
-    environment:
-      # Allow Node.js to resolve hoisted packages from root node_modules
-      - NODE_PATH=/workspace/node_modules
-    volumes:
-      - ./backend:/app
-      # Mount root node_modules as read-only for hoisted package resolution
-      - ./node_modules:/workspace/node_modules:ro
+# Copy package files
+COPY backend/package*.json ./
+
+# Install dependencies locally (no hoisting in isolated container)
+RUN npm install
+
+# Copy source and build
+COPY backend/src ./src
+COPY backend/tsconfig*.json ./
+RUN npm run build
+
+# Optional: Remove dev dependencies for production
+RUN npm prune --production
 ```
 
-#### .devcontainer/devcontainer.json
-
-```json
-{
-  "remoteEnv": {
-    "NODE_PATH": "${containerWorkspaceFolder}/node_modules"
-  }
-}
-```
+**Key Points:**
+- Each container has its own `node_modules/` with all dependencies
+- No hoisting issues because dependencies are installed per-package
+- Fully isolated and reproducible builds
+- No need for NODE_PATH or volume mounts
 
 ### How It Works
 
-#### Build Time (TypeScript)
-1. TypeScript checks the `paths` mapping first
-2. For mapped packages (like `jsonrepair`), it looks in `../node_modules/`
-3. For unmapped packages, normal resolution applies
-4. Explicit and predictable behavior
+#### Local Development (TypeScript + Node.js)
+1. **Build time:** TypeScript uses `paths` mappings to find hoisted packages in `../node_modules/`
+2. **Runtime:** Node.js automatically searches parent directories for modules (standard behavior)
+3. No configuration needed beyond tsconfig.json path mappings
 
-#### Runtime (Node.js)
-1. `NODE_PATH` tells Node.js to check `/workspace/node_modules`
-2. Root node_modules is mounted as read-only volume
-3. Node.js can resolve hoisted packages at runtime
-4. Works in Docker containers and dev containers
-5. No symlinks, no special scripts
+#### Docker Containers
+1. Each container runs `npm install` in its own directory
+2. Dependencies are installed locally in the container's `node_modules/`
+3. No hoisting, no shared dependencies between containers
+4. Fully isolated and reproducible builds
 
 ### Applied To
 
-#### TypeScript Configuration:
+#### TypeScript Configuration (Local Development):
 - ✅ `backend/tsconfig.json` - jsonrepair path mapping
 
-#### Docker Configuration:
-- ✅ `docker-compose.yml` - All services (backend, frontend, llm-service, mcp-server)
-  - NODE_PATH environment variable
-  - Root node_modules volume mount
-
-#### Dev Container Configuration:
-- ✅ `.devcontainer/devcontainer.json` - NODE_PATH in remoteEnv
+#### Docker Configuration (Isolated Builds):
+- ✅ `backend/Dockerfile` - `npm install` for local dependencies
+- ✅ `llm-service/Dockerfile` - `npm install` for local dependencies
+- ✅ `mcp-server/Dockerfile` - `npm install` for local dependencies
 
 ## Benefits
 
-### 🎯 Future-Proof
-- Works for any new dependency automatically
-- No need to create symlinks for each package
-- No need to update scripts or configuration
+### 🎯 Simple and Clear
+- TypeScript path mappings for local development
+- Isolated npm install for Docker containers
+- No complex configuration or workarounds
 
 ### 🔧 Maintainable
-- Standard TypeScript feature
-- No custom scripts or workarounds
-- Clear and documented solution
+- Standard TypeScript and Docker patterns
+- No custom scripts or hacks
+- Easy to understand and debug
 
-### 🚀 Compatible
-- Works in local development
-- Works in Docker builds
-- Works across all platforms
-- Works with npm workspaces hoisting
+### 🚀 Reliable
+- Local development: Node.js handles parent directory resolution automatically
+- Docker: Each container has its own isolated dependencies
+- Reproducible builds across all environments
 
 ### 📦 Clean
 - No symlinks in git
-- No .npmrc hacks
-- No require() workarounds
-- Proper TypeScript imports with types
+- No NODE_PATH environment variables
+- No cross-env or other runtime wrappers
+- No volume mounts for node_modules
 
 ## Usage
 
@@ -181,7 +181,7 @@ ls -la backend/node_modules/new-package  # Should NOT exist
 }
 ```
 
-4. **Runtime resolution is automatic** - NODE_PATH and volume mounts are already configured in docker-compose.yml
+4. **Runtime resolution is automatic** - Node.js searches parent directories by default
 
 ### Verification
 
@@ -246,11 +246,12 @@ Our solution makes TypeScript work with this behavior instead of fighting it.
 
 ### Docker Build Issues?
 
-Docker builds install dependencies in the container's own node_modules, so hoisting doesn't affect them. If Docker builds fail:
+Each Docker container installs its own dependencies locally. If Docker builds fail:
 
-1. Check Dockerfile installs the package
-2. Verify package.json includes the dependency
-3. Rebuild without cache: `docker-compose build --no-cache backend`
+1. **Check Dockerfile uses `npm install`** (not `npm ci` unless you have package-lock.json)
+2. **Verify package.json includes all dependencies** (including devDependencies needed for building)
+3. **Rebuild without cache:** `docker-compose build --no-cache backend`
+4. **Check for build errors:** TypeScript compilation errors, missing types, etc.
 
 ## Migration from Old Solutions
 
@@ -286,41 +287,44 @@ TypeScript will now resolve it correctly.
 - [TypeScript Compiler Options - paths](https://www.typescriptlang.org/tsconfig#paths)
 - [npm Workspaces](https://docs.npmjs.com/cli/v8/using-npm/workspaces)
 
-## Local Development (npm run dev)
+## Why This Approach Works
 
-### Runtime Resolution Works Automatically
+### Local Development
 
-Node.js automatically searches parent `node_modules` directories, so hoisted packages work at runtime without additional configuration:
+**Node.js Module Resolution Algorithm:**
+1. Check current directory's `node_modules/`
+2. Check parent directory's `node_modules/`
+3. Check grandparent directory's `node_modules/`
+4. Continue up to filesystem root
 
-```bash
-cd backend
-npm run start:dev  # Works! Node.js finds jsonrepair in ../node_modules
-```
+When code in `backend/` imports `jsonrepair`:
+1. Node.js checks `backend/node_modules/jsonrepair` (not found)
+2. Node.js checks `../node_modules/jsonrepair` (found! ✅)
 
-### Why cross-env NODE_PATH?
+**No configuration needed** - this is standard Node.js behavior.
 
-While Node.js handles this automatically, we add `cross-env NODE_PATH=../node_modules` to npm scripts for:
+### Docker Containers
 
-1. **Consistency** - Same behavior across all environments
-2. **Explicit** - Makes it clear where packages are resolved from
-3. **Docker compatibility** - Ensures Docker containers use the same resolution
-4. **Cross-platform** - Works on Windows, Mac, Linux
+Each container runs `npm install` in its own directory, creating a local `node_modules/` with all dependencies. This means:
+- No hoisting issues (each container is isolated)
+- Reproducible builds (same dependencies every time)
+- No shared state between containers
+- Standard Docker best practices
 
 ### Verification
 
-Test that runtime resolution works:
-
+**Local development:**
 ```bash
 cd backend
-node -e "const { parseJSON } = require('./dist/src/common/utils/json-parser.util.js'); console.log(parseJSON('{\"test\": \"value}'));"
+npm run build  # TypeScript compilation
+npm run start:dev  # Runtime execution
 ```
 
-Should output: `{ test: 'value' }`
+**Docker:**
+```bash
+docker-compose build backend
+docker-compose up backend
+```
 
-If you're getting "Cannot find module 'jsonrepair'" errors at runtime, check:
-
-1. **Is jsonrepair installed?** `ls -la node_modules/jsonrepair`
-2. **Is it hoisted?** Should be in root, not `backend/node_modules`
-3. **Did you rebuild?** `cd backend && npm run build`
-4. **Are you in the right directory?** Should run from `backend/`
+Both should work without module resolution errors.
 

@@ -16,7 +16,7 @@ WORKDIR /app
 # Copy package files
 COPY mcp-server/package*.json ./
 
-# Install all dependencies (including dev dependencies for building)
+# Install all dependencies locally (including dev for building, isolated container)
 RUN npm install
 
 # Create symlink to shared package BEFORE copying source

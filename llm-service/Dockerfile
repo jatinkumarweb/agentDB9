@@ -18,7 +18,7 @@ WORKDIR /app
 # Copy package files
 COPY llm-service/package*.json ./
 
-# Install dependencies
+# Install all dependencies locally (including dev for building, isolated container)
 RUN npm install
 
 # Copy source code (excluding node_modules)
@@ -30,6 +30,9 @@ RUN mkdir -p node_modules/@agentdb9 && ln -sf /shared node_modules/@agentdb9/sha
 
 # Build the application
 RUN npm run build
+
+# Remove dev dependencies to reduce image size
+RUN npm prune --production
 
 # Create models directory
 RUN mkdir -p /models
