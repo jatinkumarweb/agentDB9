@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
+import { ModelsService } from '../models/models.service';
 
 interface ProviderConfig {
   name: string;
@@ -17,6 +18,8 @@ export class ProvidersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @Inject(forwardRef(() => ModelsService))
+    private readonly modelsService: ModelsService,
   ) {}
 
   async getProviderConfigs(userId: string): Promise<ProviderConfig[]> {
@@ -25,6 +28,16 @@ export class ProvidersService {
     
     console.log(`[getProviderConfigs] userId: ${userId}, user found: ${!!user}, apiKeys:`, JSON.stringify(apiKeys));
 
+    // Fetch all models to populate provider models
+    let allModels = [];
+    try {
+      const modelsData = await this.modelsService.getModels(userId);
+      allModels = modelsData?.models || [];
+      console.log(`[getProviderConfigs] Fetched ${allModels.length} models from models service`);
+    } catch (error) {
+      console.error('[getProviderConfigs] Failed to fetch models:', error);
+    }
+
     const providers = [
       {
         name: 'openai',
@@ -32,7 +45,7 @@ export class ProvidersService {
         apiKeyLabel: 'OpenAI API Key',
         apiKeyPlaceholder: 'sk-...',
         configured: !!apiKeys.openai && apiKeys.openai.length > 0,
-        models: []
+        models: allModels.filter(m => m.provider === 'openai')
       },
       {
         name: 'anthropic',
@@ -40,7 +53,7 @@ export class ProvidersService {
         apiKeyLabel: 'Anthropic API Key',
         apiKeyPlaceholder: 'sk-ant-...',
         configured: !!apiKeys.anthropic && apiKeys.anthropic.length > 0,
-        models: []
+        models: allModels.filter(m => m.provider === 'anthropic')
       },
       {
         name: 'cohere',
@@ -48,7 +61,7 @@ export class ProvidersService {
         apiKeyLabel: 'Cohere API Key',
         apiKeyPlaceholder: 'co-...',
         configured: !!apiKeys.cohere && apiKeys.cohere.length > 0,
-        models: []
+        models: allModels.filter(m => m.provider === 'cohere')
       },
       {
         name: 'huggingface',
@@ -56,10 +69,11 @@ export class ProvidersService {
         apiKeyLabel: 'Hugging Face API Key',
         apiKeyPlaceholder: 'hf_...',
         configured: !!apiKeys.huggingface && apiKeys.huggingface.length > 0,
-        models: []
+        models: allModels.filter(m => m.provider === 'huggingface')
       }
     ];
 
+    console.log(`[getProviderConfigs] Returning providers:`, JSON.stringify(providers.map(p => ({ name: p.name, configured: p.configured, modelCount: p.models.length }))));
     return providers;
   }
 
