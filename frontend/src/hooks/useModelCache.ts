@@ -65,8 +65,11 @@ export function useModelCache(options: ModelCacheOptions = {}) {
 
       const data = await response.json();
 
-      if (data.success && data.data && data.data.models) {
-        const models = data.data.models;
+      // Handle double-wrapped response from backend
+      const modelsData = data.data?.data?.models || data.data?.models;
+      
+      if (data.success && modelsData) {
+        const models = modelsData;
         
         // Cache the result
         cache.current = {

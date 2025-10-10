@@ -86,15 +86,18 @@ export class ProvidersService {
         throw new Error(`Invalid provider: ${provider}`);
       }
 
-      if (!apiKey || apiKey.trim().length === 0) {
+      // Trim whitespace from API key
+      const trimmedApiKey = apiKey?.trim() || '';
+      
+      if (!trimmedApiKey || trimmedApiKey.length === 0) {
         throw new Error('API key cannot be empty');
       }
 
       // Validate API key format
-      this.validateApiKey(provider, apiKey);
+      this.validateApiKey(provider, trimmedApiKey);
 
       // Test the API key
-      const isValid = await this.testApiKey(provider, apiKey);
+      const isValid = await this.testApiKey(provider, trimmedApiKey);
       if (!isValid) {
         throw new Error(`Invalid API key for ${provider}`);
       }
@@ -112,7 +115,7 @@ export class ProvidersService {
         user.preferences.apiKeys = {};
       }
 
-      user.preferences.apiKeys[provider] = apiKey;
+      user.preferences.apiKeys[provider] = trimmedApiKey;
       await this.userRepository.save(user);
 
       return {
@@ -132,6 +135,14 @@ export class ProvidersService {
   }
 
   private validateApiKey(provider: string, apiKey: string): void {
+    // Log for debugging
+    console.log(`Validating API key for ${provider}:`, {
+      length: apiKey?.length,
+      prefix: apiKey?.substring(0, 10),
+      hasWhitespace: /\s/.test(apiKey),
+      type: typeof apiKey
+    });
+
     // More flexible patterns to accommodate various API key formats
     const patterns = {
       // OpenAI: sk- followed by alphanumeric, hyphens, underscores (project keys: sk-proj-)
@@ -146,8 +157,11 @@ export class ProvidersService {
 
     const pattern = patterns[provider];
     if (pattern && !pattern.test(apiKey)) {
+      console.error(`API key validation failed for ${provider}. Pattern: ${pattern}, Key starts with: ${apiKey?.substring(0, 10)}`);
       throw new Error(`Invalid API key format for ${provider}`);
     }
+    
+    console.log(`API key validation passed for ${provider}`);
   }
 
   private async testApiKey(provider: string, apiKey: string): Promise<boolean> {

@@ -211,10 +211,13 @@ export default function ModelManager() {
 
   const updateProviderConfig = async (provider: string, apiKey: string) => {
     try {
+      // Trim whitespace from API key
+      const trimmedApiKey = apiKey.trim();
+      
       const response = await fetchWithAuth('/api/providers/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, apiKey })
+        body: JSON.stringify({ provider, apiKey: trimmedApiKey })
       });
       
       const data = await response.json();
@@ -470,14 +473,18 @@ function ProviderConfigCard({ provider, onUpdate }: ProviderConfigCardProps) {
   const [apiKey, setApiKey] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
     setSaving(true);
+    setError(null);
     try {
       await onUpdate(provider.name, apiKey);
       setIsEditing(false);
       setApiKey('');
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save configuration';
+      setError(errorMessage);
       console.error('Failed to save configuration:', error);
     } finally {
       setSaving(false);
@@ -511,10 +518,16 @@ function ProviderConfigCard({ provider, onUpdate }: ProviderConfigCardProps) {
             <input
               type="password"
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+              onChange={(e) => {
+                setApiKey(e.target.value);
+                setError(null); // Clear error when user types
+              }}
               placeholder={provider.apiKeyPlaceholder}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
+            {error && (
+              <p className="mt-2 text-sm text-red-600">{error}</p>
+            )}
           </div>
           <div className="flex space-x-3">
             <button

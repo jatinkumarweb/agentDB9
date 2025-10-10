@@ -59,7 +59,8 @@ export default function ModelSelector({
             cachedModels.some((m: ModelOption) => 
               m.provider === p && (
                 m.status === 'available' || 
-                (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured))
+                (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
+                (m.status === 'unavailable' && !m.requiresApiKey)
               )
             )
           ) || providers[0];
@@ -80,7 +81,8 @@ export default function ModelSelector({
           );
           const firstAvailable = providerModels.find((m: ModelOption) => 
             m.status === 'available' || 
-            (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured))
+            (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
+            (m.status === 'unavailable' && !m.requiresApiKey)
           );
           if (firstAvailable) {
             onModelChange(firstAvailable.id);
@@ -95,6 +97,11 @@ export default function ModelSelector({
     if (model.status === 'available') return '✅';
     if (model.status === 'disabled') return '⚠️';
     if (model.status === 'error') return '❌';
+    if (model.status === 'unavailable') {
+      // Ollama models that aren't downloaded yet but can be used
+      if (!model.requiresApiKey) return '📥'; // Download icon
+      return '⚠️';
+    }
     if (model.status === 'unknown') {
       // Show as available if no API key required or API key is configured
       if (!model.requiresApiKey || model.apiKeyConfigured) return '✅';
@@ -136,7 +143,8 @@ export default function ModelSelector({
     if (!currentModelInProvider) {
       const firstAvailable = providerModels.find(m => 
         m.status === 'available' || 
-        (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured))
+        (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
+        (m.status === 'unavailable' && !m.requiresApiKey)
       );
       if (firstAvailable) {
         onModelChange(firstAvailable.id);
@@ -183,10 +191,14 @@ export default function ModelSelector({
     );
   }
 
-  // Treat models as available if they have 'available' status OR 'unknown' status without API key requirements
+  // Treat models as available if they:
+  // - Have 'available' status
+  // - Have 'unknown' status without API key requirements
+  // - Have 'unavailable' status but don't require API key (Ollama models that aren't downloaded yet)
   const availableModels = filteredModels.filter(m => 
     m.status === 'available' || 
-    (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured))
+    (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
+    (m.status === 'unavailable' && !m.requiresApiKey)
   );
   
   const disabledModels = filteredModels.filter(m => 
@@ -213,7 +225,8 @@ export default function ModelSelector({
               const providerModels = models.filter(m => m.provider === provider);
               const availableCount = providerModels.filter(m => 
                 m.status === 'available' || 
-                (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured))
+                (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
+                (m.status === 'unavailable' && !m.requiresApiKey)
               ).length;
               const totalCount = providerModels.length;
               
