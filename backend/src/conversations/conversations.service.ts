@@ -538,7 +538,16 @@ This agent is configured to use "${model}" which requires external API access.
       const ollamaUrl = process.env.OLLAMA_HOST || process.env.OLLAMA_API_URL || 'http://localhost:11434';
       console.log(`🌐 ReAct: Using Ollama at ${ollamaUrl}`);
       
-      // Execute ReAct loop
+      // Create a temporary message to show progress
+      const tempMessage = this.messagesRepository.create({
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: '🔄 Analyzing workspace...',
+        metadata: { model, streaming: true },
+      });
+      const savedTempMessage = await this.messagesRepository.save(tempMessage);
+      
+      // Execute ReAct loop with progress updates
       console.log(`⚙️ ReAct: Calling executeReActLoop with model ${model}`);
       const result = await this.reactAgentService.executeReActLoop(
         userMessage,
@@ -546,17 +555,34 @@ This agent is configured to use "${model}" which requires external API access.
         model,
         ollamaUrl,
         conversationHistory,
+        conversation.id,
+        (status: string) => {
+          // Broadcast progress via WebSocket
+          this.websocketGateway.broadcastMessageUpdate(
+            conversation.id,
+            savedTempMessage.id,
+            status,
+            true,
+            { streaming: true, progress: true }
+          );
+        }
       );
       
-      // Create assistant message with final response
+      // Update the temporary message with final response
       console.log(`💾 ReAct: Saving final answer (${result.finalAnswer.length} chars, ${result.toolsUsed.length} tools used)`);
-      const assistantMessage = this.messagesRepository.create({
-        conversationId: conversation.id,
-        role: 'assistant',
+      await this.messagesRepository.update(savedTempMessage.id, {
         content: result.finalAnswer,
-        metadata: { model, toolsUsed: result.toolsUsed, steps: result.steps },
+        metadata: { model, toolsUsed: result.toolsUsed, steps: result.steps, streaming: false } as any,
       });
-      await this.messagesRepository.save(assistantMessage);
+      
+      // Broadcast final update
+      this.websocketGateway.broadcastMessageUpdate(
+        conversation.id,
+        savedTempMessage.id,
+        result.finalAnswer,
+        false,
+        { model, toolsUsed: result.toolsUsed, streaming: false }
+      );
       
       console.log(`✅ ReAct completed successfully with ${result.toolsUsed.length} tools used`);
       if (isVerbose) {

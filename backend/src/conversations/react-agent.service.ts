@@ -31,7 +31,9 @@ export class ReActAgentService {
     systemPrompt: string,
     model: string,
     ollamaUrl: string,
-    conversationHistory: any[] = []
+    conversationHistory: any[] = [],
+    conversationId?: string,
+    progressCallback?: (status: string) => void
   ): Promise<ReActResult> {
     const steps: ReActStep[] = [];
     const toolsUsed: string[] = [];
@@ -43,6 +45,11 @@ export class ReActAgentService {
     while (iteration < this.MAX_ITERATIONS) {
       iteration++;
       this.logger.log(`\n🔁 ReAct Iteration ${iteration}/${this.MAX_ITERATIONS}`);
+      
+      // Send progress update
+      if (progressCallback) {
+        progressCallback(`🔄 Analyzing... (step ${iteration}/${this.MAX_ITERATIONS})`);
+      }
 
       // Call LLM with current context
       const llmResponse = await this.callLLM(
@@ -71,8 +78,14 @@ export class ReActAgentService {
 
       // Tool call found - execute it
       this.logger.log(`🔧 Tool call detected: ${toolCall.name}`);
+      
+      // Send progress update
+      if (progressCallback) {
+        progressCallback(`🔧 Executing: ${toolCall.name}...`);
+      }
+      
       steps.push({
-        thought: `I need to use ${toolCall.name} to answer this question`,
+        thought: `Using ${toolCall.name}...`,
         action: toolCall.name,
         actionInput: toolCall.arguments
       });
@@ -200,12 +213,21 @@ export class ReActAgentService {
     toolCall: { name: string; arguments: any },
     observation: string
   ): string {
-    return `Tool Result Received:
-${observation}
+    // For workspace summary, we have comprehensive data - encourage final answer
+    if (toolCall.name === 'get_workspace_summary') {
+      return `You received comprehensive workspace data. Use this to answer the question directly.
 
-Original Question: ${originalQuestion}
+Question: ${originalQuestion}
 
-If you need more information, use another tool (output only XML).
-If you have enough information, provide your final answer (no XML).`;
+Data: ${observation}
+
+Provide your final answer now (no more tools needed).`;
+    }
+    
+    return `Tool Result: ${observation}
+
+Question: ${originalQuestion}
+
+If you have enough info, provide final answer (no XML). Otherwise use another tool (XML only).`;
   }
 }
