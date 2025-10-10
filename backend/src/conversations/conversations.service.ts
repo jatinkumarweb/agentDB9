@@ -1728,7 +1728,7 @@ You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</argum
       const tempMessage = this.messagesRepository.create({
         conversationId: conversation.id,
         role: 'assistant',
-        content: '🔄 Analyzing workspace...',
+        content: '🤔 Planning approach...\n📋 Preparing to analyze your request (up to 5 steps)',
         metadata: { model, streaming: true, provider: 'external' },
       });
       const savedTempMessage = await this.messagesRepository.save(tempMessage);
@@ -1806,9 +1806,10 @@ You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</argum
       iteration++;
       console.log(`\n🔁 External ReAct Iteration ${iteration}/${MAX_ITERATIONS}`);
       
-      // Send progress update
+      // Send progress update with step indicator
       if (progressCallback) {
-        progressCallback(`🔄 Analyzing... (step ${iteration}/${MAX_ITERATIONS})`);
+        const stepInfo = `📋 Step ${iteration}/${MAX_ITERATIONS}`;
+        progressCallback(`${stepInfo}\n🔄 Thinking...`);
       }
 
       // Call external LLM with current context
@@ -1840,9 +1841,10 @@ You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</argum
       // Tool call found - execute it
       console.log(`🔧 Tool call detected: ${toolCall.name}`);
       
-      // Send progress update
+      // Send progress update with step indicator
       if (progressCallback) {
-        progressCallback(`🔧 Executing: ${toolCall.name}...`);
+        const stepInfo = `📋 Step ${iteration}/${MAX_ITERATIONS}`;
+        progressCallback(`${stepInfo}\n🔧 Executing: ${toolCall.name}...`);
       }
       
       steps.push({
@@ -1865,8 +1867,17 @@ You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</argum
       console.log(`👁️ Observation: ${observation.substring(0, 200)}...`);
       steps.push({ observation });
 
+      // Broadcast tool result to UI
+      if (progressCallback) {
+        const resultPreview = observation.length > 100 ? observation.substring(0, 100) + '...' : observation;
+        const stepInfo = `📋 Step ${iteration}/${MAX_ITERATIONS}`;
+        progressCallback(`${stepInfo}\n✅ ${toolCall.name} completed\n\n${resultPreview}\n\n🤔 Deciding next action...`);
+      }
+
       // Check if tool failed
       const toolFailed = !toolResult.success || observation.includes('error') || observation.includes('Error');
+      
+      console.log(`🔄 Preparing next iteration. Tool failed: ${toolFailed}`);
       
       // Prepare next message with tool result - encourage continuation if needed
       if (toolFailed) {
