@@ -48,11 +48,11 @@ error TS2307: Cannot find module 'cheerio' or its corresponding type declaration
   - Inconsistent with rest of codebase
   - Not a real solution
 
-## ✅ Robust Solution: TypeScript Path Mapping
+## ✅ Robust Solution: Two-Part Approach
+
+### Part 1: TypeScript Compilation (Build Time)
 
 Configure TypeScript to look in parent node_modules using the `paths` compiler option.
-
-### Implementation
 
 Add specific path mappings to `tsconfig.json` for hoisted packages:
 
@@ -71,20 +71,63 @@ Add specific path mappings to `tsconfig.json` for hoisted packages:
 
 **Important:** Use specific package names, NOT wildcards like `"*"`. Wildcards can break module resolution for other packages.
 
+### Part 2: Runtime Resolution (Node.js)
+
+Configure Node.js to find hoisted packages at runtime using `NODE_PATH` and volume mounts.
+
+#### docker-compose.yml
+
+For each service, add:
+
+```yaml
+services:
+  backend:
+    environment:
+      # Allow Node.js to resolve hoisted packages from root node_modules
+      - NODE_PATH=/workspace/node_modules
+    volumes:
+      - ./backend:/app
+      # Mount root node_modules as read-only for hoisted package resolution
+      - ./node_modules:/workspace/node_modules:ro
+```
+
+#### .devcontainer/devcontainer.json
+
+```json
+{
+  "remoteEnv": {
+    "NODE_PATH": "${containerWorkspaceFolder}/node_modules"
+  }
+}
+```
+
 ### How It Works
 
+#### Build Time (TypeScript)
 1. TypeScript checks the `paths` mapping first
 2. For mapped packages (like `jsonrepair`), it looks in `../node_modules/`
 3. For unmapped packages, normal resolution applies
 4. Explicit and predictable behavior
+
+#### Runtime (Node.js)
+1. `NODE_PATH` tells Node.js to check `/workspace/node_modules`
+2. Root node_modules is mounted as read-only volume
+3. Node.js can resolve hoisted packages at runtime
+4. Works in Docker containers and dev containers
 5. No symlinks, no special scripts
 
 ### Applied To
 
-- ✅ `backend/tsconfig.json`
-- ✅ `llm-service/tsconfig.json`
-- ✅ `mcp-server/tsconfig.json`
-- ✅ `frontend/tsconfig.json`
+#### TypeScript Configuration:
+- ✅ `backend/tsconfig.json` - jsonrepair path mapping
+
+#### Docker Configuration:
+- ✅ `docker-compose.yml` - All services (backend, frontend, llm-service, mcp-server)
+  - NODE_PATH environment variable
+  - Root node_modules volume mount
+
+#### Dev Container Configuration:
+- ✅ `.devcontainer/devcontainer.json` - NODE_PATH in remoteEnv
 
 ## Benefits
 
@@ -120,7 +163,7 @@ cd backend
 npm install new-package
 ```
 
-2. If you get "Cannot find module" error during build:
+2. If you get "Cannot find module" error during **build**:
 ```bash
 # Check if it's hoisted
 ls -la node_modules/new-package  # Should exist
@@ -137,6 +180,8 @@ ls -la backend/node_modules/new-package  # Should NOT exist
   }
 }
 ```
+
+4. **Runtime resolution is automatic** - NODE_PATH and volume mounts are already configured in docker-compose.yml
 
 ### Verification
 
