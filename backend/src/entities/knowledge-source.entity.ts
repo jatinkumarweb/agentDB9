@@ -56,7 +56,7 @@ export class KnowledgeSource {
   })
   status: 'pending' | 'processing' | 'indexed' | 'failed';
 
-  @Column({ nullable: true, type: 'datetime' })
+  @Column({ nullable: true, type: 'timestamp' })
   lastIndexed?: Date;
 
   @Column({ nullable: true, type: 'text' })

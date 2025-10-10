@@ -16,11 +16,11 @@ if [ "$confirm" != "yes" ]; then
 fi
 
 # Get database connection details from environment or use defaults
-DB_HOST="${DB_HOST:-localhost}"
+DB_HOST="${DB_HOST:-postgres}"
 DB_PORT="${DB_PORT:-5432}"
-DB_NAME="${DB_NAME:-agentdb9}"
-DB_USER="${DB_USER:-postgres}"
-DB_PASSWORD="${DB_PASSWORD:-postgres}"
+DB_NAME="${DB_NAME:-coding_agent}"
+DB_USER="${DB_USERNAME:-postgres}"
+DB_PASSWORD="${DB_PASSWORD:-password}"
 
 echo ""
 echo "Connecting to database: $DB_NAME at $DB_HOST:$DB_PORT"
