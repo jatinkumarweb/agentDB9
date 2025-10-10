@@ -16,7 +16,13 @@ export class ProvidersController {
     try {
       const userId = req.user?.userId;
       if (!userId) {
-        throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+        throw new HttpException(
+          {
+            success: false,
+            error: 'User not authenticated',
+          },
+          HttpStatus.UNAUTHORIZED,
+        );
       }
       const configs = await this.providersService.getProviderConfigs(userId);
       return {
@@ -24,6 +30,10 @@ export class ProvidersController {
         data: configs,
       };
     } catch (error) {
+      // Re-throw HttpExceptions as-is
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException(
         {
           success: false,
@@ -42,7 +52,13 @@ export class ProvidersController {
       // Allow userId from query param (for internal service calls) or from auth token
       const userId = queryUserId || req.user?.userId;
       if (!userId) {
-        throw new HttpException('User ID required', HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+          {
+            success: false,
+            error: 'User ID required',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
       }
       const status = await this.providersService.getProviderStatus(userId);
       return {
@@ -50,6 +66,10 @@ export class ProvidersController {
         data: status,
       };
     } catch (error) {
+      // Re-throw HttpExceptions as-is
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException(
         {
           success: false,
@@ -70,7 +90,13 @@ export class ProvidersController {
     try {
       const userId = req.user?.userId;
       if (!userId) {
-        throw new HttpException('User not authenticated', HttpStatus.UNAUTHORIZED);
+        throw new HttpException(
+          {
+            success: false,
+            error: 'User not authenticated',
+          },
+          HttpStatus.UNAUTHORIZED,
+        );
       }
       const result = await this.providersService.updateProviderConfig(
         userId,
@@ -82,6 +108,10 @@ export class ProvidersController {
         data: result,
       };
     } catch (error) {
+      // Re-throw HttpExceptions as-is
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException(
         {
           success: false,
