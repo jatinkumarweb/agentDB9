@@ -804,14 +804,12 @@ Available tools:`;
 Critical Rules:
 1. When user asks to CREATE/BUILD a project → IMMEDIATELY use execute_command (DO NOT check workspace first)
 2. When user asks to CREATE/WRITE files → IMMEDIATELY use write_file with the actual content
-3. When user asks about existing files → Use list_files or read_file
+3. When user asks to UPDATE/MODIFY existing code → Use read_file first, then write_file
 4. ALWAYS use tools to perform actions - NEVER just give instructions
-5. After using a tool, wait for results before responding
-6. DO NOT check workspace or list files before creating a project - just create it directly
-7. If creating a project, use the appropriate command:
-   - Vite React: npm create vite@latest project-name -- --template react
-   - Next.js: npx create-next-app@latest project-name --yes
-   - React: npx create-react-app project-name`;
+5. After using a tool, CONTINUE using more tools until the task is complete
+6. If a tool fails, try a different approach - DON'T give up
+7. For complex tasks, use MULTIPLE tools in sequence (read → modify → write)
+8. Only provide final answer when ALL actions are complete`;
 
         // Add note about disabled permissions
         if (!workspaceConfig.enableContext && !workspaceConfig.enableActions) {
@@ -1855,13 +1853,26 @@ You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</argum
       console.log(`👁️ Observation: ${observation.substring(0, 200)}...`);
       steps.push({ observation });
 
+      // Check if tool failed
+      const toolFailed = !toolResult.success || observation.includes('error') || observation.includes('Error');
+      
       // Prepare next message with tool result - encourage continuation if needed
-      currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ${observation}\n\nDecide your next action:
+      if (toolFailed) {
+        currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ERROR - ${observation}\n\nThe tool failed. You MUST try a different approach:
+1. Try a different tool
+2. Try the same tool with different arguments
+3. Try to work around the error
+
+Output ONLY the XML tool call for your next action (no explanations).
+Example: <tool_call><tool_name>read_file</tool_name><arguments>{"path": "package.json"}</arguments></tool_call>`;
+      } else {
+        currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ${observation}\n\nDecide your next action:
 1. Need more info or another action? → Output ONLY the XML tool call (no explanations)
 2. Have enough info to answer? → Provide your final answer (text only, no XML)
 
 CRITICAL: If using a tool, output ONLY the XML - NO text before or after it.
 Example: <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>`;
+      }
       
       // Add to conversation history
       conversationHistory.push({
