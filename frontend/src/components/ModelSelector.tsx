@@ -191,16 +191,18 @@ export default function ModelSelector({
     );
   }
 
-  // Treat models as available if they:
-  // - Have 'available' status
-  // - Have 'unknown' status without API key requirements
-  // - Have 'unavailable' status but don't require API key (Ollama models that aren't downloaded yet)
+  // Available models: Actually ready to use
   const availableModels = filteredModels.filter(m => 
     m.status === 'available' || 
-    (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
-    (m.status === 'unavailable' && !m.requiresApiKey)
+    (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured))
   );
   
+  // Unavailable but selectable: Ollama models that can be downloaded
+  const unavailableSelectableModels = filteredModels.filter(m =>
+    m.status === 'unavailable' && !m.requiresApiKey
+  );
+  
+  // Disabled models: Cannot be used without configuration
   const disabledModels = filteredModels.filter(m => 
     m.status === 'disabled' || 
     (m.status === 'unknown' && m.requiresApiKey && !m.apiKeyConfigured) ||
@@ -225,14 +227,16 @@ export default function ModelSelector({
               const providerModels = models.filter(m => m.provider === provider);
               const availableCount = providerModels.filter(m => 
                 m.status === 'available' || 
-                (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
-                (m.status === 'unavailable' && !m.requiresApiKey)
+                (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured))
+              ).length;
+              const downloadableCount = providerModels.filter(m =>
+                m.status === 'unavailable' && !m.requiresApiKey
               ).length;
               const totalCount = providerModels.length;
               
               return (
                 <option key={provider} value={provider}>
-                  {provider.charAt(0).toUpperCase() + provider.slice(1)} ({availableCount}/{totalCount} available)
+                  {provider.charAt(0).toUpperCase() + provider.slice(1)} ({availableCount} ready{downloadableCount > 0 ? `, ${downloadableCount} downloadable` : ''})
                 </option>
               );
             })}
@@ -260,16 +264,16 @@ export default function ModelSelector({
         <select
         value={selectedModel || ''}
         onChange={(e) => onModelChange(e.target.value)}
-        disabled={disabled || availableModels.length === 0}
+        disabled={disabled || (availableModels.length === 0 && unavailableSelectableModels.length === 0)}
         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
         title={selectedModel ? getModelTooltip(models.find(m => m.id === selectedModel)) : 'Select a model'}
       >
-        {availableModels.length === 0 && (
+        {availableModels.length === 0 && unavailableSelectableModels.length === 0 && (
           <option value="" disabled>No models available</option>
         )}
         
         {availableModels.length > 0 && (
-          <optgroup label="Available Models">
+          <optgroup label="✅ Available Models (Ready to Use)">
             {availableModels.map((model) => (
               <option key={model.id} value={model.id}>
                 {model.id}
@@ -278,8 +282,18 @@ export default function ModelSelector({
           </optgroup>
         )}
         
+        {unavailableSelectableModels.length > 0 && (
+          <optgroup label="📥 Ollama Models (Will Download on First Use)">
+            {unavailableSelectableModels.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.id}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        
         {disabledModels.length > 0 && (
-          <optgroup label="Disabled Models">
+          <optgroup label="⚠️ Disabled Models (Requires Configuration)">
             {disabledModels.map((model) => (
               <option key={model.id} value={model.id} disabled>
                 {model.id} - {
@@ -310,7 +324,9 @@ export default function ModelSelector({
           {currentProvider && (
             <span className="font-medium">{currentProvider}: </span>
           )}
-          {availableModels.length} available, {disabledModels.length} disabled
+          {availableModels.length} available
+          {unavailableSelectableModels.length > 0 && `, ${unavailableSelectableModels.length} downloadable`}
+          {disabledModels.length > 0 && `, ${disabledModels.length} disabled`}
         </div>
       </div>
     </div>

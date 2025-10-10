@@ -38,10 +38,11 @@ export default function ModelManager() {
     fetchProviderConfigs();
   }, []);
 
-  const fetchModels = async () => {
+  const fetchModels = async (forceRefresh = false) => {
     try {
       setLoading(true);
-      const response = await fetchWithAuth('/api/models');
+      const url = forceRefresh ? '/api/models?refresh=true' : '/api/models';
+      const response = await fetchWithAuth(url);
       const data = await response.json();
       
       // Handle double-wrapped response from backend
@@ -224,7 +225,8 @@ export default function ModelManager() {
       
       if (data.success) {
         await fetchProviderConfigs();
-        await fetchModels();
+        // Force refresh to get updated model status with new API key
+        await fetchModels(true);
       } else {
         throw new Error(data.error || 'Failed to update configuration');
       }

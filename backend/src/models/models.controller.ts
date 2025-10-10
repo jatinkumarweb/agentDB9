@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Delete, Body, HttpStatus, HttpException } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, HttpStatus, HttpException, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ModelsService } from './models.service';
 import type { APIResponse } from '@agentdb9/shared';
+import { Request } from 'express';
 
 @ApiTags('models')
 @ApiBearerAuth()
@@ -12,9 +13,11 @@ export class ModelsController {
   @Get()
   @ApiOperation({ summary: 'Get all available models' })
   @ApiResponse({ status: 200, description: 'List of all models' })
-  async getModels(): Promise<APIResponse> {
+  async getModels(@Req() req: Request): Promise<APIResponse> {
     try {
-      const result = await this.modelsService.getModels();
+      // Get userId from authenticated user (optional - if not authenticated, returns models without user-specific status)
+      const userId = (req.user as any)?.id;
+      const result = await this.modelsService.getModels(userId);
       return {
         success: true,
         data: result,
