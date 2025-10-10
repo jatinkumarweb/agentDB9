@@ -160,8 +160,8 @@ export default function ModelSelector({
   
   // Filter models by selected provider
   const filteredModels = currentProvider 
-    ? models.filter(m => m.provider === currentProvider)
-    : models;
+    ? (models || []).filter(m => m && m.provider === currentProvider)
+    : (models || []);
   
   // Get unique providers
   const providers = models && models.length > 0 
@@ -195,22 +195,26 @@ export default function ModelSelector({
   }
 
   // Available models: Actually ready to use
-  const availableModels = filteredModels.filter(m => 
-    m.status === 'available' || 
-    (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
-    (m.requiresApiKey && m.apiKeyConfigured) // API-based models with configured keys are ready
+  const availableModels = (filteredModels || []).filter(m => 
+    m && (
+      m.status === 'available' || 
+      (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
+      (m.requiresApiKey && m.apiKeyConfigured) // API-based models with configured keys are ready
+    )
   );
   
   // Unavailable but selectable: Ollama models that can be downloaded
-  const unavailableSelectableModels = filteredModels.filter(m =>
-    m.status === 'unavailable' && !m.requiresApiKey
+  const unavailableSelectableModels = (filteredModels || []).filter(m =>
+    m && m.status === 'unavailable' && !m.requiresApiKey
   );
   
   // Disabled models: Cannot be used without configuration
-  const disabledModels = filteredModels.filter(m => 
-    m.status === 'disabled' || 
-    (m.status === 'unknown' && m.requiresApiKey && !m.apiKeyConfigured) ||
-    m.status === 'error'
+  const disabledModels = (filteredModels || []).filter(m => 
+    m && (
+      m.status === 'disabled' || 
+      (m.status === 'unknown' && m.requiresApiKey && !m.apiKeyConfigured) ||
+      m.status === 'error'
+    )
   );
 
   return (
@@ -228,14 +232,16 @@ export default function ModelSelector({
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
           >
             {providers.map((provider) => {
-              const providerModels = models.filter(m => m.provider === provider);
+              const providerModels = (models || []).filter(m => m && m.provider === provider);
               const availableCount = providerModels.filter(m => 
-                m.status === 'available' || 
-                (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
-                (m.requiresApiKey && m.apiKeyConfigured) // API-based models with configured keys are ready
+                m && (
+                  m.status === 'available' || 
+                  (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
+                  (m.requiresApiKey && m.apiKeyConfigured) // API-based models with configured keys are ready
+                )
               ).length;
               const downloadableCount = providerModels.filter(m =>
-                m.status === 'unavailable' && !m.requiresApiKey
+                m && m.status === 'unavailable' && !m.requiresApiKey
               ).length;
               const totalCount = providerModels.length;
               
