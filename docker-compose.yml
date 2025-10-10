@@ -172,11 +172,11 @@ services:
     environment:
       - OLLAMA_ORIGINS=*
       - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_NUM_PARALLEL=1        # Single request for better performance
+      - OLLAMA_NUM_PARALLEL=2        # Allow 2 parallel requests
       - OLLAMA_MAX_LOADED_MODELS=1   # Keep one model loaded
       - OLLAMA_KEEP_ALIVE=30m        # Keep model in memory longer
-      - OLLAMA_NUM_CTX=4096          # Match model's actual context (avoid warning)
-      - OLLAMA_NUM_THREAD=4          # Use all 4 CPU cores
+      - OLLAMA_NUM_CTX=8192          # Increased context window
+      - OLLAMA_NUM_THREAD=6          # Use 6 CPU threads
       - OLLAMA_NUM_GPU=0             # No GPU available
       - PRELOAD_MODELS=llama3.1:latest  # Model to preload on startup
     runtime: runc
@@ -184,11 +184,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4.0'
-          memory: 8G
+          cpus: '6.0'
+          memory: 12G
         reservations:
-          cpus: '2.0'
-          memory: 4G
+          cpus: '3.0'
+          memory: 6G
     logging:
       driver: "json-file"
       options:

@@ -276,7 +276,10 @@ export class ConversationsService {
         if (isOllamaHealthy && availableModels.length > 0) {
           try {
             // Use ReAct for tool-based queries, streaming for simple queries
-            if (this.shouldUseReAct(userMessage)) {
+            const useReAct = this.shouldUseReAct(userMessage);
+            console.log(`🔍 Query analysis: "${userMessage.substring(0, 50)}..." -> ReAct: ${useReAct}`);
+            
+            if (useReAct) {
               console.log('🔄 Using ReAct pattern for tool-based query');
               await this.callOllamaAPIWithReAct(userMessage, actualModel, conversation);
               return;
@@ -513,10 +516,12 @@ This agent is configured to use "${model}" which requires external API access.
     conversation: Conversation,
   ): Promise<void> {
     const isVerbose = process.env.VERBOSE_LOGGING === 'true';
+    console.log(`🤖 ReAct: Starting for message: "${userMessage.substring(0, 100)}..."`);
     
     try {
       // Get system prompt
       const systemPrompt = this.buildSystemPrompt(conversation.agent);
+      console.log(`📝 ReAct: System prompt length: ${systemPrompt.length} chars`);
       
       // Get conversation history
       const messages = await this.messagesRepository.find({
@@ -532,8 +537,10 @@ This agent is configured to use "${model}" which requires external API access.
       
       // Get Ollama URL
       const ollamaUrl = process.env.OLLAMA_HOST || process.env.OLLAMA_API_URL || 'http://localhost:11434';
+      console.log(`🌐 ReAct: Using Ollama at ${ollamaUrl}`);
       
       // Execute ReAct loop
+      console.log(`⚙️ ReAct: Calling executeReActLoop with model ${model}`);
       const result = await this.reactAgentService.executeReActLoop(
         userMessage,
         systemPrompt,
@@ -543,6 +550,7 @@ This agent is configured to use "${model}" which requires external API access.
       );
       
       // Create assistant message with final response
+      console.log(`💾 ReAct: Saving final answer (${result.finalAnswer.length} chars, ${result.toolsUsed.length} tools used)`);
       const assistantMessage = this.messagesRepository.create({
         conversationId: conversation.id,
         role: 'assistant',
@@ -551,8 +559,9 @@ This agent is configured to use "${model}" which requires external API access.
       });
       await this.messagesRepository.save(assistantMessage);
       
+      console.log(`✅ ReAct completed successfully with ${result.toolsUsed.length} tools used`);
       if (isVerbose) {
-        console.log(`✅ ReAct completed with ${result.toolsUsed.length} tools used`);
+        console.log(`📊 ReAct details:`, { toolsUsed: result.toolsUsed, stepsCount: result.steps.length });
       }
     } catch (error) {
       console.error('❌ ReAct execution failed:', error);
