@@ -479,20 +479,16 @@ This agent is configured to use "${model}" which requires external API access.
     let systemPrompt = agent.configuration?.systemPrompt || 'You are a helpful AI assistant.';
     
     // Add ReAct pattern instructions for tool usage
-    systemPrompt += '\n\n## ReAct Pattern Instructions\n';
-    systemPrompt += 'You have access to workspace tools. Use the ReAct (Reasoning + Acting) pattern:\n';
-    systemPrompt += '1. **Think**: Reason about what information you need\n';
-    systemPrompt += '2. **Act**: Use a tool to gather that information\n';
-    systemPrompt += '3. **Observe**: Analyze the tool result\n';
-    systemPrompt += '4. **Repeat**: Continue until you have enough information to answer\n\n';
-    
-    systemPrompt += '**Available Tools**: read_file, list_directory, execute_command, write_file\n';
-    
-    systemPrompt += '\n**Tool Usage Format**:\n';
-    systemPrompt += '```json\n{\n  "thought": "I need to check what files exist in the project",\n  "action": "list_directory",\n  "action_input": "."\n}\n```\n';
-    systemPrompt += '\n**Final Answer Format**:\n';
-    systemPrompt += 'When you have enough information, provide your answer directly without JSON formatting.\n';
-    systemPrompt += '\n**Important**: Always explain your reasoning in the "thought" field. Use tools iteratively to build understanding.';
+    systemPrompt += '\n\nYou have access to workspace tools. When you need to use a tool, respond ONLY with this XML format:\n\n';
+    systemPrompt += '<tool_call>\n<tool_name>list_directory</tool_name>\n<arguments>{"path": "."}</arguments>\n</tool_call>\n\n';
+    systemPrompt += 'Available tools:\n';
+    systemPrompt += '- list_directory: List files in a directory. Args: {"path": "."}\n';
+    systemPrompt += '- read_file: Read file contents. Args: {"path": "file.js"}\n';
+    systemPrompt += '- execute_command: Run shell command. Args: {"command": "npm install"}\n';
+    systemPrompt += '- write_file: Write file. Args: {"path": "file.js", "content": "..."}\n\n';
+    systemPrompt += 'CRITICAL: When using a tool, output ONLY the XML tool_call block, nothing else.\n';
+    systemPrompt += 'After receiving tool results, you can use another tool or provide your final answer.\n';
+    systemPrompt += 'For final answers, respond normally without any XML tags.';
     
     return systemPrompt;
   }

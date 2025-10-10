@@ -153,6 +153,8 @@ export class ReActAgentService {
    * Parse tool call from LLM response
    */
   private parseToolCall(content: string): { name: string; arguments: any } | null {
+    this.logger.log(`🔍 Parsing tool call from response (${content.length} chars)`);
+    
     // Try XML format: <tool_call><tool_name>...</tool_name><arguments>...</arguments></tool_call>
     const xmlRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/s;
     const xmlMatch = content.match(xmlRegex);
@@ -160,11 +162,16 @@ export class ReActAgentService {
     if (xmlMatch) {
       const name = xmlMatch[1].trim();
       const argsJson = xmlMatch[2].trim();
+      this.logger.log(`✅ Found XML tool call: ${name} with args: ${argsJson}`);
       const args = parseJSON(argsJson);
       
       if (args) {
         return { name, arguments: args };
+      } else {
+        this.logger.warn(`❌ Failed to parse arguments JSON: ${argsJson}`);
       }
+    } else {
+      this.logger.log(`❌ No XML tool call found in response`);
     }
 
     // Try alternative format
@@ -174,6 +181,7 @@ export class ReActAgentService {
     if (altMatch) {
       const name = altMatch[1].trim();
       const argsJson = altMatch[2].trim();
+      this.logger.log(`✅ Found alternative XML tool call: ${name}`);
       const args = parseJSON(argsJson);
       
       if (args) {
