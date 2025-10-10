@@ -31,17 +31,27 @@ import { MCPModule } from './mcp/mcp.module';
         abortEarly: true,
       },
     }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST || 'postgres',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || 'password',
-      database: process.env.DB_NAME || 'coding_agent',
-      autoLoadEntities: true,
-      synchronize: process.env.DB_SYNCHRONIZE === 'true',
-      logging: true,
-    }),
+    TypeOrmModule.forRoot(
+      process.env.DATABASE_URL?.startsWith('sqlite:')
+        ? {
+            type: 'sqlite',
+            database: process.env.DATABASE_URL.replace('sqlite:', ''),
+            autoLoadEntities: true,
+            synchronize: true,
+            logging: true,
+          }
+        : {
+            type: 'postgres',
+            host: process.env.DB_HOST || 'postgres',
+            port: parseInt(process.env.DB_PORT || '5432'),
+            username: process.env.DB_USERNAME || 'postgres',
+            password: process.env.DB_PASSWORD || 'password',
+            database: process.env.DB_NAME || 'coding_agent',
+            autoLoadEntities: true,
+            synchronize: process.env.DB_SYNCHRONIZE === 'true',
+            logging: true,
+          }
+    ),
     CommonModule,
     AppConfigModule,
     DatabaseModule,
