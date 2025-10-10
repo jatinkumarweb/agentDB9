@@ -106,7 +106,9 @@ export function useModelCache(options: ModelCacheOptions = {}) {
         return cache.current.models;
       }
       
-      throw err;
+      // Return empty array instead of throwing to prevent page crashes
+      console.warn('No cached models available, returning empty array');
+      return [];
     } finally {
       setIsLoading(false);
     }

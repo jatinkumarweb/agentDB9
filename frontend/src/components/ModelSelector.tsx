@@ -50,14 +50,22 @@ export default function ModelSelector({
   const loadModels = async () => {
     try {
       const cachedModels = await getModels();
+      
+      // Safety check: ensure cachedModels is an array
+      if (!Array.isArray(cachedModels)) {
+        console.warn('getModels returned non-array:', cachedModels);
+        setModels([]);
+        return;
+      }
+      
       setModels(cachedModels);
         
         // Auto-select first provider if none selected
-        if (!selectedProvider && !internalProvider) {
-          const providers = [...new Set(cachedModels.map((m: ModelOption) => m.provider))];
+        if (!selectedProvider && !internalProvider && cachedModels.length > 0) {
+          const providers = [...new Set(cachedModels.filter(m => m && m.provider).map((m: ModelOption) => m.provider))];
           const firstProvider = providers.find(p => 
             cachedModels.some((m: ModelOption) => 
-              m.provider === p && (
+              m && m.provider === p && (
                 m.status === 'available' || 
                 (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
                 (m.status === 'unavailable' && !m.requiresApiKey) ||
@@ -75,16 +83,18 @@ export default function ModelSelector({
         }
         
         // Auto-select first available model if none selected
-        if (!selectedModel) {
+        if (!selectedModel && cachedModels.length > 0) {
           const currentProvider = selectedProvider || internalProvider;
           const providerModels = cachedModels.filter((m: ModelOption) => 
-            !currentProvider || m.provider === currentProvider
+            m && (!currentProvider || m.provider === currentProvider)
           );
           const firstAvailable = providerModels.find((m: ModelOption) => 
-            m.status === 'available' || 
-            (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
-            (m.status === 'unavailable' && !m.requiresApiKey) ||
-            (m.requiresApiKey && m.apiKeyConfigured) // API-based models with configured keys
+            m && (
+              m.status === 'available' || 
+              (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
+              (m.status === 'unavailable' && !m.requiresApiKey) ||
+              (m.requiresApiKey && m.apiKeyConfigured) // API-based models with configured keys
+            )
           );
           if (firstAvailable) {
             onModelChange(firstAvailable.id);
@@ -92,6 +102,7 @@ export default function ModelSelector({
         }
     } catch (err) {
       console.error('Failed to load models:', err);
+      setModels([]);
     }
   };
 
