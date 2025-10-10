@@ -51,13 +51,24 @@ export function useModelCache(options: ModelCacheOptions = {}) {
     setError(null);
 
     try {
+      // Get auth token from localStorage (zustand persist storage)
+      const authStorage = localStorage.getItem('auth-storage');
+      const token = authStorage ? JSON.parse(authStorage)?.state?.token : null;
+      
+      const headers: Record<string, string> = {
+        'Cache-Control': 'no-cache',
+      };
+      
+      // Add Authorization header if token exists
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch('/api/models', {
         // Disable browser caching for fresh data
         cache: 'no-store',
         credentials: 'include', // Include cookies for authentication
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
+        headers,
       });
 
       if (!response.ok) {
