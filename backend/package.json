@@ -22,7 +22,8 @@
     "test:knowledge": "jest --config ./test/jest-e2e.json knowledge-ingestion.e2e-spec.ts",
     "db:reset": "bash scripts/reset-db.sh",
     "db:fix-configs": "ts-node scripts/fix-agent-configs.ts",
-    "test:create-agents": "ts-node scripts/create-test-agents.ts"
+    "test:create-agents": "ts-node scripts/create-test-agents.ts",
+    "seed:evaluation": "ts-node scripts/seed-evaluation-data.ts"
   },
   "dependencies": {
     "@agentdb9/shared": "file:../shared",

@@ -19,6 +19,7 @@ import { WebSocketModule } from './websocket/websocket.module';
 import { ModelsModule } from './models/models.module';
 import { ProvidersModule } from './providers/providers.module';
 import { MCPModule } from './mcp/mcp.module';
+import { EvaluationModule } from './evaluation/evaluation.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { MCPModule } from './mcp/mcp.module';
     ModelsModule,
     ProvidersModule,
     MCPModule,
+    EvaluationModule,
   ],
   controllers: [AppController],
   providers: [

@@ -190,3 +190,4 @@ export * from './project-context';
 export * from './memory';
 export * from './mcp';
 export * from './api';
+export * from './evaluation';
