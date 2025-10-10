@@ -5,10 +5,15 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('[Next.js API] /api/models called, BACKEND_URL:', BACKEND_URL);
+    
     // Check if client requests fresh data
     const forceRefresh = request.nextUrl.searchParams.get('refresh') === 'true';
     
-    const response = await fetch(`${BACKEND_URL}/api/models`, {
+    const url = `${BACKEND_URL}/api/models`;
+    console.log('[Next.js API] Fetching from:', url);
+    
+    const response = await fetch(url, {
       cache: forceRefresh ? 'no-store' : 'default',
       headers: createBackendHeaders(request, {
         ...(forceRefresh && { 'Cache-Control': 'no-cache' }),
