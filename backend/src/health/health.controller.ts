@@ -37,7 +37,7 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Models retrieved successfully' })
   async getModels(@Request() req): Promise<APIResponse> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const models = await this.healthService.getModels(userId);
       return {
         success: true,

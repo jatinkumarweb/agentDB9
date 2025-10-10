@@ -14,7 +14,7 @@ export class ProvidersController {
   @ApiResponse({ status: 200, description: 'Provider configurations retrieved' })
   async getProviderConfigs(@Request() req): Promise<APIResponse> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       if (!userId) {
         throw new HttpException(
           {
@@ -50,7 +50,7 @@ export class ProvidersController {
   async getProviderStatus(@Request() req, @Query('userId') queryUserId?: string): Promise<APIResponse> {
     try {
       // Allow userId from query param (for internal service calls) or from auth token
-      const userId = queryUserId || req.user?.userId;
+      const userId = queryUserId || req.user?.id;
       if (!userId) {
         throw new HttpException(
           {
@@ -88,7 +88,7 @@ export class ProvidersController {
     @Body() body: { provider: string; apiKey: string }
   ): Promise<APIResponse> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       if (!userId) {
         throw new HttpException(
           {
