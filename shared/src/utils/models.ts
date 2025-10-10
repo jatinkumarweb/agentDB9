@@ -313,18 +313,18 @@ export const OLLAMA_MODELS: Record<string, ModelConfig> = {
   }
 };
 
-// Function to check API key availability
+// Function to check API key availability (dynamic check)
 const checkApiKey = (provider: ModelProvider): boolean => {
   if (typeof process !== 'undefined' && process.env) {
     switch (provider) {
       case 'openai':
-        return !!process.env.OPENAI_API_KEY;
+        return !!process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 0;
       case 'anthropic':
-        return !!process.env.ANTHROPIC_API_KEY;
+        return !!process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.length > 0;
       case 'cohere':
-        return !!process.env.COHERE_API_KEY;
+        return !!process.env.COHERE_API_KEY && process.env.COHERE_API_KEY.length > 0;
       case 'huggingface':
-        return !!process.env.HUGGINGFACE_API_KEY;
+        return !!process.env.HUGGINGFACE_API_KEY && process.env.HUGGINGFACE_API_KEY.length > 0;
       default:
         return false;
     }
@@ -332,7 +332,120 @@ const checkApiKey = (provider: ModelProvider): boolean => {
   return false;
 };
 
+// Helper function to get model availability status dynamically
+const getModelAvailability = (provider: ModelProvider) => {
+  const hasApiKey = checkApiKey(provider);
+  return {
+    status: hasApiKey ? ('unknown' as const) : ('disabled' as const),
+    reason: hasApiKey ? undefined : 'API key not configured',
+    requiresApiKey: true,
+    apiKeyConfigured: hasApiKey
+  };
+};
+
 export const EXTERNAL_MODELS: Record<string, ModelConfig> = {
+  'gpt-4o': {
+    id: 'gpt-4o',
+    name: 'GPT-4o',
+    provider: 'openai',
+    description: 'Most advanced multimodal model with vision capabilities',
+    capabilities: [
+      { type: 'code-generation', quality: 'excellent', speed: 'fast' },
+      { type: 'code-analysis', quality: 'excellent', speed: 'fast' },
+      { type: 'architecture', quality: 'excellent', speed: 'medium' },
+      { type: 'documentation', quality: 'excellent', speed: 'fast' }
+    ],
+    parameters: {
+      maxTokens: 16384,
+      contextLength: 128000,
+      temperature: { min: 0.0, max: 2.0, default: 0.1 }
+    },
+    pricing: {
+      inputTokens: 0.005,
+      outputTokens: 0.015,
+      currency: 'USD'
+    },
+    performance: {
+      averageResponseTime: 3000,
+      tokensPerSecond: 40,
+      memoryUsage: 0,
+      gpuRequired: false
+    },
+    availability: {
+      status: checkApiKey('openai') ? 'unknown' : 'disabled',
+      reason: checkApiKey('openai') ? undefined : 'API key not configured',
+      requiresApiKey: true,
+      apiKeyConfigured: checkApiKey('openai')
+    }
+  },
+  'gpt-4o-mini': {
+    id: 'gpt-4o-mini',
+    name: 'GPT-4o Mini',
+    provider: 'openai',
+    description: 'Fast and affordable model for most tasks',
+    capabilities: [
+      { type: 'code-generation', quality: 'high', speed: 'very-fast' },
+      { type: 'code-analysis', quality: 'high', speed: 'very-fast' },
+      { type: 'code-completion', quality: 'high', speed: 'very-fast' },
+      { type: 'documentation', quality: 'high', speed: 'very-fast' }
+    ],
+    parameters: {
+      maxTokens: 16384,
+      contextLength: 128000,
+      temperature: { min: 0.0, max: 2.0, default: 0.1 }
+    },
+    pricing: {
+      inputTokens: 0.00015,
+      outputTokens: 0.0006,
+      currency: 'USD'
+    },
+    performance: {
+      averageResponseTime: 1500,
+      tokensPerSecond: 60,
+      memoryUsage: 0,
+      gpuRequired: false
+    },
+    availability: {
+      status: checkApiKey('openai') ? 'unknown' : 'disabled',
+      reason: checkApiKey('openai') ? undefined : 'API key not configured',
+      requiresApiKey: true,
+      apiKeyConfigured: checkApiKey('openai')
+    }
+  },
+  'gpt-4-turbo': {
+    id: 'gpt-4-turbo',
+    name: 'GPT-4 Turbo',
+    provider: 'openai',
+    description: 'Latest GPT-4 with improved performance',
+    capabilities: [
+      { type: 'code-generation', quality: 'excellent', speed: 'fast' },
+      { type: 'code-analysis', quality: 'excellent', speed: 'fast' },
+      { type: 'architecture', quality: 'excellent', speed: 'medium' },
+      { type: 'documentation', quality: 'excellent', speed: 'fast' }
+    ],
+    parameters: {
+      maxTokens: 4096,
+      contextLength: 128000,
+      temperature: { min: 0.0, max: 2.0, default: 0.1 }
+    },
+    pricing: {
+      inputTokens: 0.01,
+      outputTokens: 0.03,
+      currency: 'USD'
+    },
+    performance: {
+      averageResponseTime: 3500,
+      tokensPerSecond: 30,
+      memoryUsage: 0,
+      gpuRequired: false
+    },
+    availability: {
+      status: checkApiKey('openai') ? 'unknown' : 'disabled',
+      reason: checkApiKey('openai') ? undefined : 'API key not configured',
+      requiresApiKey: true,
+      apiKeyConfigured: checkApiKey('openai')
+    }
+  },
   'gpt-4': {
     id: 'gpt-4',
     name: 'GPT-4',
@@ -357,6 +470,40 @@ export const EXTERNAL_MODELS: Record<string, ModelConfig> = {
     performance: {
       averageResponseTime: 5000,
       tokensPerSecond: 20,
+      memoryUsage: 0,
+      gpuRequired: false
+    },
+    availability: {
+      status: checkApiKey('openai') ? 'unknown' : 'disabled',
+      reason: checkApiKey('openai') ? undefined : 'API key not configured',
+      requiresApiKey: true,
+      apiKeyConfigured: checkApiKey('openai')
+    }
+  },
+  'gpt-3.5-turbo': {
+    id: 'gpt-3.5-turbo',
+    name: 'GPT-3.5 Turbo',
+    provider: 'openai',
+    description: 'Fast and cost-effective for most coding tasks',
+    capabilities: [
+      { type: 'code-generation', quality: 'high', speed: 'very-fast' },
+      { type: 'code-completion', quality: 'high', speed: 'very-fast' },
+      { type: 'code-analysis', quality: 'medium', speed: 'very-fast' },
+      { type: 'documentation', quality: 'high', speed: 'very-fast' }
+    ],
+    parameters: {
+      maxTokens: 4096,
+      contextLength: 16385,
+      temperature: { min: 0.0, max: 2.0, default: 0.3 }
+    },
+    pricing: {
+      inputTokens: 0.0005,
+      outputTokens: 0.0015,
+      currency: 'USD'
+    },
+    performance: {
+      averageResponseTime: 1500,
+      tokensPerSecond: 50,
       memoryUsage: 0,
       gpuRequired: false
     },

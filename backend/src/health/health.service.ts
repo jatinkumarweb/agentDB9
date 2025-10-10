@@ -15,6 +15,21 @@ export class HealthService {
     };
   }
 
+  private checkProviderApiKey(provider: string): boolean {
+    switch (provider) {
+      case 'openai':
+        return !!process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 0;
+      case 'anthropic':
+        return !!process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.length > 0;
+      case 'cohere':
+        return !!process.env.COHERE_API_KEY && process.env.COHERE_API_KEY.length > 0;
+      case 'huggingface':
+        return !!process.env.HUGGINGFACE_API_KEY && process.env.HUGGINGFACE_API_KEY.length > 0;
+      default:
+        return false;
+    }
+  }
+
   private async checkOllamaAvailability(): Promise<{available: boolean, reason: string, downloadedModels: string[]}> {
     try {
       const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
@@ -89,7 +104,8 @@ export class HealthService {
       const ollamaStatus = await this.checkOllamaAvailability();
       
       // Fallback to shared package models with actual Ollama status
-      const availableModels = getAvailableModels();
+      // Include disabled models so users can see all available options
+      const availableModels = getAvailableModels(true);
       const modelsWithStatus = availableModels.map(model => {
         if (model.provider === 'ollama') {
           // Check if this specific model is downloaded in Ollama
@@ -104,13 +120,15 @@ export class HealthService {
             apiKeyConfigured: true,
           };
         } else {
+          // For external API models, check if API key is configured dynamically
+          const apiKeyConfigured = this.checkProviderApiKey(model.provider);
           return {
             id: model.id,
             provider: model.provider,
-            status: model.availability.status,
-            reason: model.availability.reason,
-            requiresApiKey: model.availability.requiresApiKey,
-            apiKeyConfigured: model.availability.apiKeyConfigured,
+            status: apiKeyConfigured ? 'unknown' : 'disabled',
+            reason: apiKeyConfigured ? undefined : 'API key not configured',
+            requiresApiKey: true,
+            apiKeyConfigured,
           };
         }
       });

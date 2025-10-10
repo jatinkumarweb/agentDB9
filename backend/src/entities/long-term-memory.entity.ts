@@ -22,22 +22,22 @@ export class LongTermMemoryEntity {
   @Column({ type: 'text' })
   details: string;
 
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'text' })
   metadata: any;
 
-  @Column({ type: 'float', default: 0.5 })
+  @Column({ type: 'real', default: 0.5 })
   importance: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'integer', default: 0 })
   accessCount: number;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   lastAccessedAt?: Date;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'text', nullable: true })
   embedding?: number[];
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'text', nullable: true })
   consolidatedFrom?: string[];
 
   @CreateDateColumn()
