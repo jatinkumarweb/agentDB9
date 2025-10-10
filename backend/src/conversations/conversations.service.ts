@@ -610,7 +610,7 @@ Would you like help setting up external API access?`;
       
       // Add timeout for streaming responses
       const controller = new AbortController();
-      const STREAMING_TIMEOUT = 60000; // 60 second timeout
+      const STREAMING_TIMEOUT = 120000; // 120 second timeout (increased for large models)
       const timeoutId = setTimeout(() => {
         console.error(`⏱️ Streaming timeout after ${STREAMING_TIMEOUT/1000}s - aborting`);
         controller.abort();
@@ -659,171 +659,55 @@ Would you like help setting up external API access?`;
       let systemPrompt = '';
       
       if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
-        systemPrompt = `You are a coding assistant with workspace tools.
+        systemPrompt = `You are a helpful coding assistant with access to workspace tools.
 
-CRITICAL RULES - FOLLOW EXACTLY:`;
-
-        // Add context tool rules only if enabled
-        if (workspaceConfig.enableContext) {
-          systemPrompt += `
-1. When user asks about workspace/files/directories → ALWAYS use list_files first
-2. When user asks to read/view a file → ALWAYS use read_file
-3. When user asks about git status → ALWAYS use git_status`;
-        }
-
-        // Add action tool rules only if enabled
-        if (workspaceConfig.enableActions) {
-          const ruleStart = workspaceConfig.enableContext ? 4 : 1;
-          systemPrompt += `
-${ruleStart}. When user asks to create/modify files → use write_file (only if explicitly requested)
-${ruleStart + 1}. When user asks to run commands → use execute_command (only if explicitly requested)
-${ruleStart + 2}. NEVER execute commands or create files unless user explicitly asks`;
-        }
-
-        systemPrompt += `
-
-EXAMPLES:`;
-
-        // Add context tool examples only if enabled
-        if (workspaceConfig.enableContext) {
-          systemPrompt += `
-User: "describe the workspace" → <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
-User: "what files are here" → <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
-User: "show me the code" → <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
-User: "read package.json" → <tool_call><tool_name>read_file</tool_name><arguments>{"path": "package.json"}</arguments></tool_call>`;
-        }
-
-        // Add action tool examples only if enabled
-        if (workspaceConfig.enableActions) {
-          systemPrompt += `
-User: "create a new file" → <tool_call><tool_name>write_file</tool_name><arguments>{"path": "file.js", "content": "..."}</arguments></tool_call>
-User: "run npm install" → <tool_call><tool_name>execute_command</tool_name><arguments>{"command": "npm install"}</arguments></tool_call>`;
-        }
-
-        systemPrompt += `
-
-TOOL CALL FORMAT (use this exact XML structure):
+When you need to use a tool, respond with this XML format:
 <tool_call>
-<tool_name>list_files</tool_name>
-<arguments>{"path": "."}</arguments>
+<tool_name>tool_name_here</tool_name>
+<arguments>{"arg": "value"}</arguments>
 </tool_call>
 
-AVAILABLE TOOLS:`;
+Available tools:`;
+
+        // Add context tools if enabled
+        if (workspaceConfig.enableContext) {
+          systemPrompt += `
+- read_file: Read file contents. Args: {"path": "file.js"}
+- list_files: List directory contents. Args: {"path": "."}
+- git_status: Check git status. Args: {}`;
+        }
 
         // Add action tools if enabled
         if (workspaceConfig.enableActions) {
           systemPrompt += `
-- execute_command: Run shell commands in the VSCode workspace. Args: {"command": "your command here"}
-  * ALL commands execute in the VSCode container where the user works
-  * For npm projects: Use "mkdir project-name && cd project-name && npm init -y"
-  * For Next.js: Use "npx create-next-app@latest project-name --yes" (ALWAYS include --yes flag)
-    IMPORTANT: After creating Next.js project, configure for universal environment:
-    1. Update next.config.ts with environment-aware configuration:
-       "cat > project-name/next.config.ts << 'EOF'
-import type { NextConfig } from \"next\";
-
-const isVSCodeProxy = process.env.VSCODE_PROXY === 'true';
-const port = process.env.PORT || '3000';
-const proxyPath = isVSCodeProxy ? \`/proxy/\${port}\` : '';
-
-const nextConfig: NextConfig = {
-  basePath: proxyPath,
-  assetPrefix: proxyPath,
-  images: { unoptimized: process.env.NODE_ENV === 'development' }
-};
-
-export default nextConfig;
-EOF"
-    2. Update package.json dev script: "cd project-name && npm pkg set scripts.dev='next dev --turbopack -H 0.0.0.0'"
-    3. Inform user: "✅ Next.js project configured for universal access! Access at: http://localhost:8080/proxy/3000/ (VSCode proxy) or http://localhost:3000/ (direct)"
-  * For React: Use "npx create-react-app project-name --template typescript"
-    Note: CRA doesn't support dynamic basePath. Recommend direct port access.
-  * For Vite: Use "npm create vite@latest project-name -- --template react-ts"
-    After creation, configure vite.config.ts:
-    "cat > project-name/vite.config.ts << 'EOF'
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-const isVSCodeProxy = process.env.VSCODE_PROXY === 'true';
-const port = parseInt(process.env.PORT || '5173');
-const proxyPath = isVSCodeProxy ? \`/proxy/\${port}\` : '/';
-
-export default defineConfig({
-  plugins: [react()],
-  base: proxyPath,
-  server: { host: '0.0.0.0', port: port }
-})
-EOF"
-    Then: "cd project-name && npm pkg set scripts.dev='vite'"
-  * NEVER use "npm init -y --name" (this tries to run create-name package)
-  * To set package name after init: "npm pkg set name=project-name"
-  
-  ENVIRONMENT-AWARE CONFIGURATION:
-  * Projects run in VSCode container at /home/coder/workspace/
-  * VSCode proxies dev servers at: http://localhost:8080/proxy/<port>/
-  * Direct access available at: http://localhost:<port>/ (if port exposed)
-  * Use VSCODE_PROXY=true environment variable to enable proxy mode
-  * Default is direct access mode (no proxy prefix)
-  * Always bind dev servers to 0.0.0.0 (not localhost) for container access
-  * Projects configured with this pattern work universally (VSCode, Gitpod, Codespaces, etc.)
-  
-  COMMAND EXECUTION:
-  * All commands execute in the VSCode container workspace
-  * Commands are logged to .agent-commands.log (visible in VSCode)
-  * User can open .agent-commands.log to see all executed commands and output
-  * When executing first command, inform user: "Commands are logged to .agent-commands.log - open it in VSCode to see execution details"
-  * Dev servers (npm run dev, npm start) run in the background
-  * User can access dev servers at the specified ports
-- write_file: Write complete file content. Args: {"path": "file.js", "content": "full content"}
+- execute_command: Run shell commands. Args: {"command": "npm install"}
+- write_file: Write file content. Args: {"path": "file.js", "content": "..."}
 - create_directory: Create directory. Args: {"path": "dirname"}
 - git_commit: Commit changes. Args: {"message": "msg", "files": ["file1"]}
 - delete_file: Delete file. Args: {"path": "file.js"}`;
         }
 
-        // Add context tools if enabled
-        if (workspaceConfig.enableContext) {
-          systemPrompt += `
-
-CONTEXT TOOLS (Read-only, safe to use anytime):
-- read_file: Read file contents. Args: {"path": "file.js"}
-  * Use when user asks to see/read/view a file
-  * Use to understand code before making changes
-  * WAIT for results before responding
-- list_files: List directory contents. Args: {"path": "."}
-  * ALWAYS use when user asks about workspace/files/structure
-  * Use to explore project before answering questions
-  * ONLY respond after seeing the actual file list
-  * DO NOT make up or guess file names
-- git_status: Check git status. Args: {}
-  * Use when user asks about git/changes/commits
-  * WAIT for actual status before responding`;
-        }
-
         systemPrompt += `
 
-
-IMPORTANT:
-- Use <tool_name> tag (not the tool name as tag)
-- Provide valid JSON in <arguments>
-- ONLY output the tool call, nothing else
-- DO NOT provide an answer before using the tool
-- DO NOT make up or hallucinate information
+Rules:
+- When user asks about files/workspace, use list_files first
+- When user asks to read a file, use read_file
 - Wait for tool results before responding
-- After seeing tool results, provide your answer based on the actual data`;
+- Don't make up information - use tools to get real data`;
 
         // Add note about disabled permissions
         if (!workspaceConfig.enableContext && !workspaceConfig.enableActions) {
           systemPrompt += `
 
-NOTE: You have no workspace tools enabled. You can only provide suggestions and guidance.`;
+NOTE: No workspace tools enabled. Provide suggestions only.`;
         } else if (!workspaceConfig.enableContext) {
           systemPrompt += `
 
-NOTE: Workspace context is disabled. You cannot read files or list directories. You can only perform actions when explicitly requested.`;
+NOTE: Context disabled. Cannot read files or list directories.`;
         } else if (!workspaceConfig.enableActions) {
           systemPrompt += `
 
-NOTE: Workspace actions are disabled. You can read files and explore the workspace, but cannot modify files or execute commands.`;
+NOTE: Actions disabled. Can read files but cannot modify or execute commands.`;
         }
       } else {
         systemPrompt = `You are a helpful coding assistant. Provide clear, concise, and accurate responses. When writing code, include explanations and best practices.
@@ -831,6 +715,9 @@ NOTE: Workspace actions are disabled. You can read files and explore the workspa
 NOTE: You have no workspace tools available. You can only provide suggestions and code examples.`;
       }
 
+      const fetchStartTime = Date.now();
+      console.log(`📡 Sending request to Ollama at ${new Date().toISOString()}`);
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -854,11 +741,15 @@ NOTE: You have no workspace tools available. You can only provide suggestions an
             temperature: 0.3,
             top_p: 0.8,
             num_predict: 1024
-          }
+          },
+          keep_alive: "5m" // Keep model loaded for 5 minutes
         }),
         signal: controller.signal,
       });
 
+      const fetchDuration = Date.now() - fetchStartTime;
+      console.log(`📡 Received response headers from Ollama in ${fetchDuration}ms`);
+      
       clearTimeout(timeoutId);
 
       if (!response.ok) {
@@ -892,6 +783,11 @@ NOTE: You have no workspace tools available. You can only provide suggestions an
           chunkCount++;
           const chunk = decoder.decode(value, { stream: true });
           const lines = chunk.split('\n').filter(line => line.trim());
+          
+          if (chunkCount === 1) {
+            const timeToFirstChunk = Date.now() - startTime;
+            console.log(`⚡ First chunk received after ${timeToFirstChunk}ms`);
+          }
           
           if (chunkCount % 10 === 0) {
             const elapsed = Date.now() - startTime;
