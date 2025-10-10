@@ -36,13 +36,18 @@ RUN npm install
 # Rebuild native modules for the container architecture
 RUN npm rebuild sqlite3
 
-# Copy source code
-COPY backend/ .
-
-# Create symlink to shared package (use absolute path)
+# Create symlink to shared package before copying source
 RUN mkdir -p node_modules/@agentdb9 && \
-    rm -f node_modules/@agentdb9/shared && \
+    rm -rf node_modules/@agentdb9/shared && \
     ln -sf /shared node_modules/@agentdb9/shared
+
+# Copy source code (excluding node_modules)
+COPY backend/src ./src
+COPY backend/test ./test
+COPY backend/tsconfig*.json ./
+COPY backend/nest-cli.json ./
+COPY backend/eslint.config.mjs ./ 
+COPY backend/.prettierrc ./
 
 # Build the NestJS application
 RUN npm run build
