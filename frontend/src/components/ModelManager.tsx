@@ -232,6 +232,28 @@ export default function ModelManager() {
       }
     } catch (error) {
       console.error('Failed to update provider config:', error);
+      throw error;
+    }
+  };
+
+  const removeProviderConfig = async (provider: string) => {
+    try {
+      const response = await fetchWithAuth(`/api/providers/config/${provider}`, {
+        method: 'DELETE',
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        await fetchProviderConfigs();
+        // Force refresh to get updated model status
+        await fetchModels(true);
+      } else {
+        throw new Error(data.error || 'Failed to remove configuration');
+      }
+    } catch (error) {
+      console.error('Failed to remove provider config:', error);
+      throw error;
     }
   };
 
@@ -458,6 +480,7 @@ export default function ModelManager() {
               key={provider.name}
               provider={provider}
               onUpdate={updateProviderConfig}
+              onRemove={removeProviderConfig}
             />
           ))}
         </div>
@@ -468,13 +491,15 @@ export default function ModelManager() {
 
 interface ProviderConfigCardProps {
   provider: ProviderConfig;
-  onUpdate: (provider: string, apiKey: string) => void;
+  onUpdate: (provider: string, apiKey: string) => Promise<void>;
+  onRemove: (provider: string) => Promise<void>;
 }
 
-function ProviderConfigCard({ provider, onUpdate }: ProviderConfigCardProps) {
+function ProviderConfigCard({ provider, onUpdate, onRemove }: ProviderConfigCardProps) {
   const [apiKey, setApiKey] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
@@ -493,6 +518,26 @@ function ProviderConfigCard({ provider, onUpdate }: ProviderConfigCardProps) {
     }
   };
 
+  const handleRemove = async () => {
+    if (!confirm(`Are you sure you want to remove the ${provider.displayName} API key?`)) {
+      return;
+    }
+    
+    setRemoving(true);
+    setError(null);
+    try {
+      await onRemove(provider.name);
+      setIsEditing(false);
+      setApiKey('');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to remove configuration';
+      setError(errorMessage);
+      console.error('Failed to remove configuration:', error);
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   return (
     <div className="bg-white shadow rounded-lg p-6">
       <div className="flex items-center justify-between mb-4">
@@ -503,12 +548,23 @@ function ProviderConfigCard({ provider, onUpdate }: ProviderConfigCardProps) {
             <CheckCircle className="w-4 h-4 text-green-500 ml-2" />
           )}
         </div>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="text-sm text-blue-600 hover:text-blue-800"
-        >
-          {isEditing ? 'Cancel' : 'Configure'}
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="text-sm text-blue-600 hover:text-blue-800"
+          >
+            {isEditing ? 'Cancel' : provider.configured ? 'Update' : 'Configure'}
+          </button>
+          {provider.configured && !isEditing && (
+            <button
+              onClick={handleRemove}
+              disabled={removing}
+              className="text-sm text-red-600 hover:text-red-800 disabled:text-gray-400"
+            >
+              {removing ? 'Removing...' : 'Remove'}
+            </button>
+          )}
+        </div>
       </div>
 
       {isEditing && (
@@ -516,6 +572,9 @@ function ProviderConfigCard({ provider, onUpdate }: ProviderConfigCardProps) {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {provider.apiKeyLabel}
+              {provider.configured && (
+                <span className="ml-2 text-xs text-gray-500">(currently configured)</span>
+              )}
             </label>
             <input
               type="password"
@@ -524,7 +583,7 @@ function ProviderConfigCard({ provider, onUpdate }: ProviderConfigCardProps) {
                 setApiKey(e.target.value);
                 setError(null); // Clear error when user types
               }}
-              placeholder={provider.apiKeyPlaceholder}
+              placeholder={provider.configured ? 'Enter new API key to update' : provider.apiKeyPlaceholder}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             {error && (
@@ -537,7 +596,7 @@ function ProviderConfigCard({ provider, onUpdate }: ProviderConfigCardProps) {
               disabled={!apiKey || saving}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? 'Saving...' : provider.configured ? 'Update' : 'Save'}
             </button>
           </div>
         </div>

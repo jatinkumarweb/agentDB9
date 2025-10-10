@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, HttpStatus, HttpException, Request } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Query, HttpStatus, HttpException, Request, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ProvidersService } from './providers.service';
 import type { APIResponse } from '@agentdb9/shared';
@@ -103,6 +103,44 @@ export class ProvidersController {
         body.provider,
         body.apiKey
       );
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error) {
+      // Re-throw HttpExceptions as-is
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          success: false,
+          error: error.message,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Delete('config/:provider')
+  @ApiOperation({ summary: 'Remove provider API key' })
+  @ApiResponse({ status: 200, description: 'Provider API key removed' })
+  async removeProviderConfig(
+    @Request() req,
+    @Param('provider') provider: string
+  ): Promise<APIResponse> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new HttpException(
+          {
+            success: false,
+            error: 'User not authenticated',
+          },
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+      const result = await this.providersService.removeProviderConfig(userId, provider);
       return {
         success: true,
         data: result,

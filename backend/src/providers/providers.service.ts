@@ -80,6 +80,36 @@ export class ProvidersService {
     return apiKeys[provider] || null;
   }
 
+  async removeProviderConfig(userId: string, provider: string): Promise<any> {
+    try {
+      // Validate provider
+      if (!this.isValidProvider(provider)) {
+        throw new Error(`Invalid provider: ${provider}`);
+      }
+
+      // Get user
+      const user = await this.userRepository.findOne({ where: { id: userId } });
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Remove API key
+      if (user.preferences?.apiKeys?.[provider]) {
+        delete user.preferences.apiKeys[provider];
+        await this.userRepository.save(user);
+      }
+
+      return {
+        provider,
+        configured: false,
+        message: `${provider} API key removed successfully`
+      };
+    } catch (error) {
+      console.error(`Failed to remove ${provider} config:`, error);
+      throw new Error(`Failed to remove ${provider} configuration: ${error.message}`);
+    }
+  }
+
   async updateProviderConfig(userId: string, provider: string, apiKey: string): Promise<any> {
     try {
       if (!this.isValidProvider(provider)) {
