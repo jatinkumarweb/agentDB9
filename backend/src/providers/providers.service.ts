@@ -23,6 +23,7 @@ export class ProvidersService {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     const apiKeys = user?.preferences?.apiKeys || {};
     
+    console.log(`[getProviderConfigs] userId: ${userId}, user found: ${!!user}, apiKeys:`, JSON.stringify(apiKeys));
 
     const providers = [
       {
@@ -145,8 +146,24 @@ export class ProvidersService {
         user.preferences.apiKeys = {};
       }
 
-      user.preferences.apiKeys[provider] = trimmedApiKey;
-      await this.userRepository.save(user);
+      // Create a new object to ensure TypeORM detects the change
+      user.preferences = {
+        ...user.preferences,
+        apiKeys: {
+          ...user.preferences.apiKeys,
+          [provider]: trimmedApiKey
+        }
+      };
+      
+      console.log(`[updateProviderConfig] Before save - userId: ${userId}, provider: ${provider}, preferences:`, JSON.stringify(user.preferences));
+      
+      const savedUser = await this.userRepository.save(user);
+      
+      console.log(`[updateProviderConfig] After save - userId: ${userId}, saved preferences:`, JSON.stringify(savedUser.preferences));
+      
+      // Verify the save by re-fetching from database
+      const verifyUser = await this.userRepository.findOne({ where: { id: userId } });
+      console.log(`[updateProviderConfig] Verification query - userId: ${userId}, DB preferences:`, JSON.stringify(verifyUser?.preferences));
 
       return {
         provider,
