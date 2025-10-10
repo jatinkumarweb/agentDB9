@@ -19,7 +19,7 @@ interface ReActResult {
 @Injectable()
 export class ReActAgentService {
   private readonly logger = new Logger(ReActAgentService.name);
-  private readonly MAX_ITERATIONS = 3; // Reduced since get_workspace_summary provides comprehensive data
+  private readonly MAX_ITERATIONS = 5; // Allow more iterations for complex queries
 
   constructor(private readonly mcpService: MCPService) {}
 
@@ -227,8 +227,12 @@ DO NOT use any more tools. Provide your final answer based on this data.`;
     
     return `Tool Result: ${observation}
 
-Question: ${originalQuestion}
+Original Question: ${originalQuestion}
 
-Answer now if you have enough info (no XML). Use another tool only if absolutely necessary (XML only).`;
+Based on this result, decide your next action:
+1. If you need more information or need to perform another action → Use another tool (output XML only)
+2. If you have enough information to answer the question → Provide your final answer (no XML)
+
+You can use multiple tools in sequence to complete complex tasks.`;
   }
 }

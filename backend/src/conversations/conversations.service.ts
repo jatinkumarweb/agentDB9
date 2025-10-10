@@ -516,34 +516,52 @@ Error: ${error.message}`;
     let systemPrompt = agent.configuration?.systemPrompt || 'You are a helpful AI assistant.';
     
     // Add ReAct pattern instructions for tool usage
-    systemPrompt += '\n\nYou have access to workspace tools. Use them to gather information before answering.\n\n';
+    systemPrompt += '\n\nYou have access to workspace tools. Use them in a chain to complete complex tasks.\n\n';
     systemPrompt += 'TOOL FORMAT - Output ONLY this XML (no extra text):\n';
-    systemPrompt += '<tool_call>\n<tool_name>get_workspace_summary</tool_name>\n<arguments>{}</arguments>\n</tool_call>\n\n';
+    systemPrompt += '<tool_call>\n<tool_name>tool_name</tool_name>\n<arguments>{"arg": "value"}</arguments>\n</tool_call>\n\n';
     systemPrompt += 'Available tools:\n';
-    systemPrompt += '- get_workspace_summary: Get comprehensive workspace analysis (projects, tech stack, file stats). Args: {}\n';
+    systemPrompt += '- get_workspace_summary: Get comprehensive workspace analysis. Args: {}\n';
     systemPrompt += '- list_files: List files/folders. Args: {"path": "."}\n';
-    systemPrompt += '- read_file: Read file contents. Args: {"path": "package.json"}\n';
-    systemPrompt += '- execute_command: Run commands. Args: {"command": "npm test"}\n';
-    systemPrompt += '- write_file: Write files. Args: {"path": "file.js", "content": "..."}\n\n';
-    systemPrompt += 'WORKSPACE ANALYSIS:\n';
-    systemPrompt += 'For workspace summaries, use get_workspace_summary first - it provides projects, frameworks, and file statistics.\n';
-    systemPrompt += 'For specific files/details, use list_files or read_file.\n\n';
-    systemPrompt += 'CRITICAL: Output ONLY the XML tool_call, nothing else. After tool results, use another tool or give final answer.';
+    systemPrompt += '- read_file: Read file contents. Args: {"path": "file.js"}\n';
+    systemPrompt += '- execute_command: Run commands. Args: {"command": "npm install"}\n';
+    systemPrompt += '- write_file: Write files. Args: {"path": "file.js", "content": "..."}\n';
+    systemPrompt += '- create_directory: Create directory. Args: {"path": "src"}\n\n';
+    systemPrompt += 'MULTI-STEP REASONING:\n';
+    systemPrompt += '1. Use tools in sequence to gather information and perform actions\n';
+    systemPrompt += '2. After each tool result, decide: need more tools OR ready to answer\n';
+    systemPrompt += '3. For complex tasks, use multiple tools (e.g., check workspace → create directory → write files)\n';
+    systemPrompt += '4. Only provide final answer when you have all needed information\n\n';
+    systemPrompt += 'CRITICAL: Output ONLY XML for tool calls. After tool results, use another tool (XML) or give final answer (text).';
     
     return systemPrompt;
   }
 
   private shouldUseReAct(userMessage: string): boolean {
-    // Detect queries that likely need tool usage
-    const toolKeywords = [
-      'workspace', 'file', 'directory', 'folder', 'code', 'project',
-      'read', 'write', 'create', 'delete', 'list', 'show me',
-      'what files', 'what is in', 'tell me about', 'analyze',
-      'git', 'commit', 'branch', 'status'
+    const lowerMessage = userMessage.toLowerCase();
+    
+    // Don't use ReACT for simple direct commands
+    const directCommandPatterns = [
+      /create\s+(a\s+)?.*\s+(app|project|component)/i,
+      /build\s+(a\s+)?.*\s+(app|project)/i,
+      /make\s+(a\s+)?.*\s+(app|project|component)/i,
+      /generate\s+(a\s+)?.*\s+(app|project|component)/i,
+      /initialize\s+(a\s+)?.*\s+(app|project)/i,
+      /setup\s+(a\s+)?.*\s+(app|project)/i,
     ];
     
-    const lowerMessage = userMessage.toLowerCase();
-    return toolKeywords.some(keyword => lowerMessage.includes(keyword));
+    if (directCommandPatterns.some(pattern => pattern.test(userMessage))) {
+      console.log('🎯 Direct command detected - skipping ReACT');
+      return false;
+    }
+    
+    // Use ReACT for information gathering and analysis queries
+    const reactKeywords = [
+      'what files', 'what is in', 'tell me about', 'analyze',
+      'show me', 'list', 'find', 'search', 'look for',
+      'workspace summary', 'project structure', 'file structure'
+    ];
+    
+    return reactKeywords.some(keyword => lowerMessage.includes(keyword));
   }
 
   private async callOllamaAPIWithReAct(
@@ -763,12 +781,13 @@ Available tools:`;
         systemPrompt += `
 
 Critical Rules:
-1. When user asks to CREATE/BUILD a project → Use execute_command to run the creation command
-2. When user asks to CREATE/WRITE files → Use write_file with the actual content
+1. When user asks to CREATE/BUILD a project → IMMEDIATELY use execute_command (DO NOT check workspace first)
+2. When user asks to CREATE/WRITE files → IMMEDIATELY use write_file with the actual content
 3. When user asks about existing files → Use list_files or read_file
 4. ALWAYS use tools to perform actions - NEVER just give instructions
 5. After using a tool, wait for results before responding
-6. If creating a project, use the appropriate command:
+6. DO NOT check workspace or list files before creating a project - just create it directly
+7. If creating a project, use the appropriate command:
    - Vite React: npm create vite@latest project-name -- --template react
    - Next.js: npx create-next-app@latest project-name --yes
    - React: npx create-react-app project-name`;
@@ -1315,21 +1334,23 @@ When you need to use a tool, respond with ONLY this XML format (no other text):
         }
 
         systemPrompt += `\n\n## Critical Rules:
-1. When user asks to CREATE/BUILD a project → Use execute_command to run the creation command
-2. When user asks to CREATE/WRITE files → Use write_file with the actual content
+1. When user asks to CREATE/BUILD a project → IMMEDIATELY use execute_command (DO NOT check workspace first)
+2. When user asks to CREATE/WRITE files → IMMEDIATELY use write_file with the actual content
 3. When user asks about existing files → Use list_files or read_file
 4. ALWAYS use tools to perform actions - NEVER just give instructions
 5. After using a tool, wait for results before responding
-6. If creating a project, use the appropriate command:
+6. DO NOT check workspace or list files before creating a project - just create it directly
+7. If creating a project, use the appropriate command:
    - Vite React: npm create vite@latest project-name -- --template react
    - Next.js: npx create-next-app@latest project-name --yes
    - React: npx create-react-app project-name
 
-## Example Workflow:
-User: "Create a React app with Vite"
+## Example Workflows:
+User: "Create a React app with Vite named my-app"
 You: <tool_call><tool_name>execute_command</tool_name><arguments>{"command": "npm create vite@latest my-app -- --template react"}</arguments></tool_call>
-[Wait for result]
-You: "Project created successfully! The React app is ready in the my-app directory."`;
+
+User: "What files are in the workspace?"
+You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>`;
       }
       
       // Get conversation history for context
@@ -1736,7 +1757,7 @@ You: "Project created successfully! The React app is ready in the my-app directo
     const steps: any[] = [];
     const toolsUsed: string[] = [];
     let iteration = 0;
-    const MAX_ITERATIONS = 3;
+    const MAX_ITERATIONS = 5; // Allow more iterations for complex queries
     let currentMessage = userMessage;
 
     console.log(`🔄 Starting external ReAct loop for: "${userMessage.substring(0, 50)}..."`);
@@ -1804,8 +1825,12 @@ You: "Project created successfully! The React app is ready in the my-app directo
       console.log(`👁️ Observation: ${observation.substring(0, 200)}...`);
       steps.push({ observation });
 
-      // Prepare next message with tool result
-      currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ${observation}\n\nBased on this information, provide your final answer to the user's question.`;
+      // Prepare next message with tool result - encourage continuation if needed
+      currentMessage = `Previous query: ${userMessage}\n\nTool used: ${toolCall.name}\nTool result: ${observation}\n\nBased on this information, decide your next action:
+1. If you need more information or need to perform another action, use another tool
+2. If you have enough information to answer the user's question, provide your final answer
+
+Remember: You can use multiple tools in sequence to complete complex tasks.`;
       
       // Add to conversation history
       conversationHistory.push({
