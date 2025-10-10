@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { ProvidersService } from './providers.service';
 import type { APIResponse } from '@agentdb9/shared';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('providers')
 @ApiBearerAuth()
@@ -46,6 +47,7 @@ export class ProvidersController {
     }
   }
 
+  @Public() // Allow internal service calls without authentication
   @Get('status')
   @ApiOperation({ summary: 'Get API key configuration status for all providers' })
   @ApiResponse({ status: 200, description: 'Provider status retrieved' })
