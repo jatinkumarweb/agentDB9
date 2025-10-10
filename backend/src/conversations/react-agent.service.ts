@@ -19,7 +19,7 @@ interface ReActResult {
 @Injectable()
 export class ReActAgentService {
   private readonly logger = new Logger(ReActAgentService.name);
-  private readonly MAX_ITERATIONS = 8; // Increased for comprehensive workspace analysis
+  private readonly MAX_ITERATIONS = 3; // Reduced since get_workspace_summary provides comprehensive data
 
   constructor(private readonly mcpService: MCPService) {}
 
@@ -215,19 +215,20 @@ export class ReActAgentService {
   ): string {
     // For workspace summary, we have comprehensive data - encourage final answer
     if (toolCall.name === 'get_workspace_summary') {
-      return `You received comprehensive workspace data. Use this to answer the question directly.
+      return `WORKSPACE DATA RECEIVED - Answer the question now.
 
 Question: ${originalQuestion}
 
-Data: ${observation}
+Complete Workspace Data:
+${observation}
 
-Provide your final answer now (no more tools needed).`;
+DO NOT use any more tools. Provide your final answer based on this data.`;
     }
     
     return `Tool Result: ${observation}
 
 Question: ${originalQuestion}
 
-If you have enough info, provide final answer (no XML). Otherwise use another tool (XML only).`;
+Answer now if you have enough info (no XML). Use another tool only if absolutely necessary (XML only).`;
   }
 }
