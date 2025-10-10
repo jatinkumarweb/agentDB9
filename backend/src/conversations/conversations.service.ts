@@ -531,7 +531,7 @@ This agent is configured to use "${model}" which requires external API access.
       }));
       
       // Get Ollama URL
-      const ollamaUrl = process.env.OLLAMA_API_URL || 'http://localhost:11434';
+      const ollamaUrl = process.env.OLLAMA_HOST || process.env.OLLAMA_API_URL || 'http://localhost:11434';
       
       // Execute ReAct loop
       const result = await this.reactAgentService.executeReActLoop(
