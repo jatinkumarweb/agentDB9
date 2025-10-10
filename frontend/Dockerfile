@@ -40,8 +40,9 @@ RUN mkdir -p node_modules/@agentdb9 && \
     rm -rf node_modules/@agentdb9/shared && \
     ln -sf /shared node_modules/@agentdb9/shared
 
-# Copy source code (excluding node_modules via .dockerignore)
-COPY frontend/ .
+# Copy source code (specific files/directories to avoid node_modules)
+COPY frontend/src ./src
+COPY frontend/next.config.js frontend/tsconfig.json frontend/tailwind.config.js frontend/postcss.config.js frontend/next-env.d.ts ./
 
 # Expose port
 EXPOSE 3000

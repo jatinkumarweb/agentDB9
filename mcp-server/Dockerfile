@@ -24,8 +24,9 @@ RUN mkdir -p node_modules/@agentdb9 && \
     rm -rf node_modules/@agentdb9/shared && \
     ln -sf /shared node_modules/@agentdb9/shared
 
-# Copy source code (excluding node_modules via .dockerignore)
-COPY mcp-server/ .
+# Copy source code (specific files to avoid node_modules)
+COPY mcp-server/src ./src
+COPY mcp-server/tsconfig.json ./
 
 # Build the application
 RUN npm run build
