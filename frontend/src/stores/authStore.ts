@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import axios from 'axios';
+import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
 interface User {
   id: string;
@@ -217,14 +218,9 @@ export const useAuthStore = create<AuthState>()(
           // Set the authorization header
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
-          // Verify the token is still valid using fetch with credentials
-          console.log('checkAuth: Calling /api/auth/profile with credentials');
-          const response = await fetch('/api/auth/profile', {
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
+          // Verify the token is still valid using fetchWithAuth (includes Authorization header)
+          console.log('checkAuth: Calling /api/auth/profile with auth token');
+          const response = await fetchWithAuth('/api/auth/profile');
           
           console.log('checkAuth: Profile response status:', response.status);
           
