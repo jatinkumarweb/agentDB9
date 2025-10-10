@@ -19,11 +19,13 @@ COPY mcp-server/package*.json ./
 # Install all dependencies (including dev dependencies for building)
 RUN npm install
 
-# Copy source code
-COPY mcp-server/ .
+# Create symlink to shared package BEFORE copying source
+RUN mkdir -p node_modules/@agentdb9 && \
+    rm -rf node_modules/@agentdb9/shared && \
+    ln -sf /shared node_modules/@agentdb9/shared
 
-# Create symlink to shared package
-RUN mkdir -p node_modules/@agentdb9 && ln -sf /shared node_modules/@agentdb9/shared
+# Copy source code (excluding node_modules via .dockerignore)
+COPY mcp-server/ .
 
 # Build the application
 RUN npm run build
