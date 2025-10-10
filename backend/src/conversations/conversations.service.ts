@@ -479,16 +479,21 @@ This agent is configured to use "${model}" which requires external API access.
     let systemPrompt = agent.configuration?.systemPrompt || 'You are a helpful AI assistant.';
     
     // Add ReAct pattern instructions for tool usage
-    systemPrompt += '\n\nYou have access to workspace tools. When you need to use a tool, respond ONLY with this XML format:\n\n';
+    systemPrompt += '\n\nYou have access to workspace tools. Use them to gather information before answering.\n\n';
+    systemPrompt += 'TOOL FORMAT - Output ONLY this XML (no extra text):\n';
     systemPrompt += '<tool_call>\n<tool_name>list_directory</tool_name>\n<arguments>{"path": "."}</arguments>\n</tool_call>\n\n';
     systemPrompt += 'Available tools:\n';
-    systemPrompt += '- list_directory: List files in a directory. Args: {"path": "."}\n';
-    systemPrompt += '- read_file: Read file contents. Args: {"path": "file.js"}\n';
-    systemPrompt += '- execute_command: Run shell command. Args: {"command": "npm install"}\n';
-    systemPrompt += '- write_file: Write file. Args: {"path": "file.js", "content": "..."}\n\n';
-    systemPrompt += 'CRITICAL: When using a tool, output ONLY the XML tool_call block, nothing else.\n';
-    systemPrompt += 'After receiving tool results, you can use another tool or provide your final answer.\n';
-    systemPrompt += 'For final answers, respond normally without any XML tags.';
+    systemPrompt += '- list_directory: List files/folders. Args: {"path": "."}\n';
+    systemPrompt += '- read_file: Read file contents. Args: {"path": "package.json"}\n';
+    systemPrompt += '- execute_command: Run commands. Args: {"command": "find . -name *.js | wc -l"}\n';
+    systemPrompt += '- write_file: Write files. Args: {"path": "file.js", "content": "..."}\n\n';
+    systemPrompt += 'WORKSPACE ANALYSIS STRATEGY:\n';
+    systemPrompt += '1. Start with list_directory on root (".")\n';
+    systemPrompt += '2. Read key files (package.json, requirements.txt, etc.) to detect tech stack\n';
+    systemPrompt += '3. Use execute_command for file counts: find . -type f -name "*.js" | wc -l\n';
+    systemPrompt += '4. Explore subdirectories if needed\n';
+    systemPrompt += '5. Provide comprehensive summary with: projects found, tech stack, file statistics\n\n';
+    systemPrompt += 'CRITICAL: Output ONLY the XML tool_call, nothing else. After tool results, use another tool or give final answer.';
     
     return systemPrompt;
   }

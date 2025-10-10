@@ -19,7 +19,7 @@ interface ReActResult {
 @Injectable()
 export class ReActAgentService {
   private readonly logger = new Logger(ReActAgentService.name);
-  private readonly MAX_ITERATIONS = 5;
+  private readonly MAX_ITERATIONS = 8; // Increased for comprehensive workspace analysis
 
   constructor(private readonly mcpService: MCPService) {}
 
@@ -200,14 +200,12 @@ export class ReActAgentService {
     toolCall: { name: string; arguments: any },
     observation: string
   ): string {
-    return `Based on the tool result, please answer the original question.
+    return `Tool Result Received:
+${observation}
 
 Original Question: ${originalQuestion}
 
-Tool Used: ${toolCall.name}
-Tool Result:
-${observation}
-
-Now provide your final answer to the user based on this information. Do NOT use any more tools.`;
+If you need more information, use another tool (output only XML).
+If you have enough information, provide your final answer (no XML).`;
   }
 }
