@@ -518,10 +518,13 @@ Error: ${error.message}`;
     // Add ReAct pattern instructions for tool usage
     systemPrompt += '\n\nYou have access to workspace tools. Use them in a chain to complete complex tasks.\n\n';
     systemPrompt += 'CRITICAL: When using a tool, output ONLY the XML - NO explanations, NO plans, NO other text.\n\n';
-    systemPrompt += 'TOOL FORMAT (OUTPUT ONLY THIS):\n';
+    systemPrompt += 'EXACT TOOL FORMAT (COPY EXACTLY):\n';
     systemPrompt += '<tool_call>\n<tool_name>tool_name</tool_name>\n<arguments>{"arg": "value"}</arguments>\n</tool_call>\n\n';
-    systemPrompt += 'WRONG: "Let me create... <tool_call>..." ❌\n';
-    systemPrompt += 'CORRECT: <tool_call><tool_name>write_file</tool_name>... ✅\n\n';
+    systemPrompt += 'IMPORTANT: Use </arguments> NOT </>\n';
+    systemPrompt += 'IMPORTANT: Use </tool_name> NOT </>\n';
+    systemPrompt += 'IMPORTANT: Close ALL tags with full names\n\n';
+    systemPrompt += 'WRONG: <arguments>{"path": "."}</> ❌\n';
+    systemPrompt += 'CORRECT: <arguments>{"path": "."}</arguments> ✅\n\n';
     systemPrompt += 'Available tools:\n';
     systemPrompt += '- get_workspace_summary: Get comprehensive workspace analysis. Args: {}\n';
     systemPrompt += '- list_files: List files/folders. Args: {"path": "."}\n';
@@ -755,19 +758,25 @@ Would you like help setting up external API access?`;
 
 CRITICAL RULE: When you decide to use a tool, output ONLY the XML tool call - NO explanations, NO plans, NO other text.
 
-## Tool Call Format (OUTPUT ONLY THIS - NOTHING ELSE):
+## EXACT Tool Call Format (COPY THIS EXACTLY):
 <tool_call>
 <tool_name>tool_name_here</tool_name>
 <arguments>{"arg": "value"}</arguments>
 </tool_call>
 
-## WRONG Examples (DO NOT DO THIS):
-❌ "Let's start by creating... <tool_call>..."
-❌ "I'll create the components: <tool_call>..."
-❌ "First, we need to... <tool_call>..."
+IMPORTANT: 
+- Use </arguments> NOT </>
+- Use </tool_name> NOT </>
+- Use </tool_call> NOT </>
+- Close ALL tags properly
+
+## WRONG Examples:
+❌ <arguments>{"path": "."}</> (missing "arguments" in closing tag)
+❌ <tool_name>list_files</> (missing "tool_name" in closing tag)
+❌ "Let's start by... <tool_call>..." (text before XML)
 
 ## CORRECT Examples:
-✅ <tool_call><tool_name>execute_command</tool_name><arguments>{"command": "npm create vite@latest"}</arguments></tool_call>
+✅ <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
 ✅ <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>
 
 Available tools:`;
@@ -1318,19 +1327,23 @@ Would you like help setting up external API access?`;
       if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
         systemPrompt += `\n\n## CRITICAL: You have REAL workspace access. When you use a tool, output ONLY the XML - NO explanations.
 
-## Tool Call Format (OUTPUT ONLY THIS - NOTHING ELSE):
+## EXACT Tool Call Format (COPY EXACTLY):
 <tool_call>
 <tool_name>tool_name_here</tool_name>
 <arguments>{"arg": "value"}</arguments>
 </tool_call>
 
-## WRONG (DO NOT DO):
-❌ "Let's create the components: <tool_call>..."
-❌ "I'll start by... <tool_call>..."
-❌ "First, we need to... <tool_call>..."
+IMPORTANT:
+- Use </arguments> NOT </>
+- Use </tool_name> NOT </>
+- Close ALL tags with full names
+
+## WRONG:
+❌ <arguments>{"path": "."}</> (wrong closing tag)
+❌ "Let's create... <tool_call>..." (text before XML)
 
 ## CORRECT:
-✅ <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>
+✅ <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
 
 ## Available Tools:`;
         
@@ -1909,22 +1922,58 @@ Example: <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.js
    * Parse tool call from LLM response
    */
   private parseToolCall(response: string): { name: string; arguments: any } | null {
-    // Try to parse XML-style tool call
-    const toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/s;
-    const match = response.match(toolCallRegex);
+    console.log('🔍 Parsing tool call from response:', response.substring(0, 300));
+    
+    // Try standard format first
+    let toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/s;
+    let match = response.match(toolCallRegex);
+    
+    // Try alternative format with malformed closing tags
+    if (!match) {
+      console.log('⚠️ Standard format failed, trying alternative patterns...');
+      // Handle <arguments>...</> instead of <arguments>...</arguments>
+      toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/>\s*<\/tool_call>/s;
+      match = response.match(toolCallRegex);
+      
+      if (match) {
+        console.log('✅ Found malformed XML with </> instead of </arguments>');
+      }
+    }
+    
+    // Try even more lenient pattern
+    if (!match) {
+      // Handle missing closing tags entirely
+      toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)$/s;
+      match = response.match(toolCallRegex);
+      
+      if (match) {
+        console.log('✅ Found incomplete XML, attempting to parse...');
+      }
+    }
     
     if (match) {
       const toolName = match[1].trim();
-      const argsJson = match[2].trim();
+      let argsJson = match[2].trim();
+      
+      // Clean up malformed JSON
+      argsJson = argsJson.replace(/<\/?>/g, ''); // Remove <> or </>
+      argsJson = argsJson.replace(/<\/tool_call>.*$/s, ''); // Remove trailing </tool_call>
+      
+      console.log('📝 Extracted tool name:', toolName);
+      console.log('📝 Extracted arguments:', argsJson);
       
       try {
         const args = parseJSON(argsJson);
         if (args) {
+          console.log('✅ Successfully parsed tool call:', toolName, args);
           return { name: toolName, arguments: args };
         }
       } catch (error) {
-        console.error('Failed to parse tool arguments:', error);
+        console.error('❌ Failed to parse tool arguments:', error);
+        console.error('Raw args string:', argsJson);
       }
+    } else {
+      console.log('❌ No tool call pattern matched');
     }
     
     return null;
