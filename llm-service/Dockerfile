@@ -21,8 +21,9 @@ COPY llm-service/package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy source code
-COPY llm-service/ .
+# Copy source code (excluding node_modules)
+COPY llm-service/src ./src
+COPY llm-service/tsconfig.json llm-service/.eslintrc.json ./
 
 # Create symlink to shared package
 RUN mkdir -p node_modules/@agentdb9 && ln -sf /shared node_modules/@agentdb9/shared

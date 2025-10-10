@@ -501,14 +501,19 @@ function ProviderConfigCard({ provider, onUpdate, onRemove }: ProviderConfigCard
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleSave = async () => {
     setSaving(true);
     setError(null);
+    setSuccess(null);
     try {
       await onUpdate(provider.name, apiKey);
+      setSuccess(`${provider.displayName} API key configured successfully! Models will be available in the agent creation dropdown within 30 seconds.`);
       setIsEditing(false);
       setApiKey('');
+      // Clear success message after 10 seconds
+      setTimeout(() => setSuccess(null), 10000);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to save configuration';
       setError(errorMessage);
@@ -567,6 +572,12 @@ function ProviderConfigCard({ provider, onUpdate, onRemove }: ProviderConfigCard
         </div>
       </div>
 
+      {success && !isEditing && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+          <p className="text-sm text-green-800">{success}</p>
+        </div>
+      )}
+
       {isEditing && (
         <div className="space-y-4">
           <div>
@@ -582,12 +593,16 @@ function ProviderConfigCard({ provider, onUpdate, onRemove }: ProviderConfigCard
               onChange={(e) => {
                 setApiKey(e.target.value);
                 setError(null); // Clear error when user types
+                setSuccess(null); // Clear success when user types
               }}
               placeholder={provider.configured ? 'Enter new API key to update' : provider.apiKeyPlaceholder}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             {error && (
               <p className="mt-2 text-sm text-red-600">{error}</p>
+            )}
+            {success && (
+              <p className="mt-2 text-sm text-green-600">{success}</p>
             )}
           </div>
           <div className="flex space-x-3">

@@ -189,14 +189,18 @@ app.get('/api/models', async (req, res) => {
     ];
 
     const availableCount = models.filter(m => m.status === 'available').length;
-    const disabledCount = models.filter(m => m.status !== 'available').length;
+    const unavailableCount = models.filter(m => m.status === 'unavailable').length;
+    const disabledCount = models.filter(m => m.status === 'disabled' || m.status === 'error').length;
+    const unknownCount = models.filter(m => m.status === 'unknown').length;
 
     res.json({
       success: true,
       data: {
         models,
         available: availableCount,
+        unavailable: unavailableCount,
         disabled: disabledCount,
+        unknown: unknownCount,
         timestamp: new Date().toISOString()
       }
     });

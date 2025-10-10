@@ -16,6 +16,7 @@ export class ModelsController {
   @ApiOperation({ summary: 'Get all available models' })
   @ApiResponse({ status: 200, description: 'List of all models' })
   async getModels(@Req() req: Request): Promise<APIResponse> {
+    console.log('[ModelsController] ===== GET /api/models CALLED =====');
     try {
       // Get userId from authenticated user
       const userId = (req.user as any)?.id;

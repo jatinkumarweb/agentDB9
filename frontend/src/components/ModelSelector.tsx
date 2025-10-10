@@ -38,7 +38,7 @@ export default function ModelSelector({
   
   // Use model cache hook
   const { getModels, refreshModels, isLoading: loading, error } = useModelCache({
-    ttl: 300000, // 5 minutes
+    ttl: 30000, // 30 seconds - short TTL to pick up API key changes quickly
     maxRetries: 3,
     retryDelay: 1000
   });
