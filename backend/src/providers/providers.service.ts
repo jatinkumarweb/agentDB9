@@ -29,7 +29,7 @@ export class ProvidersService {
     console.log(`[getProviderConfigs] userId: ${userId}, user found: ${!!user}, apiKeys:`, JSON.stringify(apiKeys));
 
     // Fetch all models to populate provider models
-    let allModels = [];
+    let allModels: any[] = [];
     try {
       const modelsData = await this.modelsService.getModels(userId);
       allModels = modelsData?.models || [];
