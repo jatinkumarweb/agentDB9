@@ -557,29 +557,34 @@ Error: ${error.message}`;
   private shouldUseReAct(userMessage: string): boolean {
     const lowerMessage = userMessage.toLowerCase();
     
-    // Don't use ReACT for simple direct commands
-    const directCommandPatterns = [
-      /create\s+(a\s+)?.*\s+(app|project|component)/i,
-      /build\s+(a\s+)?.*\s+(app|project)/i,
-      /make\s+(a\s+)?.*\s+(app|project|component)/i,
-      /generate\s+(a\s+)?.*\s+(app|project|component)/i,
-      /initialize\s+(a\s+)?.*\s+(app|project)/i,
-      /setup\s+(a\s+)?.*\s+(app|project)/i,
-    ];
+    // Use ReACT for most tasks that require tool usage
+    // ReACT is better for multi-step tasks that need:
+    // - Reading existing code
+    // - Making modifications
+    // - Creating new files
+    // - Running commands
     
-    if (directCommandPatterns.some(pattern => pattern.test(userMessage))) {
-      console.log('🎯 Direct command detected - skipping ReACT');
-      return false;
-    }
-    
-    // Use ReACT for information gathering and analysis queries
+    // Keywords that indicate ReACT should be used
     const reactKeywords = [
+      // Information gathering
       'what files', 'what is in', 'tell me about', 'analyze',
       'show me', 'list', 'find', 'search', 'look for',
-      'workspace summary', 'project structure', 'file structure'
+      'workspace summary', 'project structure', 'file structure',
+      // Modification tasks
+      'update', 'modify', 'change', 'edit', 'add', 'remove',
+      'fix', 'improve', 'refactor', 'enhance',
+      // Creation tasks that need context
+      'create', 'build', 'make', 'generate', 'setup', 'initialize',
+      'implement', 'develop', 'write',
+      // Complex tasks
+      'need to', 'we need', 'i need', 'want to', 'should',
+      'app', 'project', 'component', 'feature', 'functionality'
     ];
     
-    return reactKeywords.some(keyword => lowerMessage.includes(keyword));
+    const shouldUse = reactKeywords.some(keyword => lowerMessage.includes(keyword));
+    console.log(`🔍 ReACT decision for "${userMessage.substring(0, 50)}...": ${shouldUse}`);
+    
+    return shouldUse;
   }
 
   private async callOllamaAPIWithReAct(
