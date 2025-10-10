@@ -3,19 +3,27 @@ import { EvaluationGroundTruth } from '../src/entities/evaluation-ground-truth.e
 import { ALL_SUITES } from '../src/evaluation/seed-data';
 
 async function seedEvaluationData() {
-  const dataSource = new DataSource({
-    type: process.env.DATABASE_URL?.startsWith('sqlite:') ? 'sqlite' : 'postgres',
-    database: process.env.DATABASE_URL?.startsWith('sqlite:')
-      ? process.env.DATABASE_URL.replace('sqlite:', '')
-      : undefined,
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || 'password',
-    database: process.env.DB_NAME || 'coding_agent',
-    entities: [EvaluationGroundTruth],
-    synchronize: false,
-  });
+  const isSqlite = process.env.DATABASE_URL?.startsWith('sqlite:');
+  
+  const dataSource = new DataSource(
+    isSqlite
+      ? {
+          type: 'sqlite',
+          database: (process.env.DATABASE_URL || 'sqlite:./data/dev.db').replace('sqlite:', ''),
+          entities: [EvaluationGroundTruth],
+          synchronize: false,
+        }
+      : {
+          type: 'postgres',
+          host: process.env.DB_HOST || 'localhost',
+          port: parseInt(process.env.DB_PORT || '5432'),
+          username: process.env.DB_USERNAME || 'postgres',
+          password: process.env.DB_PASSWORD || 'password',
+          database: process.env.DB_NAME || 'coding_agent',
+          entities: [EvaluationGroundTruth],
+          synchronize: false,
+        }
+  );
 
   try {
     await dataSource.initialize();

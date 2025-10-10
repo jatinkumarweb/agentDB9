@@ -198,7 +198,7 @@ export class EvaluationService {
       agent,
       groundTruths,
       dto.memoryType,
-      dto.knowledgeSources,
+      dto.knowledgeSources || [],
     );
 
     return batch;
