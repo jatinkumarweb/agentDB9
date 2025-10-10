@@ -47,6 +47,54 @@ export class ProvidersController {
     }
   }
 
+  @Public() // Allow internal service calls (LLM service needs this)
+  @Get('key/:provider')
+  @ApiOperation({ summary: 'Get API key for a specific provider' })
+  @ApiResponse({ status: 200, description: 'API key retrieved' })
+  async getProviderKey(
+    @Param('provider') provider: string,
+    @Query('userId') userId?: string
+  ): Promise<APIResponse> {
+    try {
+      console.log('[ProvidersController] getProviderKey called for provider:', provider, 'userId:', userId);
+      
+      if (!userId) {
+        throw new HttpException(
+          {
+            success: false,
+            error: 'User ID required',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      
+      const apiKey = await this.providersService.getApiKey(userId, provider);
+      
+      if (!apiKey) {
+        return {
+          success: false,
+          error: 'API key not configured for this provider',
+        };
+      }
+      
+      return {
+        success: true,
+        data: { apiKey },
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          success: false,
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   @Public() // Allow internal service calls without authentication
   @Get('status')
   @ApiOperation({ summary: 'Get API key configuration status for all providers' })

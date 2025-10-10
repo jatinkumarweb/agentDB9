@@ -455,7 +455,14 @@ export class AgentsService {
       const systemPrompt = this.buildSystemPrompt(agent, actions, knowledgeContext, projectContext, memoryContext);
       const userPrompt = this.buildUserPrompt(message, context);
       
-      const response = await fetch(`${llmServiceUrl}/api/chat`, {
+      // Add userId to the request so LLM service can fetch user's API keys
+      const url = context.userId 
+        ? `${llmServiceUrl}/api/chat?userId=${context.userId}`
+        : `${llmServiceUrl}/api/chat`;
+      
+      console.log('[AgentsService] Calling LLM service:', url, 'model:', agent.configuration?.model);
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

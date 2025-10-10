@@ -73,6 +73,122 @@ async function checkOllamaAvailability(): Promise<{available: boolean, downloade
   }
 }
 
+// Helper function to get user's API key for a provider
+async function getUserApiKey(userId: string, provider: string): Promise<string | null> {
+  try {
+    const backendUrl = process.env.BACKEND_URL || 'http://backend:8000';
+    const url = `${backendUrl}/api/providers/key/${provider}?userId=${userId}`;
+    
+    console.log('[LLM Service] Fetching API key for provider:', provider, 'userId:', userId);
+    
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (response.ok) {
+      const data = await response.json() as { data?: { apiKey: string } };
+      return data.data?.apiKey || null;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('[LLM Service] Failed to fetch API key:', error);
+    return null;
+  }
+}
+
+// Helper function to call external APIs
+async function callExternalAPI(provider: string, model: string, messages: any[], apiKey: string, options: any): Promise<any> {
+  switch (provider) {
+    case 'openai':
+      return await callOpenAI(model, messages, apiKey, options);
+    case 'anthropic':
+      return await callAnthropic(model, messages, apiKey, options);
+    default:
+      throw new Error(`Provider ${provider} not supported`);
+  }
+}
+
+// Call OpenAI API
+async function callOpenAI(model: string, messages: any[], apiKey: string, options: any): Promise<any> {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: options.temperature || 0.7,
+      max_tokens: options.max_tokens || 500
+    })
+  });
+  
+  if (!response.ok) {
+    const error = await response.json() as any;
+    throw new Error(error.error?.message || 'OpenAI API error');
+  }
+  
+  const data = await response.json() as any;
+  
+  return {
+    response: data.choices[0]?.message?.content || '',
+    message: data.choices[0]?.message?.content || '',
+    model: data.model,
+    done: true,
+    usage: {
+      prompt_tokens: data.usage?.prompt_tokens || 0,
+      completion_tokens: data.usage?.completion_tokens || 0,
+      total_tokens: data.usage?.total_tokens || 0
+    }
+  };
+}
+
+// Call Anthropic API
+async function callAnthropic(model: string, messages: any[], apiKey: string, options: any): Promise<any> {
+  // Convert messages format for Anthropic
+  const systemMessage = messages.find(m => m.role === 'system');
+  const userMessages = messages.filter(m => m.role !== 'system');
+  
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model,
+      messages: userMessages,
+      system: systemMessage?.content,
+      max_tokens: options.max_tokens || 500,
+      temperature: options.temperature || 0.7
+    })
+  });
+  
+  if (!response.ok) {
+    const error = await response.json() as any;
+    throw new Error(error.error?.message || 'Anthropic API error');
+  }
+  
+  const data = await response.json() as any;
+  
+  return {
+    response: data.content[0]?.text || '',
+    message: data.content[0]?.text || '',
+    model: data.model,
+    done: true,
+    usage: {
+      prompt_tokens: data.usage?.input_tokens || 0,
+      completion_tokens: data.usage?.output_tokens || 0,
+      total_tokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)
+    }
+  };
+}
+
 // Helper function to check API key status from backend
 async function checkProviderStatus(userId?: string): Promise<Record<string, boolean>> {
   console.log('[LLM Service] checkProviderStatus called with userId:', userId);
@@ -463,7 +579,10 @@ function formatToolsForOllama(tools: any[]): any[] {
 app.post('/api/chat', async (req, res) => {
   try {
     const { model, messages, stream, temperature, max_tokens } = req.body;
+    const userId = req.query.userId as string;
     const { getModelById } = await import('@agentdb9/shared');
+    
+    console.log('[LLM Service] /api/chat called with model:', model, 'userId:', userId);
     
     // Get model info
     const modelInfo = getModelById(model || 'codellama:7b');
@@ -472,14 +591,6 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Model not found'
-      });
-    }
-    
-    if (modelInfo.availability.status === 'disabled') {
-      return res.status(400).json({
-        success: false,
-        error: 'Model is disabled',
-        reason: modelInfo.availability.reason
       });
     }
     
@@ -530,12 +641,42 @@ app.post('/api/chat', async (req, res) => {
       }
     }
     
-    // For non-Ollama models, return helpful message
-    res.status(501).json({
-      success: false,
-      error: 'External API models not yet implemented',
-      message: 'Please configure API keys for OpenAI, Anthropic, or use Ollama models'
-    });
+    // For external API models, fetch user's API key and call the provider
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID required for external API models',
+        message: 'Please provide userId to use external API models'
+      });
+    }
+    
+    // Get user's API key for this provider
+    const apiKey = await getUserApiKey(userId, modelInfo.provider);
+    
+    if (!apiKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'API key not configured',
+        message: `Please configure your ${modelInfo.provider} API key in settings`
+      });
+    }
+    
+    // Call the appropriate external API
+    try {
+      const externalResponse = await callExternalAPI(modelInfo.provider, model, messages, apiKey, {
+        temperature,
+        max_tokens
+      });
+      
+      return res.json(externalResponse);
+    } catch (apiError: any) {
+      console.error(`${modelInfo.provider} API error:`, apiError);
+      return res.status(500).json({
+        success: false,
+        error: `${modelInfo.provider} API error`,
+        details: apiError.message
+      });
+    }
   } catch (error) {
     console.error('Chat error:', error);
     res.status(500).json({

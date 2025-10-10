@@ -110,6 +110,7 @@ services:
     environment:
       - NODE_ENV=production
       - LOG_LEVEL=${LOG_LEVEL:-warn}
+      - BACKEND_URL=http://backend:8000
       - OLLAMA_HOST=http://ollama:11434
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}

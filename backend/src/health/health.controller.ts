@@ -32,10 +32,12 @@ export class HealthController {
     };
   }
 
-  @Get('api/models')
-  @ApiOperation({ summary: 'Get available models' })
+  // Renamed to avoid conflict with ModelsController
+  // This is a legacy endpoint for health checks only
+  @Get('api/health/models')
+  @ApiOperation({ summary: 'Get available models (health check)' })
   @ApiResponse({ status: 200, description: 'Models retrieved successfully' })
-  async getModels(@Request() req): Promise<APIResponse> {
+  async getModelsHealth(@Request() req): Promise<APIResponse> {
     try {
       const userId = req.user?.id;
       const models = await this.healthService.getModels(userId);

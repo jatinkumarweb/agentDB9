@@ -4,23 +4,30 @@ import { ModelsService } from './models.service';
 import type { APIResponse } from '@agentdb9/shared';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('models')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('api/models')
 export class ModelsController {
   constructor(private readonly modelsService: ModelsService) {}
 
+  @Public() // Allow unauthenticated access - will show models based on userId if available
   @Get()
   @ApiOperation({ summary: 'Get all available models' })
   @ApiResponse({ status: 200, description: 'List of all models' })
   async getModels(@Req() req: Request): Promise<APIResponse> {
     console.log('[ModelsController] ===== GET /api/models CALLED =====');
+    console.log('[ModelsController] Headers:', JSON.stringify(req.headers));
+    console.log('[ModelsController] req.user:', req.user);
     try {
-      // Get userId from authenticated user
+      // Get userId from authenticated user (if available)
       const userId = (req.user as any)?.id;
       console.log('[ModelsController] getModels called, userId:', userId, 'type:', typeof userId);
+      
+      if (!userId) {
+        console.warn('[ModelsController] No userId found - user may not be authenticated');
+      }
+      
       const result = await this.modelsService.getModels(userId);
       return {
         success: true,
@@ -37,6 +44,8 @@ export class ModelsController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Post('download')
   @ApiOperation({ summary: 'Download a model' })
   @ApiResponse({ status: 200, description: 'Model download initiated' })
@@ -58,6 +67,8 @@ export class ModelsController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Delete('remove')
   @ApiOperation({ summary: 'Remove a model' })
   @ApiResponse({ status: 200, description: 'Model removal initiated' })
