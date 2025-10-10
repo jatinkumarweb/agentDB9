@@ -132,11 +132,16 @@ export class ProvidersService {
   }
 
   private validateApiKey(provider: string, apiKey: string): void {
+    // More flexible patterns to accommodate various API key formats
     const patterns = {
-      openai: /^sk-[a-zA-Z0-9]{48,}$/,
-      anthropic: /^sk-ant-[a-zA-Z0-9\-_]{95,}$/,
-      cohere: /^[a-zA-Z0-9]{40,}$/,
-      huggingface: /^hf_[a-zA-Z0-9]{37}$/
+      // OpenAI: sk- followed by alphanumeric, hyphens, underscores (project keys: sk-proj-)
+      openai: /^sk-[a-zA-Z0-9\-_]{20,}$/,
+      // Anthropic: sk-ant- followed by alphanumeric, hyphens, underscores
+      anthropic: /^sk-ant-[a-zA-Z0-9\-_]{20,}$/,
+      // Cohere: alphanumeric string
+      cohere: /^[a-zA-Z0-9\-_]{20,}$/,
+      // HuggingFace: hf_ followed by alphanumeric
+      huggingface: /^hf_[a-zA-Z0-9]{20,}$/
     };
 
     const pattern = patterns[provider];
