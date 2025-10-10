@@ -135,14 +135,6 @@ export class ProvidersService {
   }
 
   private validateApiKey(provider: string, apiKey: string): void {
-    // Log for debugging
-    console.log(`Validating API key for ${provider}:`, {
-      length: apiKey?.length,
-      prefix: apiKey?.substring(0, 10),
-      hasWhitespace: /\s/.test(apiKey),
-      type: typeof apiKey
-    });
-
     // More flexible patterns to accommodate various API key formats
     const patterns = {
       // OpenAI: sk- followed by alphanumeric, hyphens, underscores (project keys: sk-proj-)
@@ -157,11 +149,8 @@ export class ProvidersService {
 
     const pattern = patterns[provider];
     if (pattern && !pattern.test(apiKey)) {
-      console.error(`API key validation failed for ${provider}. Pattern: ${pattern}, Key starts with: ${apiKey?.substring(0, 10)}`);
       throw new Error(`Invalid API key format for ${provider}`);
     }
-    
-    console.log(`API key validation passed for ${provider}`);
   }
 
   private async testApiKey(provider: string, apiKey: string): Promise<boolean> {

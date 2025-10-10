@@ -15,7 +15,7 @@ export class ModelsController {
   @ApiResponse({ status: 200, description: 'List of all models' })
   async getModels(@Req() req: Request): Promise<APIResponse> {
     try {
-      // Get userId from authenticated user (optional - if not authenticated, returns models without user-specific status)
+      // Get userId from authenticated user
       const userId = (req.user as any)?.id;
       const result = await this.modelsService.getModels(userId);
       return {

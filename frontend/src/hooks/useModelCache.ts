@@ -54,6 +54,7 @@ export function useModelCache(options: ModelCacheOptions = {}) {
       const response = await fetch('/api/models', {
         // Disable browser caching for fresh data
         cache: 'no-store',
+        credentials: 'include', // Include cookies for authentication
         headers: {
           'Cache-Control': 'no-cache',
         },
