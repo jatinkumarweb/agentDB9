@@ -523,13 +523,15 @@ Error: ${error.message}`;
     systemPrompt += 'CRITICAL XML RULES:\n';
     systemPrompt += '- ALWAYS use <tool_name> tag (NOT <create_directory>, NOT <list_files>, etc.)\n';
     systemPrompt += '- Put the actual tool name INSIDE <tool_name>...</tool_name>\n';
-    systemPrompt += '- Use </arguments> NOT </>\n';
-    systemPrompt += '- Use </tool_name> NOT </>\n';
-    systemPrompt += '- Close ALL tags with full names\n\n';
+    systemPrompt += '- CLOSING TAGS MUST BE COMPLETE: </tool_name> NOT </_name> or </>\n';
+    systemPrompt += '- CLOSING TAGS MUST BE COMPLETE: </arguments> NOT </> or </_>\n';
+    systemPrompt += '- Close ALL tags with FULL tag names - no shortcuts!\n\n';
     systemPrompt += 'WRONG XML EXAMPLES:\n';
     systemPrompt += '❌ <tool_call><create_directory>create_directory</create_directory><arguments>...</arguments></tool_call>\n';
     systemPrompt += '❌ <tool_call><list_files>list_files</list_files><arguments>...</arguments></tool_call>\n';
-    systemPrompt += '❌ <tool_call><tool_name>list_files</tool_name><arguments>...</></tool_call>\n\n';
+    systemPrompt += '❌ <tool_call><tool_name>list_files</tool_name><arguments>...</></tool_call>\n';
+    systemPrompt += '❌ <tool_call><tool_name>delete_file</_name><arguments>...</></tool_call>\n';
+    systemPrompt += '❌ <tool_call><tool_name>write_file</_><arguments>...</></tool_call>\n\n';
     systemPrompt += 'CORRECT XML EXAMPLES:\n';
     systemPrompt += '✅ <tool_call><tool_name>create_directory</tool_name><arguments>{"path": "src"}</arguments></tool_call>\n';
     systemPrompt += '✅ <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>\n';
@@ -2039,6 +2041,28 @@ Example tool call: <tool_call><tool_name>write_file</tool_name><arguments>{"path
       
       if (match) {
         console.log('✅ Found malformed XML with </> instead of </arguments>');
+      }
+    }
+    
+    // Try pattern with truncated closing tags like </_name> and </>
+    if (!match) {
+      // Handle <tool_name>...</_name> and <arguments>...</>
+      toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/_?\w*>\s*<arguments>(.*?)<\/?\w*>\s*<\/tool_call>/s;
+      match = response.match(toolCallRegex);
+      
+      if (match) {
+        console.log('✅ Found malformed XML with truncated closing tags (e.g., </_name>, </>)');
+      }
+    }
+    
+    // Try very lenient pattern - just look for tool_name and arguments content
+    if (!match) {
+      // Match anything between <tool_name> and <arguments>, ignoring malformed closing tags
+      toolCallRegex = /<tool_call[^>]*>\s*<tool_name[^>]*>(.*?)<[^>]*>\s*<arguments[^>]*>(.*?)<[^>]*>\s*<\/tool_call>/s;
+      match = response.match(toolCallRegex);
+      
+      if (match) {
+        console.log('✅ Found tool call with very lenient pattern (ignoring malformed tags)');
       }
     }
     
