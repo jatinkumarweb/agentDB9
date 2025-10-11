@@ -643,8 +643,9 @@ Error: ${error.message}`;
       const savedTempMessage = await this.messagesRepository.save(tempMessage);
       
       // Execute ReAct loop with progress updates
-      // Use limited iterations (2) for /chat - discussion only, no complex tool chains
-      console.log(`⚙️ ReAct: Calling executeReActLoop with model ${model} (max 2 iterations for chat)`);
+      // Workspace (with projectId) gets more iterations for complex tool chains
+      const maxIterations = conversation.projectId ? 10 : 2;
+      console.log(`⚙️ ReAct: Calling executeReActLoop with model ${model} (max ${maxIterations} iterations for ${conversation.projectId ? 'workspace' : 'chat'})`);
       const result = await this.reactAgentService.executeReActLoop(
         userMessage,
         systemPrompt,
@@ -662,7 +663,7 @@ Error: ${error.message}`;
             { streaming: true, progress: true }
           );
         },
-        2 // Max 2 iterations for /chat
+        maxIterations
       );
       
       // Update the temporary message with final response
@@ -1771,7 +1772,9 @@ You: TOOL_CALL:
       const savedTempMessage = await this.messagesRepository.save(tempMessage);
       
       // Execute ReAct loop with external LLM
-      console.log(`⚙️ ReAct (External LLM): Starting ReAct loop with model ${model}`);
+      // Workspace (with projectId) gets more iterations for complex tool chains
+      const maxIterations = conversation.projectId ? 10 : 2;
+      console.log(`⚙️ ReAct (External LLM): Starting ReAct loop with model ${model} (max ${maxIterations} iterations for ${conversation.projectId ? 'workspace' : 'chat'})`);
       const result = await this.executeExternalReActLoop(
         userMessage,
         systemPrompt,
@@ -1790,7 +1793,7 @@ You: TOOL_CALL:
             { streaming: true, progress: true, provider: 'external' }
           );
         },
-        2 // Max 2 iterations for /chat
+        maxIterations
       );
       
       // Update the temporary message with final response
