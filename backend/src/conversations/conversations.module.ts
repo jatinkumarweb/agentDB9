@@ -5,21 +5,18 @@ import { ConversationsService } from './conversations.service';
 import { ReActAgentService } from './react-agent.service';
 import { Conversation } from '../entities/conversation.entity';
 import { Message } from '../entities/message.entity';
-import { Agent } from '../entities/agent.entity';
 import { WebSocketModule } from '../websocket/websocket.module';
 import { MCPModule } from '../mcp/mcp.module';
 import { MemoryModule } from '../memory/memory.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
-import { AgentsModule } from '../agents/agents.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Conversation, Message, Agent]),
+    TypeOrmModule.forFeature([Conversation, Message]),
     forwardRef(() => WebSocketModule),
     MCPModule,
     MemoryModule,
     KnowledgeModule,
-    forwardRef(() => AgentsModule),
   ],
   controllers: [ConversationsController],
   providers: [ConversationsService, ReActAgentService],

@@ -10,7 +10,6 @@ import { MCPService } from '../mcp/mcp.service';
 import { ReActAgentService } from './react-agent.service';
 import { MemoryService } from '../memory/memory.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
-import { AgentsService } from '../agents/agents.service';
 import { parseJSON } from '../common/utils/json-parser.util';
 // CreateMessageDto import removed - using plain object type instead
 
@@ -43,16 +42,12 @@ export class ConversationsService {
     private conversationsRepository: Repository<Conversation>,
     @InjectRepository(Message)
     private messagesRepository: Repository<Message>,
-    @InjectRepository(Agent)
-    private agentsRepository: Repository<Agent>,
     @Inject(forwardRef(() => WebSocketGateway))
     private websocketGateway: WebSocketGateway,
     private mcpService: MCPService,
     private reactAgentService: ReActAgentService,
     private memoryService: MemoryService,
     private knowledgeService: KnowledgeService,
-    @Inject(forwardRef(() => AgentsService))
-    private agentsService: AgentsService,
   ) {
     // Initialize batch update timer
     this.startBatchUpdateTimer();
@@ -259,26 +254,8 @@ export class ConversationsService {
         console.log('Project ID:', conversation.projectId);
       }
       
-      // If this is a workspace conversation (has projectId), delegate to agent service
-      if (conversation.projectId) {
-        console.log(`🔧 Workspace conversation detected (projectId: ${conversation.projectId}), delegating to agent service`);
-        
-        const context = {
-          userId: conversation.userId,
-          workspaceId: conversation.projectId,
-          conversationId: conversation.id,
-          sessionId: conversation.id,
-        };
-
-        await this.agentsService.processChatWithAgent(
-          conversation.agent.id,
-          userMessage,
-          context,
-        );
-
-        // Agent service handles everything (ReAct, tools, memory, knowledge, response storage)
-        return; // Exit early
-      }
+      // Workspace conversations (with projectId) use the same flow as regular conversations
+      // The projectId is just metadata for now - future enhancement can add workspace-specific context
       
       const model = conversation.agent?.configuration?.model || 'qwen2.5-coder:7b';
       if (isVerbose) console.log('Using model:', model);
