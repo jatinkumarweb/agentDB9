@@ -517,34 +517,32 @@ Error: ${error.message}`;
     
     // Add ReAct pattern instructions for tool usage
     systemPrompt += '\n\nYou have access to workspace tools. Use them in a chain to complete complex tasks.\n\n';
-    systemPrompt += 'CRITICAL: When using a tool, output ONLY the XML - NO explanations, NO plans, NO other text.\n\n';
+    systemPrompt += 'CRITICAL: When using a tool, output ONLY the JSON - NO explanations, NO plans, NO other text.\n\n';
     systemPrompt += 'EXACT TOOL FORMAT (COPY EXACTLY):\n';
-    systemPrompt += '<tool_call>\n<tool_name>tool_name</tool_name>\n<arguments>{"arg": "value"}</arguments>\n</tool_call>\n\n';
-    systemPrompt += 'CRITICAL XML RULES:\n';
-    systemPrompt += '- ALWAYS use <tool_name> tag (NOT <create_directory>, NOT <list_files>, etc.)\n';
-    systemPrompt += '- Put the actual tool name INSIDE <tool_name>...</tool_name>\n';
-    systemPrompt += '- CLOSING TAGS MUST BE COMPLETE: </tool_name> NOT </_name> or </>\n';
-    systemPrompt += '- CLOSING TAGS MUST BE COMPLETE: </arguments> NOT </> or </_>\n';
-    systemPrompt += '- Close ALL tags with FULL tag names - no shortcuts!\n\n';
-    systemPrompt += 'WRONG XML EXAMPLES:\n';
-    systemPrompt += '❌ <tool_call><create_directory>create_directory</create_directory><arguments>...</arguments></tool_call>\n';
-    systemPrompt += '❌ <tool_call><list_files>list_files</list_files><arguments>...</arguments></tool_call>\n';
-    systemPrompt += '❌ <tool_call><tool_name>list_files</tool_name><arguments>...</></tool_call>\n';
-    systemPrompt += '❌ <tool_call><tool_name>delete_file</_name><arguments>...</></tool_call>\n';
-    systemPrompt += '❌ <tool_call><tool_name>write_file</_><arguments>...</></tool_call>\n\n';
-    systemPrompt += 'CORRECT XML EXAMPLES:\n';
-    systemPrompt += '✅ <tool_call><tool_name>create_directory</tool_name><arguments>{"path": "src"}</arguments></tool_call>\n';
-    systemPrompt += '✅ <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>\n';
-    systemPrompt += '✅ <tool_call><tool_name>write_file</tool_name><arguments>{"path": "app.js", "content": "..."}</arguments></tool_call>\n\n';
+    systemPrompt += 'TOOL_CALL:\n';
+    systemPrompt += '{\n';
+    systemPrompt += '  "tool": "tool_name",\n';
+    systemPrompt += '  "arguments": {\n';
+    systemPrompt += '    "arg": "value"\n';
+    systemPrompt += '  }\n';
+    systemPrompt += '}\n\n';
     systemPrompt += 'CRITICAL JSON RULES:\n';
+    systemPrompt += '- Start with TOOL_CALL: marker on its own line\n';
+    systemPrompt += '- Use "tool" key for the tool name (string)\n';
+    systemPrompt += '- Use "arguments" key for the parameters (object)\n';
     systemPrompt += '- ALL string values MUST have closing quotes\n';
     systemPrompt += '- ALL objects MUST have closing braces\n';
     systemPrompt += '- Use double quotes for keys and values (NOT single quotes)\n';
     systemPrompt += '- No trailing commas\n\n';
     systemPrompt += 'WRONG JSON EXAMPLES:\n';
-    systemPrompt += '❌ {"path": "game-demo}  (missing closing quote)\n';
-    systemPrompt += '❌ {"path": \'value\'}  (single quotes)\n';
-    systemPrompt += '❌ {"path": ".",}  (trailing comma)\n\n';
+    systemPrompt += '❌ {"tool": "write_file", "arguments": {"path": "app.js}  (missing closing quote)\n';
+    systemPrompt += '❌ {\'tool\': \'write_file\'}  (single quotes)\n';
+    systemPrompt += '❌ {"tool": "list_files",}  (trailing comma)\n';
+    systemPrompt += '❌ {"tool": "write_file", "arguments": {"path": "app.js"  (missing closing brace)\n\n';
+    systemPrompt += 'CORRECT JSON EXAMPLES:\n';
+    systemPrompt += '✅ TOOL_CALL:\n{"tool": "create_directory", "arguments": {"path": "src"}}\n\n';
+    systemPrompt += '✅ TOOL_CALL:\n{"tool": "list_files", "arguments": {"path": "."}}\n\n';
+    systemPrompt += '✅ TOOL_CALL:\n{"tool": "write_file", "arguments": {"path": "app.js", "content": "console.log(\'hello\');"}}\n\n';
     systemPrompt += 'Available tools:\n';
     systemPrompt += '- get_workspace_summary: Get comprehensive workspace analysis. Args: {}\n';
     systemPrompt += '- list_files: List files/folders. Args: {"path": "."}\n';
@@ -562,7 +560,7 @@ Error: ${error.message}`;
     systemPrompt += '- Review what data you already have before requesting more\n';
     systemPrompt += '- Prefer answering with available information over gathering more data\n';
     systemPrompt += '- Maximum 5 tool calls per question - be efficient\n\n';
-    systemPrompt += 'REMEMBER: Tool call = XML ONLY. Final answer = text ONLY. Never mix them.';
+    systemPrompt += 'REMEMBER: Tool call = JSON with TOOL_CALL: marker ONLY. Final answer = text ONLY. Never mix them.';
     
     return systemPrompt;
   }
@@ -1946,10 +1944,12 @@ Decide your next action:
 
 CRITICAL RULES:
 - DO NOT repeat tools you've already used
-- If using a tool, output ONLY XML - NO explanations
+- If using a tool, output ONLY JSON with TOOL_CALL: marker - NO explanations
 - Prefer answering with available data over gathering more
 
-Example tool call: <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>`;
+Example tool call:
+TOOL_CALL:
+{"tool": "write_file", "arguments": {"path": "App.jsx", "content": "..."}}`;
       
       // Add to conversation history
       conversationHistory.push({
@@ -2015,66 +2015,81 @@ Example tool call: <tool_call><tool_name>write_file</tool_name><arguments>{"path
   private parseToolCall(response: string): { name: string; arguments: any } | null {
     console.log('🔍 Parsing tool call from response:', response.substring(0, 300));
     
-    // Try standard format first
+    // Try JSON format with TOOL_CALL: marker
+    const jsonMarkerRegex = /TOOL_CALL:\s*(\{[\s\S]*?\})\s*(?:\n|$)/;
+    let match = response.match(jsonMarkerRegex);
+    
+    if (match) {
+      console.log('✅ Found TOOL_CALL: marker with JSON');
+      const jsonStr = match[1].trim();
+      console.log('📝 Extracted JSON:', jsonStr.substring(0, 200));
+      
+      try {
+        // Use jsonrepair to fix common JSON errors
+        const toolCallData = parseJSON(jsonStr);
+        
+        if (toolCallData && toolCallData.tool) {
+          console.log('✅ Successfully parsed JSON tool call:', toolCallData.tool);
+          return {
+            name: toolCallData.tool,
+            arguments: toolCallData.arguments || {}
+          };
+        } else {
+          console.error('❌ JSON missing "tool" field:', toolCallData);
+        }
+      } catch (error) {
+        console.error('❌ Failed to parse JSON tool call:', error);
+        console.error('Raw JSON string:', jsonStr);
+      }
+    }
+    
+    // Fallback: Try to find JSON object without marker
+    if (!match) {
+      console.log('⚠️ No TOOL_CALL: marker found, trying to extract JSON object...');
+      const jsonObjectRegex = /\{\s*"tool"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*\{[\s\S]*?\}\s*\}/;
+      match = response.match(jsonObjectRegex);
+      
+      if (match) {
+        console.log('✅ Found JSON object without marker');
+        const jsonStr = match[0];
+        
+        try {
+          const toolCallData = parseJSON(jsonStr);
+          if (toolCallData && toolCallData.tool) {
+            console.log('✅ Successfully parsed JSON tool call:', toolCallData.tool);
+            return {
+              name: toolCallData.tool,
+              arguments: toolCallData.arguments || {}
+            };
+          }
+        } catch (error) {
+          console.error('❌ Failed to parse JSON object:', error);
+        }
+      }
+    }
+    
+    // Legacy fallback: Try XML format for backward compatibility
+    if (!match) {
+      console.log('⚠️ Trying legacy XML format...');
+      return this.parseToolCallXML(response);
+    }
+    
+    console.log('❌ No tool call pattern matched');
+    return null;
+  }
+  
+  /**
+   * Legacy XML parser for backward compatibility
+   */
+  private parseToolCallXML(response: string): { name: string; arguments: any } | null {
+    // Try standard XML format
     let toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/s;
     let match = response.match(toolCallRegex);
     
-    // Try format where LLM uses <tool_name_here> instead of <tool_name>
-    // Example: <tool_call><create_directory>create_directory</create_directory><arguments>...</arguments></tool_call>
+    // Try lenient patterns for malformed XML
     if (!match) {
-      console.log('⚠️ Standard format failed, trying alternative patterns...');
-      toolCallRegex = /<tool_call>\s*<(\w+)>\1<\/\1>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/s;
-      match = response.match(toolCallRegex);
-      
-      if (match) {
-        console.log('✅ Found LLM using tool name as tag: <' + match[1] + '>');
-        // Rearrange match to fit expected format: [full, toolName, args]
-        match = [match[0], match[1], match[2]];
-      }
-    }
-    
-    // Try alternative format with malformed closing tags
-    if (!match) {
-      // Handle <arguments>...</> instead of <arguments>...</arguments>
-      toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/>\s*<\/tool_call>/s;
-      match = response.match(toolCallRegex);
-      
-      if (match) {
-        console.log('✅ Found malformed XML with </> instead of </arguments>');
-      }
-    }
-    
-    // Try pattern with truncated closing tags like </_name> and </>
-    if (!match) {
-      // Handle <tool_name>...</_name> and <arguments>...</>
       toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/_?\w*>\s*<arguments>(.*?)<\/?\w*>\s*<\/tool_call>/s;
       match = response.match(toolCallRegex);
-      
-      if (match) {
-        console.log('✅ Found malformed XML with truncated closing tags (e.g., </_name>, </>)');
-      }
-    }
-    
-    // Try very lenient pattern - just look for tool_name and arguments content
-    if (!match) {
-      // Match anything between <tool_name> and <arguments>, ignoring malformed closing tags
-      toolCallRegex = /<tool_call[^>]*>\s*<tool_name[^>]*>(.*?)<[^>]*>\s*<arguments[^>]*>(.*?)<[^>]*>\s*<\/tool_call>/s;
-      match = response.match(toolCallRegex);
-      
-      if (match) {
-        console.log('✅ Found tool call with very lenient pattern (ignoring malformed tags)');
-      }
-    }
-    
-    // Try even more lenient pattern
-    if (!match) {
-      // Handle missing closing tags entirely
-      toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)$/s;
-      match = response.match(toolCallRegex);
-      
-      if (match) {
-        console.log('✅ Found incomplete XML, attempting to parse...');
-      }
     }
     
     if (match) {
@@ -2082,24 +2097,21 @@ Example tool call: <tool_call><tool_name>write_file</tool_name><arguments>{"path
       let argsJson = match[2].trim();
       
       // Clean up malformed JSON
-      argsJson = argsJson.replace(/<\/?>/g, ''); // Remove <> or </>
-      argsJson = argsJson.replace(/<\/tool_call>.*$/s, ''); // Remove trailing </tool_call>
+      argsJson = argsJson.replace(/<\/?>/g, '');
+      argsJson = argsJson.replace(/<\/tool_call>.*$/s, '');
       
-      console.log('📝 Extracted tool name:', toolName);
-      console.log('📝 Extracted arguments:', argsJson);
+      console.log('📝 Extracted from XML - tool name:', toolName);
+      console.log('📝 Extracted from XML - arguments:', argsJson);
       
       try {
         const args = parseJSON(argsJson);
         if (args) {
-          console.log('✅ Successfully parsed tool call:', toolName, args);
+          console.log('✅ Successfully parsed XML tool call:', toolName);
           return { name: toolName, arguments: args };
         }
       } catch (error) {
-        console.error('❌ Failed to parse tool arguments:', error);
-        console.error('Raw args string:', argsJson);
+        console.error('❌ Failed to parse XML tool arguments:', error);
       }
-    } else {
-      console.log('❌ No tool call pattern matched');
     }
     
     return null;

@@ -179,45 +179,75 @@ Provide a complete answer based on the data you already have.`;
   }
 
   /**
-   * Parse tool call from LLM response
+   * Parse tool call from LLM response (JSON format with jsonrepair)
    */
   private parseToolCall(content: string): { name: string; arguments: any } | null {
     this.logger.log(`🔍 Parsing tool call from response (${content.length} chars)`);
     
-    // Try XML format: <tool_call><tool_name>...</tool_name><arguments>...</arguments></tool_call>
-    const xmlRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/s;
-    const xmlMatch = content.match(xmlRegex);
-
-    if (xmlMatch) {
-      const name = xmlMatch[1].trim();
-      const argsJson = xmlMatch[2].trim();
-      this.logger.log(`✅ Found XML tool call: ${name} with args: ${argsJson}`);
-      const args = parseJSON(argsJson);
+    // Try JSON format with TOOL_CALL: marker
+    const jsonMarkerRegex = /TOOL_CALL:\s*(\{[\s\S]*?\})\s*(?:\n|$)/;
+    let match = content.match(jsonMarkerRegex);
+    
+    if (match) {
+      this.logger.log('✅ Found TOOL_CALL: marker with JSON');
+      const jsonStr = match[1].trim();
       
-      if (args) {
-        return { name, arguments: args };
-      } else {
-        this.logger.warn(`❌ Failed to parse arguments JSON: ${argsJson}`);
-      }
-    } else {
-      this.logger.log(`❌ No XML tool call found in response`);
-    }
-
-    // Try alternative format
-    const altRegex = /<tool_call>\s*<(\w+)>.*?<\/\1>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/s;
-    const altMatch = content.match(altRegex);
-
-    if (altMatch) {
-      const name = altMatch[1].trim();
-      const argsJson = altMatch[2].trim();
-      this.logger.log(`✅ Found alternative XML tool call: ${name}`);
-      const args = parseJSON(argsJson);
-      
-      if (args) {
-        return { name, arguments: args };
+      try {
+        // Use jsonrepair to fix common JSON errors
+        const toolCallData = parseJSON(jsonStr);
+        
+        if (toolCallData && toolCallData.tool) {
+          this.logger.log(`✅ Successfully parsed JSON tool call: ${toolCallData.tool}`);
+          return {
+            name: toolCallData.tool,
+            arguments: toolCallData.arguments || {}
+          };
+        }
+      } catch (error) {
+        this.logger.error('❌ Failed to parse JSON tool call:', error);
       }
     }
+    
+    // Fallback: Try to find JSON object without marker
+    if (!match) {
+      const jsonObjectRegex = /\{\s*"tool"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*\{[\s\S]*?\}\s*\}/;
+      match = content.match(jsonObjectRegex);
+      
+      if (match) {
+        this.logger.log('✅ Found JSON object without marker');
+        try {
+          const toolCallData = parseJSON(match[0]);
+          if (toolCallData && toolCallData.tool) {
+            return {
+              name: toolCallData.tool,
+              arguments: toolCallData.arguments || {}
+            };
+          }
+        } catch (error) {
+          this.logger.error('❌ Failed to parse JSON object:', error);
+        }
+      }
+    }
+    
+    // Legacy fallback: Try XML format for backward compatibility
+    if (!match) {
+      this.logger.log('⚠️ Trying legacy XML format...');
+      const xmlRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/s;
+      const xmlMatch = content.match(xmlRegex);
 
+      if (xmlMatch) {
+        const name = xmlMatch[1].trim();
+        const argsJson = xmlMatch[2].trim();
+        this.logger.log(`✅ Found XML tool call: ${name}`);
+        const args = parseJSON(argsJson);
+        
+        if (args) {
+          return { name, arguments: args };
+        }
+      }
+    }
+
+    this.logger.log('❌ No tool call pattern matched');
     return null;
   }
 
@@ -246,10 +276,12 @@ DO NOT use any more tools. Provide your final answer based on this data.`;
 Original Question: ${originalQuestion}
 
 Decide your next action:
-1. Need more info or another action? → Output ONLY the XML tool call (no text before/after)
-2. Have enough info? → Provide final answer (text only, no XML)
+1. Need more info or another action? → Output ONLY the JSON tool call (no text before/after)
+2. Have enough info? → Provide final answer (text only, no JSON)
 
-CRITICAL: If using a tool, output ONLY XML - NO explanations.
-Example: <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>`;
+CRITICAL: If using a tool, output ONLY JSON with TOOL_CALL: marker - NO explanations.
+Example:
+TOOL_CALL:
+{"tool": "write_file", "arguments": {"path": "App.jsx", "content": "..."}}`;
   }
 }
