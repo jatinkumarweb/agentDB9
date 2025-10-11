@@ -4,27 +4,34 @@
 
 This project uses **Node.js 22** (LTS).
 
-### After updating Node version in devcontainer.json:
+## 🚨 If your terminal shows Node 18 or 20 instead of 22:
 
-The devcontainer needs to be rebuilt for changes to take effect:
+**Quick Fix (Run this once):**
+```bash
+.devcontainer/switch-to-node-22.sh
+```
 
-**Option 1: Rebuild in Gitpod**
+This script will:
+- Install Node.js 22 via nvm
+- Set it as default
+- Update your shell profiles
+- Make it permanent for all new terminals
+
+### Alternative: Rebuild Container (Clean approach)
+
+**Option 1: Gitpod**
 ```bash
 gitpod devcontainer rebuild
 ```
 
-**Option 2: Rebuild in VS Code**
+**Option 2: VS Code**
 1. Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
 2. Select "Dev Containers: Rebuild Container"
-
-**Option 3: Manual install (temporary)**
-```bash
-bash -c "source /usr/local/share/nvm/nvm.sh && nvm install 22 && nvm alias default 22 && nvm use 22"
-```
 
 ### Verify Node version:
 ```bash
 node --version  # Should show v22.x.x
+npm --version   # Should show v10.x.x
 ```
 
 ## Current Configuration
