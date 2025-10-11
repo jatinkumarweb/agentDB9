@@ -19,7 +19,7 @@ import { AgentsModule } from '../agents/agents.module';
     MCPModule,
     MemoryModule,
     KnowledgeModule,
-    AgentsModule,
+    forwardRef(() => AgentsModule),
   ],
   controllers: [ConversationsController],
   providers: [ConversationsService, ReActAgentService],

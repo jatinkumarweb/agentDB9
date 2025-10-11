@@ -51,6 +51,7 @@ export class ConversationsService {
     private reactAgentService: ReActAgentService,
     private memoryService: MemoryService,
     private knowledgeService: KnowledgeService,
+    @Inject(forwardRef(() => AgentsService))
     private agentsService: AgentsService,
   ) {
     // Initialize batch update timer
