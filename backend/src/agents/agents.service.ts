@@ -335,17 +335,20 @@ export class AgentsService {
         memoryContext
       );
       
-      // Execute with ReAct pattern
+      // Execute with ReAct pattern (5 iterations for workspace)
       const response = await this.reactAgentService.executeWithReAct(
         message,
         model,
         enhancedSystemPrompt,
-        context
+        context,
+        5 // Full iterations for workspace
       );
 
       // Update agent status back to idle
       agent.status = 'idle';
       await this.agentsRepository.save(agent);
+      
+      // Note: Message storage is handled by ReAct service via conversationId in context
       
       return {
         response,

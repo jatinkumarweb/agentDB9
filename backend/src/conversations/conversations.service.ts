@@ -10,7 +10,7 @@ import { MCPService } from '../mcp/mcp.service';
 import { ReActAgentService } from './react-agent.service';
 import { MemoryService } from '../memory/memory.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
-import { ContextService } from '../context/context.service';
+import { AgentsService } from '../agents/agents.service';
 import { parseJSON } from '../common/utils/json-parser.util';
 // CreateMessageDto import removed - using plain object type instead
 
@@ -43,13 +43,15 @@ export class ConversationsService {
     private conversationsRepository: Repository<Conversation>,
     @InjectRepository(Message)
     private messagesRepository: Repository<Message>,
+    @InjectRepository(Agent)
+    private agentsRepository: Repository<Agent>,
     @Inject(forwardRef(() => WebSocketGateway))
     private websocketGateway: WebSocketGateway,
     private mcpService: MCPService,
     private reactAgentService: ReActAgentService,
     private memoryService: MemoryService,
     private knowledgeService: KnowledgeService,
-    private contextService: ContextService,
+    private agentsService: AgentsService,
   ) {
     // Initialize batch update timer
     this.startBatchUpdateTimer();
@@ -256,76 +258,25 @@ export class ConversationsService {
         console.log('Project ID:', conversation.projectId);
       }
       
-      // If this is a workspace conversation (has projectId), enhance with agent context
-      let knowledgeContext: any = null;
-      let projectContext: any = null;
-      let memoryContext: any = null;
-      
+      // If this is a workspace conversation (has projectId), delegate to agent service
       if (conversation.projectId) {
-        console.log(`🔧 Workspace conversation detected (projectId: ${conversation.projectId}), fetching enhanced context`);
+        console.log(`🔧 Workspace conversation detected (projectId: ${conversation.projectId}), delegating to agent service`);
         
-        // Retrieve knowledge context if knowledge base is enabled
-        if (conversation.agent?.configuration?.knowledgeBase?.enabled) {
-          try {
-            const topK = conversation.agent.configuration.knowledgeBase.retrievalTopK || 5;
-            knowledgeContext = await this.knowledgeService.getAgentKnowledgeContext(
-              conversation.agent.id,
-              userMessage,
-              topK
-            );
-            if (knowledgeContext && knowledgeContext.chunks) {
-              console.log(`📚 Retrieved ${knowledgeContext.chunks.length} knowledge chunks`);
-            }
-          } catch (error: any) {
-            console.warn(`Failed to retrieve knowledge context: ${error.message}`);
-          }
-        }
+        const context = {
+          userId: conversation.userId,
+          workspaceId: conversation.projectId,
+          conversationId: conversation.id,
+          sessionId: conversation.id,
+        };
 
-        // Get project context for workspace awareness
-        try {
-          projectContext = await this.contextService.getProjectSummary(conversation.projectId);
-          if (projectContext) {
-            console.log(`📁 Retrieved project context for workspace ${conversation.projectId}`);
-          }
-        } catch (error: any) {
-          console.warn(`Failed to retrieve project context: ${error.message}`);
-        }
+        await this.agentsService.processChatWithAgent(
+          conversation.agent.id,
+          userMessage,
+          context,
+        );
 
-        // Get memory context for continuous learning
-        try {
-          memoryContext = await this.memoryService.getMemoryContext(
-            conversation.agent.id,
-            conversation.id, // Use conversationId as sessionId
-            userMessage,
-          );
-          if (memoryContext) {
-            console.log(`🧠 Retrieved memory context: ${memoryContext.summary}`);
-          }
-        } catch (error: any) {
-          console.warn(`Failed to retrieve memory context: ${error.message}`);
-        }
-
-        // Store interaction in short-term memory
-        try {
-          await this.memoryService.createMemory({
-            agentId: conversation.agent.id,
-            sessionId: conversation.id,
-            category: 'interaction',
-            content: `User: ${userMessage}`,
-            importance: 0.5,
-            metadata: {
-              workspaceId: conversation.projectId,
-              userId: conversation.userId,
-              tags: ['chat', 'interaction'],
-              keywords: this.extractKeywords(userMessage),
-              confidence: 0.8,
-              relevance: 0.7,
-              source: 'chat',
-            },
-          });
-        } catch (error: any) {
-          console.warn(`Failed to store interaction in memory: ${error.message}`);
-        }
+        // Agent service handles everything (ReAct, tools, memory, knowledge, response storage)
+        return; // Exit early
       }
       
       const model = conversation.agent?.configuration?.model || 'qwen2.5-coder:7b';
@@ -2484,12 +2435,4 @@ TOOL_CALL:
     return supportedPatterns.some(pattern => modelLower.includes(pattern));
   }
 
-  private extractKeywords(message: string): string[] {
-    const words = message.toLowerCase().split(/\s+/);
-    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'can']);
-    
-    return words
-      .filter(word => word.length > 3 && !stopWords.has(word))
-      .slice(0, 10);
-  }
 }
