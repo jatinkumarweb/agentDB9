@@ -704,27 +704,26 @@ Error: ${error.message}`;
       // Store final conversation summary in memory and consolidate to long-term
       if (conversation.agent?.configuration?.memory?.enabled) {
         try {
-          // Save conversation summary to short-term memory
+          // Save conversation summary directly to long-term memory (database)
+          const summary = `Conversation: ${userMessage.substring(0, 100)}...`;
+          const details = `User: ${userMessage}\n\nAgent: ${result.finalAnswer}\n\nTools used: ${result.toolsUsed.join(', ')}`;
+          
           await this.memoryService.createMemory({
             agentId: conversation.agentId,
             sessionId: conversation.id,
-            type: 'short-term',
+            type: 'long-term',
             category: 'interaction',
-            content: `User: ${userMessage}\nAgent: ${result.finalAnswer}\nTools used: ${result.toolsUsed.join(', ')}`,
+            content: `${summary}\n\n${details}`,
             importance: result.toolsUsed.length > 0 ? 0.8 : 0.5,
             metadata: {
-              tags: [model, 'ollama', 'react'],
+              tags: [model, 'ollama', 'react', 'conversation'],
               keywords: result.toolsUsed.length > 0 ? ['tool-usage', ...result.toolsUsed] : ['conversation'],
               confidence: 1.0,
               relevance: 1.0,
               source: 'conversation' as any
             }
           });
-          console.log('✅ Stored ReAct conversation summary in memory');
-          
-          // Auto-consolidate to long-term memory (async, non-blocking)
-          this.consolidateConversationMemory(conversation.agentId, conversation.id)
-            .catch(err => console.error('Failed to consolidate memory:', err));
+          console.log('✅ Stored ReAct conversation summary in database');
         } catch (error) {
           console.error('Failed to store ReAct interaction in memory:', error);
         }
@@ -1877,27 +1876,26 @@ You: TOOL_CALL:
       // Store final conversation summary in memory and consolidate to long-term
       if (conversation.agent?.configuration?.memory?.enabled) {
         try {
-          // Save conversation summary to short-term memory
+          // Save conversation summary directly to long-term memory (database)
+          const summary = `Conversation: ${userMessage.substring(0, 100)}...`;
+          const details = `User: ${userMessage}\n\nAgent: ${result.finalAnswer}\n\nTools used: ${result.toolsUsed.join(', ')}`;
+          
           await this.memoryService.createMemory({
             agentId: conversation.agentId,
             sessionId: conversation.id,
-            type: 'short-term',
+            type: 'long-term',
             category: 'interaction',
-            content: `User: ${userMessage}\nAgent: ${result.finalAnswer}\nTools used: ${result.toolsUsed.join(', ')}`,
+            content: `${summary}\n\n${details}`,
             importance: result.toolsUsed.length > 0 ? 0.8 : 0.5,
             metadata: {
-              tags: [model, 'external', 'react'],
+              tags: [model, 'external', 'react', 'conversation'],
               keywords: result.toolsUsed.length > 0 ? ['tool-usage', ...result.toolsUsed] : ['conversation'],
               confidence: 1.0,
               relevance: 1.0,
               source: 'conversation' as any
             }
           });
-          console.log('✅ Stored ReAct (External LLM) conversation summary in memory');
-          
-          // Auto-consolidate to long-term memory (async, non-blocking)
-          this.consolidateConversationMemory(conversation.agentId, conversation.id)
-            .catch(err => console.error('Failed to consolidate memory:', err));
+          console.log('✅ Stored ReAct (External LLM) conversation summary in database');
         } catch (error) {
           console.error('Failed to store ReAct (External LLM) interaction in memory:', error);
         }
@@ -2252,7 +2250,8 @@ TOOL_CALL:
   }
 
   /**
-   * Save tool execution to short-term memory (async, non-blocking)
+   * Save tool execution to long-term memory (async, non-blocking)
+   * Saves directly to database for persistence across restarts
    */
   private async saveToolExecutionMemory(
     agentId: string,
@@ -2264,16 +2263,18 @@ TOOL_CALL:
   ): Promise<void> {
     try {
       const success = toolResult?.success !== false;
+      const summary = `${toolName}: ${success ? 'Success' : 'Error'}`;
       const content = success
         ? `Tool: ${toolName}\nResult: Success\nObservation: ${observation.substring(0, 500)}`
         : `Tool: ${toolName}\nResult: Error\nError: ${toolResult?.error || observation}`;
       
+      // Save directly to long-term memory (database) for persistence
       await this.memoryService.createMemory({
         agentId,
         sessionId,
-        type: 'short-term',
-        category: 'interaction' as any, // Using interaction category for tool executions
-        content,
+        type: 'long-term',
+        category: 'interaction' as any,
+        content: `${summary}\n\n${content}`,
         importance: success ? 0.7 : 0.9, // Higher importance for errors
         metadata: {
           tags: [model, 'tool-execution', toolName, success ? 'success' : 'error'],
@@ -2283,7 +2284,7 @@ TOOL_CALL:
           source: 'tool-execution' as any
         }
       });
-      console.log(`✅ Saved tool execution memory: ${toolName} (${success ? 'success' : 'error'})`);
+      console.log(`✅ Saved tool execution memory to database: ${toolName} (${success ? 'success' : 'error'})`);
     } catch (error) {
       console.error(`Failed to save tool execution memory for ${toolName}:`, error);
     }
