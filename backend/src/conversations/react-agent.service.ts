@@ -34,7 +34,8 @@ export class ReActAgentService {
     conversationHistory: any[] = [],
     conversationId?: string,
     progressCallback?: (status: string) => void,
-    maxIterations?: number
+    maxIterations?: number,
+    toolExecutionCallback?: (toolName: string, toolResult: any, observation: string) => Promise<void>
   ): Promise<ReActResult> {
     const MAX_ITERATIONS = maxIterations || this.DEFAULT_MAX_ITERATIONS;
     const steps: ReActStep[] = [];
@@ -121,6 +122,11 @@ Provide a complete answer based on the data you already have.`;
 
       this.logger.log(`👁️ Observation: ${observation.substring(0, 200)}...`);
       steps.push({ observation });
+      
+      // Call tool execution callback if provided (for memory saving)
+      if (toolExecutionCallback) {
+        await toolExecutionCallback(toolCall.name, toolResult, observation);
+      }
 
       // Prepare next message with tool result
       currentMessage = this.buildFollowUpPrompt(userMessage, toolCall, observation);

@@ -663,7 +663,21 @@ Error: ${error.message}`;
             { streaming: true, progress: true }
           );
         },
-        maxIterations
+        maxIterations,
+        // Tool execution callback - save memory after each tool
+        async (toolName: string, toolResult: any, observation: string) => {
+          if (conversation.agent?.configuration?.memory?.enabled) {
+            // Save tool execution to short-term memory (async, non-blocking)
+            this.saveToolExecutionMemory(
+              conversation.agentId,
+              conversation.id,
+              toolName,
+              toolResult,
+              observation,
+              model
+            ).catch(err => console.error('Failed to save tool memory:', err));
+          }
+        }
       );
       
       // Update the temporary message with final response
@@ -687,15 +701,16 @@ Error: ${error.message}`;
         console.log(`📊 ReAct details:`, { toolsUsed: result.toolsUsed, stepsCount: result.steps.length });
       }
       
-      // Store interaction in memory if enabled
+      // Store final conversation summary in memory and consolidate to long-term
       if (conversation.agent?.configuration?.memory?.enabled) {
         try {
+          // Save conversation summary to short-term memory
           await this.memoryService.createMemory({
             agentId: conversation.agentId,
             sessionId: conversation.id,
             type: 'short-term',
             category: 'interaction',
-            content: `User: ${userMessage}\nAgent: ${result.finalAnswer}`,
+            content: `User: ${userMessage}\nAgent: ${result.finalAnswer}\nTools used: ${result.toolsUsed.join(', ')}`,
             importance: result.toolsUsed.length > 0 ? 0.8 : 0.5,
             metadata: {
               tags: [model, 'ollama', 'react'],
@@ -705,7 +720,11 @@ Error: ${error.message}`;
               source: 'conversation' as any
             }
           });
-          console.log('✅ Stored ReAct interaction in memory');
+          console.log('✅ Stored ReAct conversation summary in memory');
+          
+          // Auto-consolidate to long-term memory (async, non-blocking)
+          this.consolidateConversationMemory(conversation.agentId, conversation.id)
+            .catch(err => console.error('Failed to consolidate memory:', err));
         } catch (error) {
           console.error('Failed to store ReAct interaction in memory:', error);
         }
@@ -1817,7 +1836,21 @@ You: TOOL_CALL:
             { streaming: true, progress: true, provider: 'external' }
           );
         },
-        maxIterations
+        maxIterations,
+        // Tool execution callback - save memory after each tool
+        async (toolName: string, toolResult: any, observation: string) => {
+          if (conversation.agent?.configuration?.memory?.enabled) {
+            // Save tool execution to short-term memory (async, non-blocking)
+            this.saveToolExecutionMemory(
+              conversation.agentId,
+              conversation.id,
+              toolName,
+              toolResult,
+              observation,
+              model
+            ).catch(err => console.error('Failed to save tool memory:', err));
+          }
+        }
       );
       
       // Update the temporary message with final response
@@ -1841,15 +1874,16 @@ You: TOOL_CALL:
         console.log(`📊 ReAct (External LLM) details:`, { toolsUsed: result.toolsUsed, stepsCount: result.steps.length });
       }
       
-      // Store interaction in memory if enabled
+      // Store final conversation summary in memory and consolidate to long-term
       if (conversation.agent?.configuration?.memory?.enabled) {
         try {
+          // Save conversation summary to short-term memory
           await this.memoryService.createMemory({
             agentId: conversation.agentId,
             sessionId: conversation.id,
             type: 'short-term',
             category: 'interaction',
-            content: `User: ${userMessage}\nAgent: ${result.finalAnswer}`,
+            content: `User: ${userMessage}\nAgent: ${result.finalAnswer}\nTools used: ${result.toolsUsed.join(', ')}`,
             importance: result.toolsUsed.length > 0 ? 0.8 : 0.5,
             metadata: {
               tags: [model, 'external', 'react'],
@@ -1859,7 +1893,11 @@ You: TOOL_CALL:
               source: 'conversation' as any
             }
           });
-          console.log('✅ Stored ReAct (External LLM) interaction in memory');
+          console.log('✅ Stored ReAct (External LLM) conversation summary in memory');
+          
+          // Auto-consolidate to long-term memory (async, non-blocking)
+          this.consolidateConversationMemory(conversation.agentId, conversation.id)
+            .catch(err => console.error('Failed to consolidate memory:', err));
         } catch (error) {
           console.error('Failed to store ReAct (External LLM) interaction in memory:', error);
         }
@@ -1882,7 +1920,8 @@ You: TOOL_CALL:
     conversationHistory: any[] = [],
     conversationId?: string,
     progressCallback?: (status: string) => void,
-    maxIterations: number = 5
+    maxIterations: number = 5,
+    toolExecutionCallback?: (toolName: string, toolResult: any, observation: string) => Promise<void>
   ): Promise<{ finalAnswer: string; steps: any[]; toolsUsed: string[] }> {
     const steps: any[] = [];
     const toolsUsed: string[] = [];
@@ -1985,6 +2024,11 @@ Provide a complete answer based on the data you already have.`;
 
       console.log(`👁️ Observation: ${observation.substring(0, 200)}...`);
       steps.push({ observation });
+      
+      // Call tool execution callback if provided (for memory saving)
+      if (toolExecutionCallback) {
+        await toolExecutionCallback(toolCall.name, toolResult, observation);
+      }
 
       // Broadcast tool result to UI
       if (progressCallback) {
@@ -2205,6 +2249,110 @@ TOOL_CALL:
       'delete_file': 'Delete a file from the workspace'
     };
     return descriptions[toolName] || `Execute ${toolName}`;
+  }
+
+  /**
+   * Save tool execution to short-term memory (async, non-blocking)
+   */
+  private async saveToolExecutionMemory(
+    agentId: string,
+    sessionId: string,
+    toolName: string,
+    toolResult: any,
+    observation: string,
+    model: string
+  ): Promise<void> {
+    try {
+      const success = toolResult?.success !== false;
+      const content = success
+        ? `Tool: ${toolName}\nResult: Success\nObservation: ${observation.substring(0, 500)}`
+        : `Tool: ${toolName}\nResult: Error\nError: ${toolResult?.error || observation}`;
+      
+      await this.memoryService.createMemory({
+        agentId,
+        sessionId,
+        type: 'short-term',
+        category: 'interaction' as any, // Using interaction category for tool executions
+        content,
+        importance: success ? 0.7 : 0.9, // Higher importance for errors
+        metadata: {
+          tags: [model, 'tool-execution', toolName, success ? 'success' : 'error'],
+          keywords: [toolName, success ? 'success' : 'error'],
+          confidence: 1.0,
+          relevance: 1.0,
+          source: 'tool-execution' as any
+        }
+      });
+      console.log(`✅ Saved tool execution memory: ${toolName} (${success ? 'success' : 'error'})`);
+    } catch (error) {
+      console.error(`Failed to save tool execution memory for ${toolName}:`, error);
+    }
+  }
+
+  /**
+   * Consolidate conversation memories to long-term storage (async, non-blocking)
+   */
+  private async consolidateConversationMemory(agentId: string, conversationId: string): Promise<void> {
+    try {
+      console.log(`🔄 Starting memory consolidation for conversation ${conversationId}`);
+      
+      // Get all short-term memories for this conversation
+      const stmResult = await this.memoryService.queryMemories({
+        agentId,
+        sessionId: conversationId,
+        limit: 100
+      });
+      
+      if (!stmResult.memories || stmResult.memories.length === 0) {
+        console.log('No memories to consolidate');
+        return;
+      }
+      
+      // Group memories by conversation and create a single long-term memory chunk
+      const toolExecutions = stmResult.memories.filter(m => 
+        m.metadata?.tags?.includes('tool-execution')
+      );
+      const interactions = stmResult.memories.filter(m => 
+        !m.metadata?.tags?.includes('tool-execution')
+      );
+      
+      // Build consolidated summary
+      const summary = `Conversation with ${toolExecutions.length} tool executions`;
+      const details = [
+        '=== Conversation Summary ===',
+        ...interactions.map(m => (m as any).content || ''),
+        '',
+        '=== Tool Executions ===',
+        ...toolExecutions.map(m => (m as any).content || '')
+      ].join('\n\n');
+      
+      // Calculate importance (higher if tools were used or errors occurred)
+      const hasErrors = toolExecutions.some(m => 
+        m.metadata?.tags?.includes('error')
+      );
+      const importance = hasErrors ? 0.9 : (toolExecutions.length > 0 ? 0.8 : 0.6);
+      
+      // Create long-term memory
+      await this.memoryService.createMemory({
+        agentId,
+        sessionId: conversationId,
+        type: 'long-term',
+        category: 'interaction',
+        content: details,
+        importance,
+        metadata: {
+          tags: ['conversation', 'consolidated', ...toolExecutions.map(m => m.metadata?.tags || []).flat()],
+          keywords: ['conversation', ...toolExecutions.map(m => m.metadata?.keywords || []).flat()],
+          confidence: 1.0,
+          relevance: 1.0,
+          source: 'consolidation' as any
+        }
+      });
+      
+      console.log(`✅ Consolidated ${stmResult.memories.length} memories to long-term storage`);
+    } catch (error) {
+      console.error('Failed to consolidate conversation memory:', error);
+    }
   }
 
   private getToolParameters(toolName: string): any {
