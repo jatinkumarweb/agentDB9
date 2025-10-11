@@ -2295,10 +2295,26 @@ TOOL_CALL:
     console.log(`🔍 Parsing tool calls from content (length: ${content.length})`);
     console.log(`📝 Content preview: ${content.substring(0, 200)}...`);
     
+    // Pre-process content to fix common JSON formatting errors from LLMs
+    let processedContent = content;
+    
+    // Fix missing closing quote and comma before "arguments"
+    // Pattern: "value "arguments" -> "value", "arguments"
+    processedContent = processedContent.replace(/(\w) "arguments"/g, '$1", "arguments"');
+    
+    // Also fix missing comma when quote is present
+    // Pattern: "value" "arguments" -> "value", "arguments"
+    processedContent = processedContent.replace(/" "arguments"/g, '", "arguments"');
+    
+    if (processedContent !== content) {
+      console.log(`🔧 Fixed JSON formatting errors in content`);
+      console.log(`📝 Fixed preview: ${processedContent.substring(0, 200)}...`);
+    }
+    
     // Parse JSON-style tool calls from the response
     // Try JSON format with TOOL_CALL: marker
     const jsonMarkerRegex = /TOOL_CALL:\s*(\{[\s\S]*?\})\s*(?:\n|$)/g;
-    let matches = [...content.matchAll(jsonMarkerRegex)];
+    let matches = [...processedContent.matchAll(jsonMarkerRegex)];
     
     console.log(`🔎 JSON format matches: ${matches.length}`);
     
@@ -2306,7 +2322,7 @@ TOOL_CALL:
     if (matches.length === 0) {
       console.log(`⚠️ No JSON tool calls found, trying legacy XML format...`);
       const xmlRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/gs;
-      const xmlMatches = [...content.matchAll(xmlRegex)];
+      const xmlMatches = [...processedContent.matchAll(xmlRegex)];
       
       if (xmlMatches.length === 0) {
         console.log(`⚠️ No tool calls found in content`);
@@ -2316,7 +2332,7 @@ TOOL_CALL:
       console.log(`✅ Found ${xmlMatches.length} XML tool call(s) in response`);
       
       // Remove XML tool calls from content for cleaner display
-      let cleanContent = content.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
+      let cleanContent = processedContent.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
       
       for (const match of xmlMatches) {
         const toolName = match[1].trim();
@@ -2352,7 +2368,7 @@ TOOL_CALL:
     console.log(`✅ Found ${matches.length} JSON tool call(s) in response`);
     
     // Remove JSON tool calls from content for cleaner display
-    let cleanContent = content.replace(/TOOL_CALL:\s*\{[\s\S]*?\}\s*(?:\n|$)/g, '').trim();
+    let cleanContent = processedContent.replace(/TOOL_CALL:\s*\{[\s\S]*?\}\s*(?:\n|$)/g, '').trim();
     
     for (const match of matches) {
       const jsonStr = match[1].trim();
