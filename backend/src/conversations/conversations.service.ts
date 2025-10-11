@@ -686,6 +686,30 @@ Error: ${error.message}`;
       if (isVerbose) {
         console.log(`📊 ReAct details:`, { toolsUsed: result.toolsUsed, stepsCount: result.steps.length });
       }
+      
+      // Store interaction in memory if enabled
+      if (conversation.agent?.configuration?.memory?.enabled) {
+        try {
+          await this.memoryService.createMemory({
+            agentId: conversation.agentId,
+            sessionId: conversation.id,
+            type: 'short-term',
+            category: 'interaction',
+            content: `User: ${userMessage}\nAgent: ${result.finalAnswer}`,
+            importance: result.toolsUsed.length > 0 ? 0.8 : 0.5,
+            metadata: {
+              tags: [model, 'ollama', 'react'],
+              keywords: result.toolsUsed.length > 0 ? ['tool-usage', ...result.toolsUsed] : ['conversation'],
+              confidence: 1.0,
+              relevance: 1.0,
+              source: 'conversation' as any
+            }
+          });
+          console.log('✅ Stored ReAct interaction in memory');
+        } catch (error) {
+          console.error('Failed to store ReAct interaction in memory:', error);
+        }
+      }
     } catch (error) {
       console.error('❌ ReAct execution failed:', error);
       throw error;
@@ -1815,6 +1839,30 @@ You: TOOL_CALL:
       console.log(`✅ ReAct (External LLM) completed successfully with ${result.toolsUsed.length} tools used`);
       if (isVerbose) {
         console.log(`📊 ReAct (External LLM) details:`, { toolsUsed: result.toolsUsed, stepsCount: result.steps.length });
+      }
+      
+      // Store interaction in memory if enabled
+      if (conversation.agent?.configuration?.memory?.enabled) {
+        try {
+          await this.memoryService.createMemory({
+            agentId: conversation.agentId,
+            sessionId: conversation.id,
+            type: 'short-term',
+            category: 'interaction',
+            content: `User: ${userMessage}\nAgent: ${result.finalAnswer}`,
+            importance: result.toolsUsed.length > 0 ? 0.8 : 0.5,
+            metadata: {
+              tags: [model, 'external', 'react'],
+              keywords: result.toolsUsed.length > 0 ? ['tool-usage', ...result.toolsUsed] : ['conversation'],
+              confidence: 1.0,
+              relevance: 1.0,
+              source: 'conversation' as any
+            }
+          });
+          console.log('✅ Stored ReAct (External LLM) interaction in memory');
+        } catch (error) {
+          console.error('Failed to store ReAct (External LLM) interaction in memory:', error);
+        }
       }
     } catch (error) {
       console.error('❌ ReAct (External LLM) execution failed:', error);
