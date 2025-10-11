@@ -42,9 +42,20 @@ export class MemoryController {
   }
 
   /**
+   * Get memories by agent ID
+   */
+  @Get(':agentId')
+  async getMemoriesByAgent(
+    @Param('agentId') agentId: string,
+    @Query('type') type?: string,
+  ) {
+    return this.memoryService.getMemoriesByAgent(agentId, type);
+  }
+
+  /**
    * Get memory statistics
    */
-  @Get('stats/:agentId')
+  @Get(':agentId/stats')
   async getStats(@Param('agentId') agentId: string): Promise<MemoryStats> {
     return this.memoryService.getStats(agentId);
   }

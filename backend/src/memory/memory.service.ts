@@ -125,6 +125,32 @@ export class MemoryService {
   }
 
   /**
+   * Get memories by agent ID
+   */
+  async getMemoriesByAgent(agentId: string, type?: string) {
+    const result: any = {};
+
+    if (!type || type === 'short-term') {
+      const stmResult = await this.stmService.query({
+        agentId,
+        sessionId: 'all',
+        limit: 100,
+      });
+      result.shortTerm = stmResult.memories;
+    }
+
+    if (!type || type === 'long-term') {
+      const ltmResult = await this.ltmService.query({
+        agentId,
+        limit: 100,
+      });
+      result.longTerm = ltmResult.memories;
+    }
+
+    return result;
+  }
+
+  /**
    * Get memory statistics
    */
   async getStats(agentId: string): Promise<MemoryStats> {
