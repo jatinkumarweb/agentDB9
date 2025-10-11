@@ -523,7 +523,7 @@ export class MCPService {
       // Read existing content
       let existingContent = '';
       try {
-        const readResponse = await fetch(`${this.mcpServerUrl}/api/execute`, {
+        const readResponse = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -544,7 +544,7 @@ export class MCPService {
       const newContent = existingContent + content;
       
       // Write to file
-      await fetch(`${this.mcpServerUrl}/api/execute`, {
+      await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
