@@ -622,14 +622,16 @@ Error: ${error.message}`;
     systemPrompt += '- get_workspace_summary: Get comprehensive workspace analysis. Args: {}\n';
     systemPrompt += '- list_files: List files/folders. Args: {"path": "."}\n';
     systemPrompt += '- read_file: Read file contents. Args: {"path": "file.js"}\n';
-    systemPrompt += '- execute_command: Run commands. Args: {"command": "npm install"}\n';
     systemPrompt += '- write_file: Write files. Args: {"path": "file.js", "content": "..."}\n';
-    systemPrompt += '- create_directory: Create directory. Args: {"path": "src"}\n\n';
+    systemPrompt += '- delete_file: Delete a file. Args: {"path": "file.js"}\n';
+    systemPrompt += '- create_directory: Create directory. Args: {"path": "src"}\n';
+    systemPrompt += '- execute_command: Run commands. Args: {"command": "npm install"}\n\n';
     systemPrompt += 'MULTI-STEP REASONING:\n';
-    systemPrompt += '1. Use tools in sequence to gather information and perform actions\n';
-    systemPrompt += '2. After each tool result, decide: need more tools OR ready to answer\n';
-    systemPrompt += '3. For complex tasks, use multiple tools (e.g., check workspace → create directory → write files)\n';
-    systemPrompt += '4. Only provide final answer when you have all needed information\n\n';
+    systemPrompt += '1. ALWAYS check workspace context first (use list_files or get_workspace_summary)\n';
+    systemPrompt += '2. Use tools in sequence to gather information and perform actions\n';
+    systemPrompt += '3. After each tool result, decide: need more tools OR ready to answer\n';
+    systemPrompt += '4. For file operations (delete, update, read), verify the file exists first\n';
+    systemPrompt += '5. Only provide final answer when you have all needed information\n\n';
     systemPrompt += 'EFFICIENCY RULES:\n';
     systemPrompt += '- NEVER call the same tool twice with the same arguments\n';
     systemPrompt += '- Review what data you already have before requesting more\n';
@@ -657,7 +659,7 @@ Error: ${error.message}`;
       'show me', 'list', 'find', 'search', 'look for',
       'workspace summary', 'project structure', 'file structure',
       // Modification tasks
-      'update', 'modify', 'change', 'edit', 'add', 'remove',
+      'update', 'modify', 'change', 'edit', 'add', 'remove', 'delete',
       'fix', 'improve', 'refactor', 'enhance',
       // Creation tasks that need context
       'create', 'build', 'make', 'generate', 'setup', 'initialize',
