@@ -133,7 +133,7 @@ export class MemoryService {
     if (!type || type === 'short-term') {
       const stmResult = await this.stmService.query({
         agentId,
-        sessionId: 'all',
+        // Don't pass sessionId to get all sessions
         limit: 100,
       });
       result.shortTerm = stmResult.memories;

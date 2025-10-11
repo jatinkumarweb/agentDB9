@@ -194,9 +194,14 @@ export class ShortTermMemoryService {
    * Get session statistics
    */
   async getSessionStats(agentId: string, sessionId: string): Promise<any> {
-    const memories = Array.from(this.memoryStore.values())
-      .filter(m => m.agentId === agentId && m.sessionId === sessionId)
+    let memories = Array.from(this.memoryStore.values())
+      .filter(m => m.agentId === agentId)
       .filter(m => new Date() <= m.expiresAt);
+    
+    // If sessionId is provided and not 'all', filter by session
+    if (sessionId && sessionId !== 'all') {
+      memories = memories.filter(m => m.sessionId === sessionId);
+    }
 
     const byCategory: Record<string, number> = {};
     let totalImportance = 0;
