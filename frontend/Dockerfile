@@ -1,5 +1,5 @@
 # Explicitly specify platform to avoid architecture confusion
-FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:18-slim
+FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:22-slim
 
 WORKDIR /app
 
