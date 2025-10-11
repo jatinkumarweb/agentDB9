@@ -1807,6 +1807,7 @@ You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</argum
   ): Promise<{ finalAnswer: string; steps: any[]; toolsUsed: string[] }> {
     const steps: any[] = [];
     const toolsUsed: string[] = [];
+    const toolCallHistory = new Set<string>();
     let iteration = 0;
     const MAX_ITERATIONS = 5; // Allow more iterations for complex queries
     let currentMessage = userMessage;
@@ -1859,6 +1860,23 @@ You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</argum
       }
 
       console.log(`🔧 Tool call found: ${toolCall.name} - Continuing loop`);
+
+      // Check for repeated tool calls (infinite loop detection)
+      const toolKey = `${toolCall.name}:${JSON.stringify(toolCall.arguments)}`;
+      if (toolCallHistory.has(toolKey)) {
+        console.log(`⚠️ Detected repeated tool call: ${toolKey} - Forcing final answer`);
+        const forceAnswerPrompt = `You've already called ${toolCall.name} with these exact arguments and received the results.
+
+DO NOT call any more tools. Based on ALL the information you've gathered so far, provide your FINAL ANSWER to the original question now.
+
+Original Question: ${userMessage}
+
+Provide a complete answer based on the data you already have.`;
+        
+        currentMessage = forceAnswerPrompt;
+        continue; // Skip to next iteration which should give final answer
+      }
+      toolCallHistory.add(toolKey);
 
       // Tool call found - execute it
       console.log(`🔧 Tool call detected: ${toolCall.name}`);

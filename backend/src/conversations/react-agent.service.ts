@@ -37,6 +37,7 @@ export class ReActAgentService {
   ): Promise<ReActResult> {
     const steps: ReActStep[] = [];
     const toolsUsed: string[] = [];
+    const toolCallHistory = new Set<string>();
     let iteration = 0;
     let currentMessage = userMessage;
 
@@ -75,6 +76,21 @@ export class ReActAgentService {
           toolsUsed
         };
       }
+
+      // Check for repeated tool calls (infinite loop detection)
+      const toolKey = `${toolCall.name}:${JSON.stringify(toolCall.arguments)}`;
+      if (toolCallHistory.has(toolKey)) {
+        this.logger.warn(`⚠️ Detected repeated tool call: ${toolKey} - Forcing final answer`);
+        currentMessage = `You've already called ${toolCall.name} with these exact arguments and received the results.
+
+DO NOT call any more tools. Based on ALL the information you've gathered so far, provide your FINAL ANSWER to the original question now.
+
+Original Question: ${userMessage}
+
+Provide a complete answer based on the data you already have.`;
+        continue; // Skip to next iteration which should give final answer
+      }
+      toolCallHistory.add(toolKey);
 
       // Tool call found - execute it
       this.logger.log(`🔧 Tool call detected: ${toolCall.name}`);
