@@ -555,6 +555,11 @@ Error: ${error.message}`;
     systemPrompt += '2. After each tool result, decide: need more tools OR ready to answer\n';
     systemPrompt += '3. For complex tasks, use multiple tools (e.g., check workspace → create directory → write files)\n';
     systemPrompt += '4. Only provide final answer when you have all needed information\n\n';
+    systemPrompt += 'EFFICIENCY RULES:\n';
+    systemPrompt += '- NEVER call the same tool twice with the same arguments\n';
+    systemPrompt += '- Review what data you already have before requesting more\n';
+    systemPrompt += '- Prefer answering with available information over gathering more data\n';
+    systemPrompt += '- Maximum 5 tool calls per question - be efficient\n\n';
     systemPrompt += 'REMEMBER: Tool call = XML ONLY. Final answer = text ONLY. Never mix them.';
     
     return systemPrompt;
@@ -1919,17 +1924,30 @@ Provide a complete answer based on the data you already have.`;
       
       console.log(`🔄 Preparing next iteration. Tool failed: ${toolFailed}`);
       
-      // Prepare next message with tool result - use simpler prompt like Ollama
-      currentMessage = `Tool Result: ${observation}
+      // Build context-aware follow-up prompt
+      const toolsSummary = toolsUsed.length > 0 
+        ? `\n\nTools you've already used:\n${toolsUsed.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
+        : '';
+      
+      // Prepare next message with tool result - include context to prevent loops
+      currentMessage = `Latest Tool Result from ${toolCall.name}:
+${observation}
+${toolsSummary}
 
 Original Question: ${userMessage}
 
-Decide your next action:
-1. Need more info or another action? → Output ONLY the XML tool call (no text before/after)
-2. Have enough info? → Provide final answer (text only, no XML)
+IMPORTANT: You've already gathered data from ${toolsUsed.length} tool(s). Review what you have before calling more tools.
 
-CRITICAL: If using a tool, output ONLY XML - NO explanations.
-Example: <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>`;
+Decide your next action:
+1. Have enough info to answer? → Provide final answer (text only, NO XML tags)
+2. Need DIFFERENT information? → Output ONLY ONE XML tool call (no text before/after)
+
+CRITICAL RULES:
+- DO NOT repeat tools you've already used
+- If using a tool, output ONLY XML - NO explanations
+- Prefer answering with available data over gathering more
+
+Example tool call: <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>`;
       
       // Add to conversation history
       conversationHistory.push({
