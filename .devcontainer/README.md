@@ -6,16 +6,29 @@ This project uses **Node.js 22** (LTS).
 
 ## 🚨 If your terminal shows Node 18 or 20 instead of 22:
 
-**Quick Fix (Run this once):**
+### Option 1: Quick Fix (Current Terminal Only)
 ```bash
-.devcontainer/switch-to-node-22.sh
+source scripts/use-node-22.sh
+```
+or
+```bash
+. scripts/use-node-22.sh
+```
+
+This switches to Node 22 in your current terminal session.
+
+### Option 2: Permanent Fix (All Future Terminals)
+```bash
+bash .devcontainer/switch-to-node-22.sh
 ```
 
 This script will:
 - Install Node.js 22 via nvm
 - Set it as default
-- Update your shell profiles
+- Update your shell profiles (.bashrc, .zshrc)
 - Make it permanent for all new terminals
+
+**Note:** Use `bash` to run the script, not `source` or `.`
 
 ### Alternative: Rebuild Container (Clean approach)
 
