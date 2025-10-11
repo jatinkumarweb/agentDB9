@@ -22,6 +22,6 @@ import { ContextModule } from '../context/context.module';
   ],
   controllers: [ConversationsController],
   providers: [ConversationsService, ReActAgentService],
-  exports: [ConversationsService],
+  exports: [ConversationsService, ReActAgentService],
 })
 export class ConversationsModule {}

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Agent } from '../entities/agent.entity';
@@ -7,6 +7,7 @@ import { generateId } from '@agentdb9/shared';
 import { KnowledgeService } from '../knowledge/knowledge.service';
 import { ContextService } from '../context/context.service';
 import { MemoryService } from '../memory/memory.service';
+import { ReActAgentService } from '../conversations/react-agent.service';
 
 @Injectable()
 export class AgentsService {
@@ -18,6 +19,8 @@ export class AgentsService {
     private knowledgeService: KnowledgeService,
     private contextService: ContextService,
     private memoryService: MemoryService,
+    @Inject(forwardRef(() => ReActAgentService))
+    private reactAgentService: ReActAgentService,
   ) {}
 
   async findAll(userId?: string): Promise<Agent[]> {
@@ -297,9 +300,6 @@ export class AgentsService {
         }
       }
 
-      // Analyze the message to determine if it requires code actions
-      const actions = await this.analyzeMessage(message, context);
-      
       // Store interaction in short-term memory
       if (context.sessionId) {
         try {
@@ -324,17 +324,24 @@ export class AgentsService {
         }
       }
 
-      // Generate response using the specific agent's configuration, knowledge context, project context, and memory
-      const response = await this.generateAgentResponse(agent, message, context, actions, knowledgeContext, projectContext, memoryContext);
+      // Use ReAct pattern for tool execution with enhanced context
+      const model = agent.configuration?.model || 'qwen2.5-coder:7b';
       
-      // Update agent status to coding if actions are required
-      if (actions.length > 0) {
-        agent.status = 'coding';
-        await this.agentsRepository.save(agent);
-        
-        // Execute actions via MCP
-        await this.executeMCPActions(actions, { ...context, agentId, agentName: agent.name });
-      }
+      // Build enhanced system prompt with all context
+      const enhancedSystemPrompt = this.buildEnhancedSystemPrompt(
+        agent,
+        knowledgeContext,
+        projectContext,
+        memoryContext
+      );
+      
+      // Execute with ReAct pattern
+      const response = await this.reactAgentService.executeWithReAct(
+        message,
+        model,
+        enhancedSystemPrompt,
+        context
+      );
 
       // Update agent status back to idle
       agent.status = 'idle';
@@ -342,7 +349,7 @@ export class AgentsService {
       
       return {
         response,
-        actions,
+        actions: [], // ReAct handles actions internally
         timestamp: new Date(),
         context: { ...context, agentId, agentName: agent.name },
         agent: {
@@ -350,7 +357,7 @@ export class AgentsService {
           name: agent.name,
           description: agent.description
         },
-        knowledgeUsed: knowledgeContext ? knowledgeContext.chunks.length : 0
+        knowledgeUsed: knowledgeContext ? knowledgeContext.chunks?.length || 0 : 0
       };
     } catch (error) {
       console.error('Error processing chat with agent:', error);
@@ -563,6 +570,45 @@ Respond in a helpful, professional manner. Be specific about what you'll do and 
     return words
       .filter(word => word.length > 3 && !stopWords.has(word))
       .slice(0, 10);
+  }
+
+  private buildEnhancedSystemPrompt(
+    agent: Agent,
+    knowledgeContext?: any,
+    projectContext?: any,
+    memoryContext?: any
+  ): string {
+    let prompt = agent.configuration?.systemPrompt || `You are ${agent.name}, ${agent.description}`;
+
+    // Add knowledge context
+    if (knowledgeContext && knowledgeContext.chunks && knowledgeContext.chunks.length > 0) {
+      prompt += '\n\n## Relevant Knowledge:\n';
+      knowledgeContext.chunks.forEach((chunk: any, index: number) => {
+        prompt += `\n${index + 1}. ${chunk.content}`;
+      });
+    }
+
+    // Add project context
+    if (projectContext) {
+      prompt += '\n\n## Project Context:\n';
+      if (projectContext.languages) {
+        prompt += `\nLanguages: ${projectContext.languages.join(', ')}`;
+      }
+      if (projectContext.frameworks) {
+        prompt += `\nFrameworks: ${projectContext.frameworks.join(', ')}`;
+      }
+      if (projectContext.structure) {
+        prompt += `\nProject Structure: ${JSON.stringify(projectContext.structure, null, 2)}`;
+      }
+    }
+
+    // Add memory context
+    if (memoryContext && memoryContext.summary) {
+      prompt += '\n\n## Previous Context:\n';
+      prompt += memoryContext.summary;
+    }
+
+    return prompt;
   }
 
   private buildUserPrompt(message: string, context: any): string {

@@ -19,7 +19,7 @@ interface ReActResult {
 @Injectable()
 export class ReActAgentService {
   private readonly logger = new Logger(ReActAgentService.name);
-  private readonly MAX_ITERATIONS = 5; // Allow more iterations for complex queries
+  private readonly DEFAULT_MAX_ITERATIONS = 5;
 
   constructor(private readonly mcpService: MCPService) {}
 
@@ -33,8 +33,10 @@ export class ReActAgentService {
     ollamaUrl: string,
     conversationHistory: any[] = [],
     conversationId?: string,
-    progressCallback?: (status: string) => void
+    progressCallback?: (status: string) => void,
+    maxIterations?: number
   ): Promise<ReActResult> {
+    const MAX_ITERATIONS = maxIterations || this.DEFAULT_MAX_ITERATIONS;
     const steps: ReActStep[] = [];
     const toolsUsed: string[] = [];
     const toolCallHistory = new Set<string>();
@@ -43,13 +45,13 @@ export class ReActAgentService {
 
     this.logger.log(`🔄 Starting ReAct loop for: "${userMessage.substring(0, 50)}..."`);
 
-    while (iteration < this.MAX_ITERATIONS) {
+    while (iteration < MAX_ITERATIONS) {
       iteration++;
-      this.logger.log(`\n🔁 ReAct Iteration ${iteration}/${this.MAX_ITERATIONS}`);
+      this.logger.log(`\n🔁 ReAct Iteration ${iteration}/${MAX_ITERATIONS}`);
       
       // Send progress update
       if (progressCallback) {
-        progressCallback(`🔄 Analyzing... (step ${iteration}/${this.MAX_ITERATIONS})`);
+        progressCallback(`🔄 Analyzing... (step ${iteration}/${MAX_ITERATIONS})`);
       }
 
       // Call LLM with current context
@@ -131,7 +133,7 @@ Provide a complete answer based on the data you already have.`;
     }
 
     // Max iterations reached
-    this.logger.warn(`⚠️ Max iterations (${this.MAX_ITERATIONS}) reached`);
+    this.logger.warn(`⚠️ Max iterations (${MAX_ITERATIONS}) reached`);
     return {
       finalAnswer: 'I apologize, but I reached the maximum number of steps while processing your request. Please try rephrasing your question.',
       steps,
@@ -283,5 +285,36 @@ CRITICAL: If using a tool, output ONLY JSON with TOOL_CALL: marker - NO explanat
 Example:
 TOOL_CALL:
 {"tool": "write_file", "arguments": {"path": "App.jsx", "content": "..."}}`;
+  }
+
+  /**
+   * Execute ReAct with custom configuration for agent service
+   */
+  async executeWithReAct(
+    userMessage: string,
+    model: string,
+    systemPrompt: string,
+    context: any,
+    maxIterations: number = 5
+  ): Promise<string> {
+    const ollamaUrl = process.env.OLLAMA_HOST || 'http://localhost:11434';
+    
+    try {
+      const result = await this.executeReActLoop(
+        userMessage,
+        systemPrompt,
+        model,
+        ollamaUrl,
+        [],
+        context.conversationId,
+        undefined,
+        maxIterations
+      );
+      
+      return result.finalAnswer;
+    } catch (error) {
+      this.logger.error('Error in executeWithReAct:', error);
+      throw error;
+    }
   }
 }

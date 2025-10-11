@@ -712,7 +712,8 @@ Error: ${error.message}`;
       const savedTempMessage = await this.messagesRepository.save(tempMessage);
       
       // Execute ReAct loop with progress updates
-      console.log(`⚙️ ReAct: Calling executeReActLoop with model ${model}`);
+      // Use limited iterations (2) for /chat - discussion only, no complex tool chains
+      console.log(`⚙️ ReAct: Calling executeReActLoop with model ${model} (max 2 iterations for chat)`);
       const result = await this.reactAgentService.executeReActLoop(
         userMessage,
         systemPrompt,
@@ -729,7 +730,8 @@ Error: ${error.message}`;
             true,
             { streaming: true, progress: true }
           );
-        }
+        },
+        2 // Max 2 iterations for /chat
       );
       
       // Update the temporary message with final response
@@ -1856,7 +1858,8 @@ You: TOOL_CALL:
             true,
             { streaming: true, progress: true, provider: 'external' }
           );
-        }
+        },
+        2 // Max 2 iterations for /chat
       );
       
       // Update the temporary message with final response
@@ -1896,13 +1899,14 @@ You: TOOL_CALL:
     userId: string,
     conversationHistory: any[] = [],
     conversationId?: string,
-    progressCallback?: (status: string) => void
+    progressCallback?: (status: string) => void,
+    maxIterations: number = 5
   ): Promise<{ finalAnswer: string; steps: any[]; toolsUsed: string[] }> {
     const steps: any[] = [];
     const toolsUsed: string[] = [];
     const toolCallHistory = new Set<string>();
     let iteration = 0;
-    const MAX_ITERATIONS = 5; // Allow more iterations for complex queries
+    const MAX_ITERATIONS = maxIterations;
     let currentMessage = userMessage;
 
     console.log(`🔄 Starting external ReAct loop for: "${userMessage.substring(0, 50)}..."`);
