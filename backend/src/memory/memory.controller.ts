@@ -49,7 +49,26 @@ export class MemoryController {
     @Param('agentId') agentId: string,
     @Query('type') type?: string,
   ) {
-    return this.memoryService.getMemoriesByAgent(agentId, type);
+    const memories = await this.memoryService.getMemoriesByAgent(agentId, type);
+    
+    // Flatten the response for frontend compatibility
+    let allMemories: any[] = [];
+    if (memories.shortTerm) {
+      allMemories = [...allMemories, ...memories.shortTerm];
+    }
+    if (memories.longTerm) {
+      allMemories = [...allMemories, ...memories.longTerm];
+    }
+    
+    return {
+      success: true,
+      data: allMemories,
+      count: allMemories.length,
+      breakdown: {
+        shortTerm: memories.shortTerm?.length || 0,
+        longTerm: memories.longTerm?.length || 0,
+      }
+    };
   }
 
   /**
