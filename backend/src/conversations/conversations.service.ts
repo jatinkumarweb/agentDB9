@@ -784,28 +784,34 @@ Would you like help setting up external API access?`;
       if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
         systemPrompt = `You are a helpful coding assistant with REAL workspace access. You can EXECUTE commands and CREATE files.
 
-CRITICAL RULE: When you decide to use a tool, output ONLY the XML tool call - NO explanations, NO plans, NO other text.
+CRITICAL RULE: When you decide to use a tool, output ONLY the JSON tool call - NO explanations, NO plans, NO other text.
 
 ## EXACT Tool Call Format (COPY THIS EXACTLY):
-<tool_call>
-<tool_name>tool_name_here</tool_name>
-<arguments>{"arg": "value"}</arguments>
-</tool_call>
+TOOL_CALL:
+{
+  "tool": "tool_name_here",
+  "arguments": {
+    "arg": "value"
+  }
+}
 
 IMPORTANT: 
-- Use </arguments> NOT </>
-- Use </tool_name> NOT </>
-- Use </tool_call> NOT </>
-- Close ALL tags properly
+- Start with TOOL_CALL: marker
+- Use "tool" key for tool name
+- Use "arguments" key for parameters
+- Close ALL quotes and braces properly
 
 ## WRONG Examples:
-❌ <arguments>{"path": "."}</> (missing "arguments" in closing tag)
-❌ <tool_name>list_files</> (missing "tool_name" in closing tag)
-❌ "Let's start by... <tool_call>..." (text before XML)
+❌ {"tool": "write_file", "arguments": {"path": "app.js}  (missing closing quote)
+❌ {"tool": "list_files",}  (trailing comma)
+❌ "Let's start by... TOOL_CALL: ..." (text before JSON)
 
 ## CORRECT Examples:
-✅ <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
-✅ <tool_call><tool_name>write_file</tool_name><arguments>{"path": "App.jsx", "content": "..."}</arguments></tool_call>
+✅ TOOL_CALL:
+{"tool": "list_files", "arguments": {"path": "."}}
+
+✅ TOOL_CALL:
+{"tool": "write_file", "arguments": {"path": "App.jsx", "content": "..."}}
 
 Available tools:`;
 
@@ -1351,25 +1357,30 @@ Would you like help setting up external API access?`;
       let systemPrompt = conversation.agent?.configuration?.systemPrompt || 'You are a helpful coding assistant.';
       
       if (modelSupportsTools && (workspaceConfig.enableActions || workspaceConfig.enableContext)) {
-        systemPrompt += `\n\n## CRITICAL: You have REAL workspace access. When you use a tool, output ONLY the XML - NO explanations.
+        systemPrompt += `\n\n## CRITICAL: You have REAL workspace access. When you use a tool, output ONLY the JSON - NO explanations.
 
 ## EXACT Tool Call Format (COPY EXACTLY):
-<tool_call>
-<tool_name>tool_name_here</tool_name>
-<arguments>{"arg": "value"}</arguments>
-</tool_call>
+TOOL_CALL:
+{
+  "tool": "tool_name_here",
+  "arguments": {
+    "arg": "value"
+  }
+}
 
 IMPORTANT:
-- Use </arguments> NOT </>
-- Use </tool_name> NOT </>
-- Close ALL tags with full names
+- Start with TOOL_CALL: marker
+- Use "tool" key for tool name
+- Use "arguments" key for parameters
+- Close ALL quotes and braces
 
 ## WRONG:
-❌ <arguments>{"path": "."}</> (wrong closing tag)
-❌ "Let's create... <tool_call>..." (text before XML)
+❌ {"tool": "write_file", "arguments": {"path": "app.js}  (missing quote)
+❌ "Let's create... TOOL_CALL: ..." (text before JSON)
 
 ## CORRECT:
-✅ <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>
+✅ TOOL_CALL:
+{"tool": "list_files", "arguments": {"path": "."}}
 
 ## Available Tools:`;
         
@@ -1403,10 +1414,12 @@ IMPORTANT:
 
 ## Example Workflows:
 User: "Create a React app with Vite named my-app"
-You: <tool_call><tool_name>execute_command</tool_name><arguments>{"command": "npm create vite@latest my-app -- --template react"}</arguments></tool_call>
+You: TOOL_CALL:
+{"tool": "execute_command", "arguments": {"command": "npm create vite@latest my-app -- --template react"}}
 
 User: "What files are in the workspace?"
-You: <tool_call><tool_name>list_files</tool_name><arguments>{"path": "."}</arguments></tool_call>`;
+You: TOOL_CALL:
+{"tool": "list_files", "arguments": {"path": "."}}`;
       }
       
       // Get conversation history for context
@@ -1939,8 +1952,8 @@ Original Question: ${userMessage}
 IMPORTANT: You've already gathered data from ${toolsUsed.length} tool(s). Review what you have before calling more tools.
 
 Decide your next action:
-1. Have enough info to answer? → Provide final answer (text only, NO XML tags)
-2. Need DIFFERENT information? → Output ONLY ONE XML tool call (no text before/after)
+1. Have enough info to answer? → Provide final answer (text only, NO JSON)
+2. Need DIFFERENT information? → Output ONLY ONE JSON tool call (no text before/after)
 
 CRITICAL RULES:
 - DO NOT repeat tools you've already used
@@ -2203,40 +2216,78 @@ TOOL_CALL:
     console.log(`🔍 Parsing tool calls from content (length: ${content.length})`);
     console.log(`📝 Content preview: ${content.substring(0, 200)}...`);
     
-    // Parse XML-style tool calls from the response
-    // Try standard format first: <tool_call><tool_name>...</tool_name><arguments>...</arguments></tool_call>
-    let toolCallRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/gs;
-    let matches = [...content.matchAll(toolCallRegex)];
+    // Parse JSON-style tool calls from the response
+    // Try JSON format with TOOL_CALL: marker
+    const jsonMarkerRegex = /TOOL_CALL:\s*(\{[\s\S]*?\})\s*(?:\n|$)/g;
+    let matches = [...content.matchAll(jsonMarkerRegex)];
     
-    console.log(`🔎 Standard format matches: ${matches.length}`);
+    console.log(`🔎 JSON format matches: ${matches.length}`);
     
-    // If no matches, try alternative format: <tool_call><execute_command>...</execute_command><arguments>...</arguments></tool_call>
+    // If no JSON matches, try legacy XML format for backward compatibility
     if (matches.length === 0) {
-      toolCallRegex = /<tool_call>\s*<(\w+)>.*?<\/\1>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/gs;
-      matches = [...content.matchAll(toolCallRegex)];
-      console.log(`🔎 Alternative format matches: ${matches.length}`);
+      console.log(`⚠️ No JSON tool calls found, trying legacy XML format...`);
+      const xmlRegex = /<tool_call>\s*<tool_name>(.*?)<\/tool_name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_call>/gs;
+      const xmlMatches = [...content.matchAll(xmlRegex)];
+      
+      if (xmlMatches.length === 0) {
+        console.log(`⚠️ No tool calls found in content`);
+        return;
+      }
+      
+      console.log(`✅ Found ${xmlMatches.length} XML tool call(s) in response`);
+      
+      // Remove XML tool calls from content for cleaner display
+      let cleanContent = content.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
+      
+      for (const match of xmlMatches) {
+        const toolName = match[1].trim();
+        const argsJson = match[2].trim();
+        
+        try {
+          const args = parseJSON(argsJson);
+          if (!args) {
+            console.error(`Failed to parse XML tool arguments for ${toolName}`);
+            continue;
+          }
+          
+          // Execute tool and update message inline (XML legacy path)
+          const toolResult = await this.mcpService.executeTool({
+            name: toolName,
+            arguments: args
+          });
+          
+          const resultToShow = toolResult.result !== undefined ? toolResult.result : { error: 'No result returned' };
+          const toolResultText = `\n\n**Tool Executed: ${toolName}**\n\`\`\`json\n${JSON.stringify(resultToShow, null, 2)}\n\`\`\`\n`;
+          cleanContent += toolResultText;
+          
+          await this.messagesRepository.update(message.id, {
+            content: cleanContent
+          });
+        } catch (error) {
+          console.error(`Error executing XML tool ${toolName}:`, error);
+        }
+      }
+      return;
     }
     
-    if (matches.length === 0) {
-      console.log(`⚠️ No tool calls found in content`);
-      return; // No tool calls found
-    }
+    console.log(`✅ Found ${matches.length} JSON tool call(s) in response`);
     
-    console.log(`✅ Found ${matches.length} tool call(s) in response`);
-    
-    // Remove tool call XML from content for cleaner display
-    let cleanContent = content.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
+    // Remove JSON tool calls from content for cleaner display
+    let cleanContent = content.replace(/TOOL_CALL:\s*\{[\s\S]*?\}\s*(?:\n|$)/g, '').trim();
     
     for (const match of matches) {
-      const toolName = match[1].trim();
-      const argsJson = match[2].trim();
+      const jsonStr = match[1].trim();
+      let toolName = 'unknown'; // Declare outside try block for error handling
       
       try {
-        const args = parseJSON(argsJson);
-        if (!args) {
-          console.error(`Failed to parse tool arguments for ${toolName}`);
+        const toolCallData = parseJSON(jsonStr);
+        if (!toolCallData || !toolCallData.tool) {
+          console.error(`Failed to parse JSON tool call:`, jsonStr);
           continue;
         }
+        
+        toolName = toolCallData.tool;
+        const args = toolCallData.arguments || {};
         console.log(`Executing tool: ${toolName} with args:`, args);
         
         // Broadcast tool execution start

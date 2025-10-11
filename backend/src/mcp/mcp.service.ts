@@ -90,29 +90,49 @@ export class MCPService {
   }
 
   /**
-   * Parse agent response to extract tool calls
+   * Parse agent response to extract tool calls (supports JSON and legacy formats)
    */
   parseToolCalls(agentResponse: string): MCPToolCall[] {
     const toolCalls: MCPToolCall[] = [];
     
-    // Look for tool call patterns in the agent response
-    // Pattern: [TOOL:tool_name:{"arg1":"value1","arg2":"value2"}]
-    const toolCallRegex = /\[TOOL:(\w+):(\{[^}]*\})\]/g;
+    // Try JSON format with TOOL_CALL: marker
+    const jsonMarkerRegex = /TOOL_CALL:\s*(\{[\s\S]*?\})\s*(?:\n|$)/g;
     let match;
     
-    while ((match = toolCallRegex.exec(agentResponse)) !== null) {
+    while ((match = jsonMarkerRegex.exec(agentResponse)) !== null) {
       try {
-        const toolName = match[1];
-        const args = parseJSON(match[2]);
+        const jsonStr = match[1].trim();
+        const toolCallData = parseJSON(jsonStr);
         
-        if (args) {
+        if (toolCallData && toolCallData.tool) {
           toolCalls.push({
-            name: toolName,
-            arguments: args
+            name: toolCallData.tool,
+            arguments: toolCallData.arguments || {}
           });
         }
       } catch (error) {
-        this.logger.warn(`Failed to parse tool call: ${match[0]}`, error);
+        this.logger.warn(`Failed to parse JSON tool call: ${match[0]}`, error);
+      }
+    }
+    
+    // If no JSON format found, try legacy format: [TOOL:tool_name:{"arg1":"value1"}]
+    if (toolCalls.length === 0) {
+      const legacyRegex = /\[TOOL:(\w+):(\{[^}]*\})\]/g;
+      
+      while ((match = legacyRegex.exec(agentResponse)) !== null) {
+        try {
+          const toolName = match[1];
+          const args = parseJSON(match[2]);
+          
+          if (args) {
+            toolCalls.push({
+              name: toolName,
+              arguments: args
+            });
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to parse legacy tool call: ${match[0]}`, error);
+        }
       }
     }
     
