@@ -10,6 +10,7 @@ import { MCPService } from '../mcp/mcp.service';
 import { ReActAgentService } from './react-agent.service';
 import { MemoryService } from '../memory/memory.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
+import { AgentsService } from '../agents/agents.service';
 import { parseJSON } from '../common/utils/json-parser.util';
 // CreateMessageDto import removed - using plain object type instead
 
@@ -48,6 +49,7 @@ export class ConversationsService {
     private reactAgentService: ReActAgentService,
     private memoryService: MemoryService,
     private knowledgeService: KnowledgeService,
+    private agentsService: AgentsService,
   ) {
     // Initialize batch update timer
     this.startBatchUpdateTimer();
@@ -251,6 +253,46 @@ export class ConversationsService {
         console.log('Agent loaded:', !!conversation.agent);
         console.log('Agent ID:', conversation.agent?.id);
         console.log('Agent configuration:', conversation.agent?.configuration);
+        console.log('Project ID:', conversation.projectId);
+      }
+      
+      // If this is a workspace conversation (has projectId), use agent service for enhanced capabilities
+      if (conversation.projectId) {
+        console.log(`🔧 Workspace conversation detected (projectId: ${conversation.projectId}), using agent service`);
+        
+        const context = {
+          userId: conversation.userId,
+          workspaceId: conversation.projectId,
+          conversationId: conversation.id,
+          sessionId: conversation.id, // Use conversationId as sessionId for memory
+        };
+
+        const agentResponse = await this.agentsService.processChatWithAgent(
+          conversation.agent.id,
+          userMessage,
+          context,
+        );
+
+        // Create and save the agent's response message
+        const aiMessage = this.messagesRepository.create({
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: agentResponse.response,
+          metadata: {
+            knowledgeUsed: agentResponse.knowledgeUsed,
+            actions: agentResponse.actions,
+            timestamp: agentResponse.timestamp,
+          },
+        });
+
+        const savedMessage = await this.messagesRepository.save(aiMessage);
+
+        // Broadcast via WebSocket
+        if (this.websocketGateway) {
+          this.websocketGateway.broadcastNewMessage(conversation.id, savedMessage);
+        }
+
+        return;
       }
       
       const model = conversation.agent?.configuration?.model || 'qwen2.5-coder:7b';

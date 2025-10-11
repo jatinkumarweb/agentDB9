@@ -9,6 +9,7 @@ import { WebSocketModule } from '../websocket/websocket.module';
 import { MCPModule } from '../mcp/mcp.module';
 import { MemoryModule } from '../memory/memory.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
+import { AgentsModule } from '../agents/agents.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { KnowledgeModule } from '../knowledge/knowledge.module';
     MCPModule,
     MemoryModule,
     KnowledgeModule,
+    AgentsModule,
   ],
   controllers: [ConversationsController],
   providers: [ConversationsService, ReActAgentService],

@@ -561,13 +561,14 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         return currentConversation;
       }
 
-      // Create a new conversation for workspace chat
+      // Create a new conversation for workspace chat with projectId
       const response = await fetchWithAuth('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           agentId: selectedAgent.id, 
-          title: `Workspace Chat with ${selectedAgent.name}` 
+          title: `Workspace Chat with ${selectedAgent.name}`,
+          projectId: 'default' // Mark this as a workspace conversation
         }),
       });
 

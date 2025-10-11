@@ -19,4 +19,8 @@ export class CreateConversationDto {
   @IsOptional()
   @IsString()
   userId?: string;
+
+  @IsOptional()
+  @IsString()
+  projectId?: string;
 }
