@@ -574,28 +574,33 @@ Error: ${error.message}`;
   private shouldUseReAct(userMessage: string): boolean {
     const lowerMessage = userMessage.toLowerCase();
     
-    // Use ReACT for most tasks that require tool usage
-    // ReACT is better for multi-step tasks that need:
-    // - Reading existing code
-    // - Making modifications
+    // Use ReACT ONLY for tasks that REQUIRE tool usage
+    // ReACT is for multi-step tasks that need:
+    // - Reading/analyzing workspace files
+    // - Making code modifications
     // - Creating new files
     // - Running commands
     
-    // Keywords that indicate ReACT should be used
+    // Simple conversational queries should NOT use ReACT
+    // Examples that should NOT trigger ReACT:
+    // - "what is react?" (general knowledge)
+    // - "explain how to..." (explanation)
+    // - "tell me about javascript" (general info)
+    
+    // Keywords that indicate ReACT should be used (workspace/file operations)
     const reactKeywords = [
-      // Information gathering
-      'what files', 'what is in', 'tell me about', 'analyze',
-      'show me', 'list', 'find', 'search', 'look for',
-      'workspace summary', 'project structure', 'file structure',
-      // Modification tasks
-      'update', 'modify', 'change', 'edit', 'add', 'remove', 'delete',
-      'fix', 'improve', 'refactor', 'enhance',
-      // Creation tasks that need context
-      'create', 'build', 'make', 'generate', 'setup', 'initialize',
-      'implement', 'develop', 'write',
-      // Complex tasks
-      'need to', 'we need', 'i need', 'want to', 'should',
-      'app', 'project', 'component', 'feature', 'functionality'
+      // Workspace information gathering (requires file access)
+      'what files', 'what is in the', 'show me the code', 'show me the file',
+      'list files', 'list the files', 'workspace summary', 'project structure', 'file structure',
+      'read the file', 'check the file', 'look at the file',
+      // Modification tasks (requires file operations)
+      'update the', 'modify the', 'change the', 'edit the', 'add to', 'remove from', 'delete the',
+      'fix the', 'improve the', 'refactor the', 'enhance the',
+      // Creation tasks (requires file creation)
+      'create a file', 'create a component', 'build a', 'make a file', 'generate a file',
+      'setup the', 'initialize the', 'implement in', 'write to file',
+      // Command execution
+      'run the', 'execute the', 'install', 'npm', 'git commit', 'git status'
     ];
     
     const shouldUse = reactKeywords.some(keyword => lowerMessage.includes(keyword));
@@ -1192,6 +1197,9 @@ NOTE: You have no workspace tools available. You can only provide suggestions an
                 // Parse and execute tool calls from the response
                 await this.parseAndExecuteToolCalls(finalContent, conversation, savedMessage);
                 
+                // Store interaction in memory if enabled
+                await this.storeInteractionMemory(conversation, userMessage, finalContent, model, toolsUsed);
+                
                 return finalContent;
               }
             } catch (parseError) {
@@ -1236,6 +1244,9 @@ NOTE: You have no workspace tools available. You can only provide suggestions an
             this.queueMessageUpdate(savedMessage.id, fullContent, finalMetadata);
             await this.processPendingUpdates();
           }
+          
+          // Store interaction in memory if enabled
+          await this.storeInteractionMemory(conversation, userMessage, fullContent, model, toolsUsed);
         }
       } finally {
         reader.releaseLock();
@@ -1707,6 +1718,9 @@ You: TOOL_CALL:
                   // Parse and execute tool calls from the response
                   await this.parseAndExecuteToolCalls(finalContent, conversation, savedMessage);
                   
+                  // Store interaction in memory if enabled
+                  await this.storeInteractionMemory(conversation, userMessage, finalContent, model, []);
+                  
                   return;
                 }
               }
@@ -1749,6 +1763,9 @@ You: TOOL_CALL:
           
           // Parse and execute tool calls
           await this.parseAndExecuteToolCalls(fullContent, conversation, savedMessage);
+          
+          // Store interaction in memory if enabled
+          await this.storeInteractionMemory(conversation, userMessage, fullContent, model, []);
         }
       } finally {
         reader.releaseLock();
@@ -2253,6 +2270,42 @@ TOOL_CALL:
    * Save tool execution to long-term memory (async, non-blocking)
    * Saves directly to database for persistence across restarts
    */
+  /**
+   * Store interaction in memory (helper method to avoid duplication)
+   */
+  private async storeInteractionMemory(
+    conversation: any,
+    userMessage: string,
+    agentResponse: string,
+    model: string,
+    toolsUsed: any[] = []
+  ): Promise<void> {
+    if (!conversation.agent?.configuration?.memory?.enabled) {
+      return;
+    }
+
+    try {
+      await this.memoryService.createMemory({
+        agentId: conversation.agentId,
+        sessionId: conversation.id,
+        type: 'short-term',
+        category: 'interaction',
+        content: `User: ${userMessage}\nAgent: ${agentResponse}`,
+        importance: toolsUsed.length > 0 ? 0.8 : 0.5,
+        metadata: {
+          tags: [model, this.isOllamaModel(model) ? 'ollama' : 'external'],
+          keywords: toolsUsed.length > 0 ? ['tool-usage'] : ['conversation'],
+          confidence: 1.0,
+          relevance: 1.0,
+          source: 'conversation' as any
+        }
+      });
+      console.log('✅ Stored interaction in memory');
+    } catch (error) {
+      console.error('Failed to store interaction in memory:', error);
+    }
+  }
+
   private async saveToolExecutionMemory(
     agentId: string,
     sessionId: string,
