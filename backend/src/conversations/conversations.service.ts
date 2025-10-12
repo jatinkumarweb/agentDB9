@@ -892,14 +892,20 @@ Available tools:`;
         systemPrompt += `
 
 Critical Rules:
-1. When user asks to CREATE/BUILD a project → IMMEDIATELY use execute_command (DO NOT check workspace first)
-2. When user asks to CREATE/WRITE files → IMMEDIATELY use write_file with the actual content
-3. When user asks to UPDATE/MODIFY existing code → Use read_file first, then write_file
-4. ALWAYS use tools to perform actions - NEVER just give instructions
-5. After using a tool, CONTINUE using more tools until the task is complete
-6. If a tool fails, try a different approach - DON'T give up
-7. For complex tasks, use MULTIPLE tools in sequence (read → modify → write)
-8. Only provide final answer when ALL actions are complete`;
+1. For GENERAL QUESTIONS (explanations, concepts, how-to): Answer directly without tools
+2. For WORKSPACE TASKS (create/read/modify files, run commands): Use tools
+3. When user asks to CREATE/BUILD a project → Use execute_command
+4. When user asks to CREATE/WRITE files → Use write_file with the actual content
+5. When user asks to UPDATE/MODIFY existing code → Use read_file first, then write_file
+6. After using a tool, CONTINUE using more tools until the task is complete
+7. If a tool fails, try a different approach - DON'T give up
+8. For complex tasks, use MULTIPLE tools in sequence (read → modify → write)
+
+Examples:
+- "Why is the sky blue?" → Answer directly (no tools needed)
+- "Explain React hooks" → Answer directly (no tools needed)
+- "Create a React component" → Use write_file tool
+- "What files are in the project?" → Use list_files tool`;
 
         // Add note about disabled permissions
         if (!workspaceConfig.enableContext && !workspaceConfig.enableActions) {
