@@ -1,4 +1,5 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { KnowledgeService } from './knowledge.service';
@@ -14,11 +15,61 @@ export class KnowledgeController {
   constructor(private readonly knowledgeService: KnowledgeService) {}
 
   /**
+   * Upload and ingest a file
+   */
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFile(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('agentId') agentId: string,
+    @Body('title') title: string,
+    @Body('description') description?: string,
+  ) {
+    if (!file) {
+      return { success: false, error: 'No file provided' };
+    }
+
+    try {
+      const source: KnowledgeSource = {
+        type: 'file',
+        url: file.originalname,
+        content: file.buffer.toString('utf-8'),
+        metadata: {
+          title: title || file.originalname,
+          description: description || '',
+          mimeType: file.mimetype,
+          size: file.size,
+        },
+      };
+
+      const request: KnowledgeIngestionRequest = {
+        agentId,
+        source,
+        options: {
+          generateEmbeddings: true,
+          chunkSize: 1000,
+          chunkOverlap: 200,
+        },
+      };
+
+      const result = await this.knowledgeService.ingestSource(request);
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Ingest a knowledge source
    */
   @Post('ingest')
   async ingest(@Body() request: KnowledgeIngestionRequest) {
-    return this.knowledgeService.ingestSource(request);
+    try {
+      const result = await this.knowledgeService.ingestSource(request);
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   }
 
   /**
@@ -81,7 +132,12 @@ export class KnowledgeController {
    */
   @Get('sources/:agentId')
   async listSources(@Param('agentId') agentId: string) {
-    return this.knowledgeService.listSources(agentId);
+    try {
+      const sources = await this.knowledgeService.listSources(agentId);
+      return { success: true, data: sources };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   }
 
   /**
@@ -89,7 +145,12 @@ export class KnowledgeController {
    */
   @Post('sources/:sourceId/reindex')
   async reindexSource(@Param('sourceId') sourceId: string) {
-    return this.knowledgeService.reindexSource(sourceId);
+    try {
+      const result = await this.knowledgeService.reindexSource(sourceId);
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   }
 
   /**

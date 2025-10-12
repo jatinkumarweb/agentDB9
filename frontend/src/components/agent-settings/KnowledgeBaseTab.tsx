@@ -5,9 +5,9 @@ import { Database, Plus, FileText, Globe, Github, Book, Trash2, RefreshCw, Uploa
 import { fetchWithAuth } from '@/utils/fetch-with-auth';
 import toast from 'react-hot-toast';
 import { KnowledgeSource } from '@agentdb9/shared';
-import FileUploader from '../knowledge/FileUploader';
 import KnowledgeSourceCard from '../knowledge/KnowledgeSourceCard';
 import AddSourceModal from '../knowledge/AddSourceModal';
+import FileUploadModal from '../knowledge/FileUploadModal';
 
 interface KnowledgeBaseTabProps {
   agentId: string;
@@ -264,44 +264,25 @@ export default function KnowledgeBaseTab({ agentId, configuration = {}, onChange
       )}
 
       {/* Modals */}
-      {/* TODO: Fix FileUploader component props
-      {showUploader && (
-        <FileUploader
-          agentId={agentId}
-          onClose={() => setShowUploader(false)}
-          onSuccess={() => {
-            setShowUploader(false);
-            loadSources();
-          }}
-        />*/}
-      {showUploader && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6">
-            <p>File uploader temporarily disabled</p>
-            <button onClick={() => setShowUploader(false)} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded">Close</button>
-          </div>
-        </div>
-      )}
+      <FileUploadModal
+        agentId={agentId}
+        isOpen={showUploader}
+        onClose={() => setShowUploader(false)}
+        onSuccess={() => {
+          setShowUploader(false);
+          loadSources();
+        }}
+      />
 
-      {/* TODO: Fix AddSourceModal component props
-      {showAddModal && (
-        <AddSourceModal
-          agentId={agentId}
-          onClose={() => setShowAddModal(false)}
-          onSuccess={() => {
-            setShowAddModal(false);
-            loadSources();
-          }}
-        />
-      )}*/}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6">
-            <p>Add source modal temporarily disabled</p>
-            <button onClick={() => setShowAddModal(false)} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded">Close</button>
-          </div>
-        </div>
-      )}
+      <AddSourceModal
+        agentId={agentId}
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={() => {
+          setShowAddModal(false);
+          loadSources();
+        }}
+      />
     </div>
   );
 }

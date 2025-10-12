@@ -2,38 +2,74 @@
 
 import { useState } from 'react';
 import { X, Plus } from 'lucide-react';
+import { fetchWithAuth } from '@/utils/fetch-with-auth';
+import toast from 'react-hot-toast';
 
 interface AddSourceModalProps {
+  agentId: string;
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (source: any) => void;
+  onSuccess: () => void;
 }
 
-export default function AddSourceModal({ isOpen, onClose, onAdd }: AddSourceModalProps) {
+export default function AddSourceModal({ agentId, isOpen, onClose, onSuccess }: AddSourceModalProps) {
   const [sourceType, setSourceType] = useState<'url' | 'text'>('url');
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const source = {
-      type: sourceType === 'url' ? 'website' : 'markdown',
-      url: sourceType === 'url' ? url : undefined,
-      content: sourceType === 'text' ? content : undefined,
-      metadata: {
-        title,
-        description,
-        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-      },
-    };
+    setIsSubmitting(true);
 
-    onAdd(source);
-    
-    // Reset form
+    try {
+      const source = {
+        agentId,
+        source: {
+          type: sourceType === 'url' ? 'website' : 'markdown',
+          url: sourceType === 'url' ? url : undefined,
+          content: sourceType === 'text' ? content : undefined,
+          metadata: {
+            title,
+            description,
+            tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+          },
+        },
+        options: {
+          generateEmbeddings: true,
+          chunkSize: 1000,
+          chunkOverlap: 200,
+        },
+      };
+
+      const response = await fetchWithAuth('/api/knowledge/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(source),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Knowledge source added successfully');
+        onSuccess();
+        handleClose();
+      } else {
+        toast.error(data.error || 'Failed to add source');
+      }
+    } catch (error) {
+      console.error('Add source error:', error);
+      toast.error('Failed to add source');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleClose = () => {
     setUrl('');
     setTitle('');
     setDescription('');
@@ -50,8 +86,9 @@ export default function AddSourceModal({ isOpen, onClose, onAdd }: AddSourceModa
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Add Knowledge Source</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-500 hover:text-gray-700"
+            disabled={isSubmitting}
           >
             <X className="w-5 h-5" />
           </button>
@@ -159,17 +196,19 @@ export default function AddSourceModal({ isOpen, onClose, onAdd }: AddSourceModa
           <div className="flex space-x-3 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+              disabled={isSubmitting}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center disabled:bg-gray-400"
+              disabled={isSubmitting}
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Source
+              {isSubmitting ? 'Adding...' : 'Add Source'}
             </button>
           </div>
         </form>
