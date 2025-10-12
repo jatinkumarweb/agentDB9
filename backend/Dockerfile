@@ -30,8 +30,8 @@ WORKDIR /app
 # Copy package files
 COPY backend/package*.json ./
 
-# Install dependencies locally (no hoisting, isolated container)
-RUN npm install --omit=dev
+# Install all dependencies (including dev dependencies for development mode)
+RUN npm install
 
 # Rebuild native modules for the container architecture
 RUN npm rebuild sqlite3
