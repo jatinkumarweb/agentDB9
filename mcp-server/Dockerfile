@@ -18,11 +18,10 @@ RUN npm config set fetch-timeout 300000 && \
 WORKDIR /app
 
 # Copy and build shared package first
-COPY shared/package*.json /shared/
+COPY shared/ /shared/
 WORKDIR /shared
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --prefer-offline --no-audit 2>/dev/null || npm install --no-audit
-COPY shared/ /shared/
 RUN npm run build
 
 # Switch to MCP server directory
