@@ -1029,6 +1029,7 @@ NOTE: You have no workspace tools available. You can only provide suggestions an
       let fullContent = '';
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
+      const toolsUsed: string[] = [];
 
       if (!reader) {
         throw new Error('No response body reader available');
@@ -1080,6 +1081,11 @@ NOTE: You have no workspace tools available. You can only provide suggestions an
                   
                   if (toolName && toolArgs) {
                     console.log(`Executing tool: ${toolName} with args:`, toolArgs);
+                    
+                    // Track tool usage
+                    if (!toolsUsed.includes(toolName)) {
+                      toolsUsed.push(toolName);
+                    }
                     
                     // Broadcast tool execution start
                     this.websocketGateway.broadcastAgentActivity({
@@ -1601,6 +1607,7 @@ You: TOOL_CALL:
       let fullContent = '';
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
+      const toolsUsed: string[] = [];
 
       if (!reader) {
         throw new Error('No response body reader available');
