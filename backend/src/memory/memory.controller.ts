@@ -60,10 +60,22 @@ export class MemoryController {
       allMemories = [...allMemories, ...memories.longTerm];
     }
     
+    // Transform memories to match frontend expectations
+    const transformedMemories = allMemories.map(memory => ({
+      id: memory.id,
+      category: memory.category,
+      content: memory.summary || memory.content, // Frontend expects 'content'
+      summary: memory.summary,
+      details: memory.details,
+      importance: memory.importance,
+      createdAt: memory.createdAt,
+      metadata: memory.metadata,
+    }));
+    
     return {
       success: true,
-      data: allMemories,
-      count: allMemories.length,
+      data: transformedMemories,
+      count: transformedMemories.length,
       breakdown: {
         shortTerm: memories.shortTerm?.length || 0,
         longTerm: memories.longTerm?.length || 0,
@@ -75,8 +87,25 @@ export class MemoryController {
    * Get memory statistics
    */
   @Get(':agentId/stats')
-  async getStats(@Param('agentId') agentId: string): Promise<MemoryStats> {
-    return this.memoryService.getStats(agentId);
+  async getStats(@Param('agentId') agentId: string) {
+    const stats = await this.memoryService.getStats(agentId);
+    
+    // Transform stats to match frontend expectations
+    return {
+      success: true,
+      data: {
+        shortTerm: {
+          total: stats.shortTerm.total,
+          byCategory: stats.shortTerm.byCategory,
+        },
+        longTerm: {
+          total: stats.longTerm.total,
+          byCategory: stats.longTerm.byCategory,
+        },
+        averageImportance: stats.longTerm.averageImportance || 0,
+        lastConsolidation: stats.consolidation?.lastRun,
+      }
+    };
   }
 
   /**
