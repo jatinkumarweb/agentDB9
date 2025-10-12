@@ -8,7 +8,7 @@
 export const designTokens = {
   // Color Palette
   colors: {
-    // Primary gradient colors
+    // Primary gradient colors (dark theme)
     primary: {
       purple: {
         900: '#4c1d95', // Deep purple
@@ -19,16 +19,63 @@ export const designTokens = {
       },
       indigo: {
         900: '#312e81', // Deep indigo
+        600: '#4f46e5', // Solid indigo
         500: '#6366f1', // Medium indigo
+        400: '#818cf8', // Light indigo
+        200: '#c7d2fe', // Very light indigo
       },
       blue: {
         900: '#1e3a8a', // Deep blue
         500: '#3b82f6', // Medium blue
+        300: '#93c5fd', // Light blue
+        200: '#bfdbfe', // Very light blue
+        50: '#eff6ff',  // Pale blue
       },
       pink: {
         500: '#ec4899', // Medium pink
         400: '#f472b6', // Light pink
         300: '#f9a8d4', // Very light pink
+        200: '#fbcfe8', // Pale pink
+      },
+    },
+
+    // Light theme colors
+    light: {
+      blue: {
+        50: '#eff6ff',
+        200: '#bfdbfe',
+        300: '#93c5fd',
+      },
+      cyan: {
+        200: '#a5f3fc',
+      },
+      emerald: {
+        50: '#ecfdf5',
+        300: '#6ee7b7',
+      },
+      teal: {
+        200: '#99f6e4',
+      },
+      purple: {
+        50: '#faf5ff',
+        300: '#d8b4fe',
+        600: '#9333ea',
+      },
+      indigo: {
+        200: '#c7d2fe',
+        600: '#4f46e5',
+      },
+      pink: {
+        200: '#fbcfe8',
+      },
+      gray: {
+        50: '#f9fafb',
+        300: '#d1d5db',
+        400: '#9ca3af',
+        600: '#4b5563',
+        700: '#374151',
+        800: '#1f2937',
+        900: '#111827',
       },
     },
 
@@ -49,9 +96,15 @@ export const designTokens = {
 
     // Background gradients
     gradients: {
+      // Dark theme gradients
       primary: 'linear-gradient(to bottom right, #4c1d95, #312e81, #1e3a8a)',
       button: 'linear-gradient(to right, #a855f7, #ec4899)',
       hover: 'linear-gradient(to right, #c084fc, #f472b6)',
+      
+      // Light theme gradients
+      lightBackground: 'linear-gradient(to bottom right, #eff6ff, #ecfdf5, #faf5ff)',
+      lightButton: 'linear-gradient(to right, #4f46e5, #9333ea)',
+      lightHover: 'linear-gradient(to right, #818cf8, #d8b4fe)',
     },
   },
 
@@ -222,21 +275,37 @@ export const createGlassmorphicCard = () => `
 
 // Tailwind CSS class helpers
 export const tailwindTokens = {
-  // Gradient backgrounds
+  // Dark theme - Gradient backgrounds
   gradientPrimary: 'bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900',
   gradientButton: 'bg-gradient-to-r from-purple-500 to-pink-500',
   gradientHover: 'bg-gradient-to-r from-purple-400 to-pink-400',
   
-  // Glassmorphic card
+  // Dark theme - Glassmorphic card
   glassmorphicCard: 'bg-white bg-opacity-10 backdrop-blur-2xl rounded-3xl border border-white border-opacity-20',
   
-  // Input field
+  // Dark theme - Input field
   glassmorphicInput: 'bg-white bg-opacity-10 rounded-2xl border border-white border-opacity-20 backdrop-blur-sm',
   
-  // Text colors
+  // Dark theme - Text colors
   textPrimary: 'text-white',
   textSecondary: 'text-purple-200',
   textAccent: 'text-purple-300',
+  
+  // Light theme - Gradient backgrounds
+  lightGradientPrimary: 'bg-gradient-to-br from-blue-50 via-emerald-50 to-purple-50',
+  lightGradientButton: 'bg-gradient-to-r from-indigo-600 to-purple-600',
+  lightGradientHover: 'bg-gradient-to-r from-indigo-200 to-purple-200',
+  
+  // Light theme - Glassmorphic card
+  lightGlassmorphicCard: 'bg-white/40 backdrop-blur-2xl rounded-3xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.08)]',
+  
+  // Light theme - Input field
+  lightGlassmorphicInput: 'bg-white/50 backdrop-blur-sm rounded-2xl border border-white/80',
+  
+  // Light theme - Text colors
+  lightTextPrimary: 'text-gray-900',
+  lightTextSecondary: 'text-gray-600',
+  lightTextAccent: 'text-indigo-600',
   
   // Transitions
   transitionAll: 'transition-all duration-300',
@@ -247,6 +316,11 @@ export const tailwindTokens = {
   hoverScale: 'hover:-translate-y-1',
   hoverGlow: 'hover:shadow-2xl',
   hoverBrightness: 'hover:bg-opacity-15',
+  
+  // Light theme hover effects
+  lightHoverScale: 'hover:-translate-y-0.5',
+  lightHoverGlow: 'hover:shadow-xl',
+  lightHoverBrightness: 'hover:bg-white/60',
 };
 
 export default designTokens;

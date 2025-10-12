@@ -7,6 +7,7 @@ import { Eye, EyeOff, Mail, Lock, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import toast from 'react-hot-toast';
 import { tailwindTokens } from '@/styles/design-tokens';
+import GradientColorPicker from '@/components/dev/GradientColorPicker';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,6 +32,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showGradientPicker, setShowGradientPicker] = useState(false);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -91,63 +93,112 @@ export default function LoginPage() {
   };
 
   return (
-    <div className={`min-h-screen ${tailwindTokens.gradientPrimary} flex items-center justify-center p-4 overflow-hidden relative`}>
-      {/* Animated liquid blobs */}
+    <div 
+      className="min-h-screen bg-gradient-to-br from-blue-50 via-emerald-50 to-purple-50 flex items-center justify-center p-4 overflow-hidden relative font-['Inter',sans-serif]"
+      data-gradient-bg
+    >
+      {/* Animated liquid blobs - very slow animations */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500 rounded-full mix-blend-screen filter blur-3xl opacity-30 animate-pulse"></div>
-        <div className="absolute top-1/4 right-0 w-96 h-96 bg-pink-500 rounded-full mix-blend-screen filter blur-3xl opacity-30 animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-blue-500 rounded-full mix-blend-screen filter blur-3xl opacity-30 animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div 
+          className="absolute top-0 left-0 w-[500px] h-[500px] bg-gradient-to-br from-blue-300 to-cyan-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40"
+          style={{ animation: 'blob1 25s ease-in-out infinite' }}
+          data-blob="1"
+        ></div>
+        <div 
+          className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-gradient-to-br from-purple-300 to-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40"
+          style={{ animation: 'blob2 30s ease-in-out infinite' }}
+          data-blob="2"
+        ></div>
+        <div 
+          className="absolute bottom-0 left-1/3 w-[500px] h-[500px] bg-gradient-to-br from-emerald-300 to-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40"
+          style={{ animation: 'blob3 28s ease-in-out infinite' }}
+          data-blob="3"
+        ></div>
+        <div 
+          className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-gradient-to-br from-indigo-200 to-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40"
+          style={{ animation: 'blob4 32s ease-in-out infinite' }}
+          data-blob="4"
+        ></div>
       </div>
 
-      {/* Floating particles */}
-      <div className="absolute inset-0">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-2 h-2 bg-white rounded-full opacity-20"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animation: `float ${5 + Math.random() * 10}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 5}s`
-            }}
-          ></div>
-        ))}
-      </div>
+      {/* Noise texture overlay for matte effect */}
+      <div 
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+          backgroundRepeat: 'repeat',
+        }}
+      ></div>
 
       <style>{`
-        @keyframes float {
+        @keyframes blob1 {
           0%, 100% {
-            transform: translateY(0px) translateX(0px);
+            transform: translate(0, 0) scale(1);
           }
-          50% {
-            transform: translateY(-20px) translateX(10px);
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+        }
+        @keyframes blob2 {
+          0%, 100% {
+            transform: translate(0, 0) scale(1);
+          }
+          33% {
+            transform: translate(-40px, 30px) scale(1.15);
+          }
+          66% {
+            transform: translate(30px, -30px) scale(0.95);
+          }
+        }
+        @keyframes blob3 {
+          0%, 100% {
+            transform: translate(0, 0) scale(1);
+          }
+          33% {
+            transform: translate(50px, 20px) scale(0.9);
+          }
+          66% {
+            transform: translate(-30px, -40px) scale(1.1);
+          }
+        }
+        @keyframes blob4 {
+          0%, 100% {
+            transform: translate(0, 0) scale(1);
+          }
+          33% {
+            transform: translate(-25px, -35px) scale(1.05);
+          }
+          66% {
+            transform: translate(40px, 25px) scale(0.95);
           }
         }
       `}</style>
 
       {/* Login card */}
       <div className="relative z-10 w-full max-w-md">
-        <div className={`${tailwindTokens.glassmorphicCard} p-8 shadow-2xl`}>
+        <div className="bg-white/40 backdrop-blur-2xl rounded-3xl border border-white/60 p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-block mb-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-pink-400 rounded-2xl flex items-center justify-center transform rotate-12 shadow-lg">
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-2xl flex items-center justify-center transform rotate-12 shadow-lg">
                 <div className="w-12 h-12 bg-white rounded-xl transform -rotate-12"></div>
               </div>
             </div>
-            <h1 className={`text-4xl font-bold ${tailwindTokens.textPrimary} mb-2`}>Welcome Back</h1>
-            <p className={`${tailwindTokens.textSecondary} text-sm`}>Sign in to continue your journey</p>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome Back</h1>
+            <p className="text-gray-600 text-sm">Sign in to continue your journey</p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email input */}
             <div className="relative group">
-              <div className={`absolute inset-0 ${tailwindTokens.gradientHover} rounded-2xl opacity-0 group-hover:opacity-100 ${tailwindTokens.transitionAll} blur`}></div>
-              <div className={`relative ${tailwindTokens.glassmorphicInput} ${tailwindTokens.transitionAll} hover:bg-opacity-15`}>
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-200 to-purple-200 rounded-2xl opacity-0 group-hover:opacity-30 transition-all duration-300 blur"></div>
+              <div className="relative bg-white/50 backdrop-blur-sm rounded-2xl border border-white/80 transition-all duration-300 hover:bg-white/60 hover:border-indigo-200">
                 <div className="flex items-center px-4 py-4">
-                  <Mail className={`w-5 h-5 ${tailwindTokens.textAccent} mr-3`} />
+                  <Mail className="w-5 h-5 text-indigo-500 mr-3" />
                   <input
                     id="email"
                     name="email"
@@ -156,7 +207,7 @@ export default function LoginPage() {
                     value={email}
                     onChange={handleEmailChange}
                     placeholder="Email address"
-                    className={`flex-1 bg-transparent ${tailwindTokens.textPrimary} placeholder-purple-300 outline-none`}
+                    className="flex-1 bg-transparent text-gray-900 placeholder-gray-400 outline-none"
                     aria-label="Email address"
                     aria-invalid={!!errors.email}
                     aria-describedby={errors.email ? "email-error" : undefined}
@@ -164,7 +215,7 @@ export default function LoginPage() {
                 </div>
               </div>
               {errors.email && (
-                <p id="email-error" className="mt-2 text-sm text-pink-300" role="alert">
+                <p id="email-error" className="mt-2 text-sm text-red-600" role="alert">
                   {errors.email}
                 </p>
               )}
@@ -172,10 +223,10 @@ export default function LoginPage() {
 
             {/* Password input */}
             <div className="relative group">
-              <div className={`absolute inset-0 ${tailwindTokens.gradientHover} rounded-2xl opacity-0 group-hover:opacity-100 ${tailwindTokens.transitionAll} blur`}></div>
-              <div className={`relative ${tailwindTokens.glassmorphicInput} ${tailwindTokens.transitionAll} hover:bg-opacity-15`}>
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-200 to-purple-200 rounded-2xl opacity-0 group-hover:opacity-30 transition-all duration-300 blur"></div>
+              <div className="relative bg-white/50 backdrop-blur-sm rounded-2xl border border-white/80 transition-all duration-300 hover:bg-white/60 hover:border-indigo-200">
                 <div className="flex items-center px-4 py-4">
-                  <Lock className={`w-5 h-5 ${tailwindTokens.textAccent} mr-3`} />
+                  <Lock className="w-5 h-5 text-indigo-500 mr-3" />
                   <input
                     id="password"
                     name="password"
@@ -184,7 +235,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={handlePasswordChange}
                     placeholder="Password"
-                    className={`flex-1 bg-transparent ${tailwindTokens.textPrimary} placeholder-purple-300 outline-none`}
+                    className="flex-1 bg-transparent text-gray-900 placeholder-gray-400 outline-none"
                     aria-label="Password"
                     aria-invalid={!!errors.password}
                     aria-describedby={errors.password ? "password-error" : undefined}
@@ -192,7 +243,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className={`${tailwindTokens.textAccent} hover:text-white ${tailwindTokens.transitionColors}`}
+                    className="text-indigo-500 hover:text-indigo-700 transition-colors duration-300"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -200,7 +251,7 @@ export default function LoginPage() {
                 </div>
               </div>
               {errors.password && (
-                <p id="password-error" className="mt-2 text-sm text-pink-300" role="alert">
+                <p id="password-error" className="mt-2 text-sm text-red-600" role="alert">
                   {errors.password}
                 </p>
               )}
@@ -208,19 +259,19 @@ export default function LoginPage() {
 
             {/* Remember & Forgot */}
             <div className="flex items-center justify-between text-sm">
-              <label className={`flex items-center ${tailwindTokens.textSecondary} cursor-pointer group`}>
+              <label className="flex items-center text-gray-600 cursor-pointer group">
                 <input 
                   id="remember-me"
                   name="remember-me"
                   type="checkbox" 
-                  className="mr-2 accent-purple-500" 
+                  className="mr-2 accent-indigo-600" 
                   aria-label="Remember me"
                 />
-                <span className={`group-hover:text-white ${tailwindTokens.transitionColors}`}>Remember me</span>
+                <span className="group-hover:text-gray-900 transition-colors duration-300">Remember me</span>
               </label>
               <Link 
                 href="/auth/forgot-password" 
-                className={`${tailwindTokens.textAccent} hover:text-white ${tailwindTokens.transitionColors}`}
+                className="text-indigo-600 hover:text-indigo-800 transition-colors duration-300 font-medium"
               >
                 Forgot password?
               </Link>
@@ -232,7 +283,7 @@ export default function LoginPage() {
               disabled={isLoading}
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
-              className={`w-full ${tailwindTokens.gradientButton} ${tailwindTokens.textPrimary} font-semibold py-4 rounded-2xl shadow-lg ${tailwindTokens.hoverGlow} transform ${tailwindTokens.hoverScale} ${tailwindTokens.transitionAll} flex items-center justify-center group disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-4 rounded-2xl shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-purple-700 transform hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center group disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               aria-label="Sign in"
             >
               {isLoading ? (
@@ -243,7 +294,7 @@ export default function LoginPage() {
               ) : (
                 <>
                   <span>Sign In</span>
-                  <ArrowRight className={`ml-2 w-5 h-5 ${tailwindTokens.transitionTransform} ${isHovered ? 'translate-x-1' : ''}`} />
+                  <ArrowRight className={`ml-2 w-5 h-5 transition-transform duration-300 ${isHovered ? 'translate-x-1' : ''}`} />
                 </>
               )}
             </button>
@@ -251,9 +302,9 @@ export default function LoginPage() {
 
           {/* Divider */}
           <div className="flex items-center my-6">
-            <div className="flex-1 h-px bg-white bg-opacity-20"></div>
-            <span className={`px-4 ${tailwindTokens.textSecondary} text-sm`}>or</span>
-            <div className="flex-1 h-px bg-white bg-opacity-20"></div>
+            <div className="flex-1 h-px bg-gray-300"></div>
+            <span className="px-4 text-gray-500 text-sm">or</span>
+            <div className="flex-1 h-px bg-gray-300"></div>
           </div>
 
           {/* Social login - Placeholder for future implementation */}
@@ -261,7 +312,7 @@ export default function LoginPage() {
             <button 
               type="button"
               disabled
-              className={`${tailwindTokens.glassmorphicInput} py-3 ${tailwindTokens.textPrimary} hover:bg-opacity-20 ${tailwindTokens.transitionAll} transform ${tailwindTokens.hoverScale} disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
+              className="bg-white/50 backdrop-blur-sm rounded-2xl border border-white/80 py-3 text-gray-700 hover:bg-white/60 transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               aria-label="Sign in with Google (coming soon)"
             >
               Google
@@ -269,7 +320,7 @@ export default function LoginPage() {
             <button 
               type="button"
               disabled
-              className={`${tailwindTokens.glassmorphicInput} py-3 ${tailwindTokens.textPrimary} hover:bg-opacity-20 ${tailwindTokens.transitionAll} transform ${tailwindTokens.hoverScale} disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
+              className="bg-white/50 backdrop-blur-sm rounded-2xl border border-white/80 py-3 text-gray-700 hover:bg-white/60 transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               aria-label="Sign in with Apple (coming soon)"
             >
               Apple
@@ -277,11 +328,11 @@ export default function LoginPage() {
           </div>
 
           {/* Sign up link */}
-          <p className={`text-center ${tailwindTokens.textSecondary} text-sm mt-6`}>
+          <p className="text-center text-gray-600 text-sm mt-6">
             Don&apos;t have an account?{' '}
             <Link 
               href="/auth/signup" 
-              className={`${tailwindTokens.textPrimary} font-semibold hover:underline`}
+              className="text-gray-900 font-semibold hover:text-indigo-600 transition-colors duration-300"
             >
               Sign up
             </Link>
@@ -289,14 +340,29 @@ export default function LoginPage() {
         </div>
 
         {/* Demo credentials */}
-        <div className={`mt-6 ${tailwindTokens.glassmorphicCard} p-4`}>
-          <h3 className={`text-sm font-medium ${tailwindTokens.textSecondary} mb-2`}>Demo Credentials</h3>
-          <p className={`text-xs ${tailwindTokens.textAccent}`}>
+        <div className="mt-6 bg-white/40 backdrop-blur-2xl rounded-3xl border border-white/60 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Demo Credentials</h3>
+          <p className="text-xs text-gray-600">
             Email: demo@agentdb9.com<br />
             Password: demo123
           </p>
         </div>
+
+        {/* Dev Tool Toggle Button */}
+        {process.env.NODE_ENV === 'development' && !showGradientPicker && (
+          <button
+            onClick={() => setShowGradientPicker(true)}
+            className="mt-4 w-full bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 p-3 shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:bg-white/50 transition-all duration-300 text-sm font-medium text-gray-700"
+          >
+            🎨 Open Gradient Color Picker
+          </button>
+        )}
       </div>
+
+      {/* Gradient Color Picker Dev Tool */}
+      {showGradientPicker && (
+        <GradientColorPicker onClose={() => setShowGradientPicker(false)} />
+      )}
     </div>
   );
 }

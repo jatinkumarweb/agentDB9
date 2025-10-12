@@ -79,6 +79,7 @@ agentdb9/
 - **[Interactive Prompts Solution](./INTERACTIVE_PROMPTS_SOLUTION.md)** - Handle CLI prompts (Next.js, React, Vite, etc.)
 - **[Docker-in-Docker Guide](./DOCKER_IN_DOCKER_GUIDE.md)** - Use Docker inside the dev container
 - **[Security Implementation](./SECURITY_IMPLEMENTATION.md)** - Rate limiting and session management
+- **[Light Theme Design](./docs/LIGHT_THEME_DESIGN.md)** - Modern light theme design system and gradient color picker
 - **[Cleanup Report](./CLEANUP_REPORT.md)** - Code cleanup and optimization
 - **[Issues Resolved](./ISSUES_RESOLVED.md)** - Recent fixes and solutions
 
