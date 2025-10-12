@@ -84,6 +84,14 @@ export interface KnowledgeSourceMetadata {
   updatedAt: Date;
   chunkCount?: number;
   tokenCount?: number;
+  
+  // Crawling options for documentation sites
+  useJavaScript?: boolean;
+  waitForSelector?: string;
+  followLinks?: boolean;
+  maxDepth?: number;
+  maxPages?: number;
+  pageCount?: number;
 }
 
 export interface CodeStylePreferences {

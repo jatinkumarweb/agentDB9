@@ -20,6 +20,7 @@ import { ModelsModule } from './models/models.module';
 import { ProvidersModule } from './providers/providers.module';
 import { MCPModule } from './mcp/mcp.module';
 import { EvaluationModule } from './evaluation/evaluation.module';
+import { KnowledgeModule } from './knowledge/knowledge.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { EvaluationModule } from './evaluation/evaluation.module';
     ProvidersModule,
     MCPModule,
     EvaluationModule,
+    KnowledgeModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,10 +1,23 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { KnowledgeSource as KnowledgeSourceType, LoadedDocument, DocumentSection, CodeBlock } from '@agentdb9/shared';
-// import { load } from 'cheerio'; // Temporarily disabled
+import { load } from 'cheerio';
+import puppeteer, { Browser, Page } from 'puppeteer';
+import { detectPresetFromUrl, applyPreset } from '../config/crawl-presets';
+
+export interface CrawlOptions {
+  maxDepth?: number;
+  maxPages?: number;
+  followLinks?: boolean;
+  waitForSelector?: string;
+  useJavaScript?: boolean;
+  includePatterns?: RegExp[];
+  excludePatterns?: RegExp[];
+}
 
 @Injectable()
-export class DocumentLoaderService {
+export class DocumentLoaderService implements OnModuleDestroy {
   private readonly logger = new Logger(DocumentLoaderService.name);
+  private browser: Browser | null = null;
 
   /**
    * Load document from source
@@ -57,27 +70,68 @@ export class DocumentLoaderService {
 
   /**
    * Load website content
-   * TODO: Re-enable cheerio functionality after resolving module resolution issues
    */
   private async loadWebsite(source: KnowledgeSourceType): Promise<LoadedDocument> {
     if (!source.url) {
       throw new Error('Website source must have a URL');
     }
 
-    // Temporarily disabled - cheerio functionality
-    // const html = await this.fetchContent(source.url);
-    // const $ = load(html);
+    // Check if JavaScript rendering is needed
+    const useJavaScript = (source.metadata as any)?.useJavaScript || false;
     
-    this.logger.warn('Website loading temporarily disabled - cheerio functionality commented out');
-    
-    return {
-      content: `Website loading temporarily disabled for: ${source.url}`,
-      metadata: source.metadata,
-      sections: [],
-      codeBlocks: [],
-    };
+    if (useJavaScript) {
+      return this.loadWebsiteWithPuppeteer(source);
+    }
 
-    /* Commented out cheerio code:
+    try {
+      const html = await this.fetchContent(source.url);
+      return this.parseHTML(html, source);
+    } catch (error) {
+      this.logger.error(`Failed to load website ${source.url}: ${error.message}`);
+      throw new Error(`Failed to load website: ${error.message}`);
+    }
+  }
+
+  /**
+   * Load website with Puppeteer for JavaScript-rendered content
+   */
+  private async loadWebsiteWithPuppeteer(source: KnowledgeSourceType): Promise<LoadedDocument> {
+    const browser = await this.getBrowser();
+    const page = await browser.newPage();
+
+    try {
+      this.logger.log(`Loading ${source.url} with Puppeteer...`);
+      
+      await page.setUserAgent('AgentDB9-KnowledgeIngestion/1.0');
+      await page.goto(source.url!, { 
+        waitUntil: 'networkidle2',
+        timeout: 30000 
+      });
+
+      // Wait for specific selector if provided
+      const waitForSelector = (source.metadata as any)?.waitForSelector;
+      if (waitForSelector) {
+        await page.waitForSelector(waitForSelector, { timeout: 10000 });
+      }
+
+      // Get rendered HTML
+      const html = await page.content();
+      
+      return this.parseHTML(html, source);
+    } catch (error) {
+      this.logger.error(`Puppeteer failed to load ${source.url}: ${error.message}`);
+      throw new Error(`Failed to load website with JavaScript: ${error.message}`);
+    } finally {
+      await page.close();
+    }
+  }
+
+  /**
+   * Parse HTML content with Cheerio
+   */
+  private parseHTML(html: string, source: KnowledgeSourceType): LoadedDocument {
+    const $ = load(html);
+    
     // Remove script and style tags
     $('script, style, nav, footer, header').remove();
 
@@ -114,7 +168,7 @@ export class DocumentLoaderService {
       const code = $elem.text().trim();
       const language = $elem.attr('class')?.match(/language-(\w+)/)?.[1] || 'text';
       
-      if (code.length > 10) { // Only include substantial code blocks
+      if (code.length > 10) {
         codeBlocks.push({
           language,
           code,
@@ -131,7 +185,6 @@ export class DocumentLoaderService {
       sections,
       codeBlocks,
     };
-    */
   }
 
   /**
@@ -213,11 +266,382 @@ export class DocumentLoaderService {
   }
 
   /**
-   * Load documentation
+   * Load documentation with crawling support
    */
   private async loadDocumentation(source: KnowledgeSourceType): Promise<LoadedDocument> {
-    // Documentation is similar to website loading but with special handling
+    if (!source.url) {
+      throw new Error('Documentation source must have a URL');
+    }
+
+    // Auto-detect and apply preset if not explicitly configured
+    if (!(source.metadata as any)?.maxDepth && !(source.metadata as any)?.preset) {
+      const preset = detectPresetFromUrl(source.url);
+      if (preset) {
+        this.logger.log(`Auto-detected preset: ${preset.name}`);
+        source.metadata = applyPreset(source.metadata, preset);
+      }
+    }
+
+    const crawlOptions: CrawlOptions = {
+      maxDepth: (source.metadata as any)?.maxDepth || 2,
+      maxPages: (source.metadata as any)?.maxPages || 50,
+      followLinks: (source.metadata as any)?.followLinks !== false,
+      useJavaScript: (source.metadata as any)?.useJavaScript || false,
+      waitForSelector: (source.metadata as any)?.waitForSelector,
+    };
+
+    // Check if we should crawl multiple pages
+    if (crawlOptions.followLinks) {
+      return this.crawlDocumentation(source, crawlOptions);
+    }
+
+    // Single page load
     return this.loadWebsite(source);
+  }
+
+  /**
+   * Crawl documentation site
+   */
+  private async crawlDocumentation(
+    source: KnowledgeSourceType,
+    options: CrawlOptions
+  ): Promise<LoadedDocument> {
+    const visited = new Set<string>();
+    const toVisit: Array<{ url: string; depth: number }> = [];
+    
+    const allContent: string[] = [];
+    const allSections: DocumentSection[] = [];
+    const allCodeBlocks: CodeBlock[] = [];
+    let pageCount = 0;
+
+    const baseUrl = new URL(source.url!);
+    const baseDomain = baseUrl.origin;
+    const basePath = baseUrl.pathname.split('/').slice(0, -1).join('/');
+
+    this.logger.log(`Starting documentation crawl from ${source.url}`);
+    this.logger.log(`Max depth: ${options.maxDepth}, Max pages: ${options.maxPages}`);
+
+    // Try to find and parse sitemap first
+    const sitemapUrls = await this.findSitemapUrls(baseDomain);
+    if (sitemapUrls.length > 0) {
+      this.logger.log(`Found ${sitemapUrls.length} URLs from sitemap`);
+      sitemapUrls.forEach(url => {
+        if (url.startsWith(baseDomain + basePath)) {
+          toVisit.push({ url, depth: 0 });
+        }
+      });
+    }
+
+    // If no sitemap or sitemap didn't have enough URLs, start with base URL
+    if (toVisit.length === 0) {
+      toVisit.push({ url: source.url!, depth: 0 });
+    }
+
+    while (toVisit.length > 0 && pageCount < (options.maxPages || 50)) {
+      const { url, depth } = toVisit.shift()!;
+
+      if (visited.has(url) || depth > (options.maxDepth || 2)) {
+        continue;
+      }
+
+      visited.add(url);
+      pageCount++;
+
+      try {
+        this.logger.log(`Crawling [${pageCount}/${options.maxPages}] depth ${depth}: ${url}`);
+        
+        const pageSource = { ...source, url };
+        const doc = options.useJavaScript
+          ? await this.loadWebsiteWithPuppeteer(pageSource)
+          : await this.loadWebsite(pageSource);
+
+        allContent.push(`\n\n=== ${doc.metadata.title} ===\n\n${doc.content}`);
+        if (doc.sections) {
+          allSections.push(...doc.sections);
+        }
+        if (doc.codeBlocks) {
+          allCodeBlocks.push(...doc.codeBlocks);
+        }
+
+        // Extract links if we haven't reached max depth
+        if (depth < (options.maxDepth || 2)) {
+          const links = await this.extractLinks(url, options.useJavaScript || false);
+          
+          for (const link of links) {
+            const linkUrl = this.resolveUrl(url, link);
+            
+            if (this.shouldFollowLink(linkUrl, baseDomain, basePath, visited, options)) {
+              toVisit.push({ url: linkUrl, depth: depth + 1 });
+            }
+          }
+        }
+
+        // Small delay to be respectful
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        this.logger.warn(`Failed to crawl ${url}: ${error.message}`);
+      }
+    }
+
+    this.logger.log(`Crawl complete: ${pageCount} pages processed`);
+
+    return {
+      content: allContent.join('\n'),
+      metadata: {
+        ...source.metadata,
+        title: source.metadata.title || 'Documentation',
+        pageCount,
+      },
+      sections: allSections,
+      codeBlocks: allCodeBlocks,
+    };
+  }
+
+  /**
+   * Extract links from a page
+   */
+  private async extractLinks(url: string, useJavaScript: boolean): Promise<string[]> {
+    if (useJavaScript) {
+      const browser = await this.getBrowser();
+      const page = await browser.newPage();
+      
+      try {
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+        
+        const links = await page.evaluate(() => {
+          return Array.from(document.querySelectorAll('a[href]'))
+            .map(a => (a as HTMLAnchorElement).href)
+            .filter(href => href && !href.startsWith('#'));
+        });
+        
+        return links;
+      } finally {
+        await page.close();
+      }
+    } else {
+      const html = await this.fetchContent(url);
+      const $ = load(html);
+      const links: string[] = [];
+      
+      $('a[href]').each((i, elem) => {
+        const href = $(elem).attr('href');
+        if (href && !href.startsWith('#')) {
+          links.push(href);
+        }
+      });
+      
+      return links;
+    }
+  }
+
+  /**
+   * Resolve relative URL to absolute
+   */
+  private resolveUrl(baseUrl: string, relativeUrl: string): string {
+    try {
+      return new URL(relativeUrl, baseUrl).href;
+    } catch {
+      return relativeUrl;
+    }
+  }
+
+  /**
+   * Check if link should be followed
+   */
+  private shouldFollowLink(
+    url: string,
+    baseDomain: string,
+    basePath: string,
+    visited: Set<string>,
+    options: CrawlOptions
+  ): boolean {
+    if (visited.has(url)) {
+      return false;
+    }
+
+    try {
+      const urlObj = new URL(url);
+      
+      // Must be same domain
+      if (urlObj.origin !== baseDomain) {
+        return false;
+      }
+
+      // Should be under base path (for documentation sites)
+      if (!urlObj.pathname.startsWith(basePath)) {
+        return false;
+      }
+
+      // Check include patterns
+      if (options.includePatterns && options.includePatterns.length > 0) {
+        if (!options.includePatterns.some(pattern => pattern.test(url))) {
+          return false;
+        }
+      }
+
+      // Check exclude patterns
+      if (options.excludePatterns && options.excludePatterns.length > 0) {
+        if (options.excludePatterns.some(pattern => pattern.test(url))) {
+          return false;
+        }
+      }
+
+      // Exclude common non-documentation URLs
+      const excludeExtensions = ['.pdf', '.zip', '.tar', '.gz', '.jpg', '.png', '.gif', '.svg'];
+      if (excludeExtensions.some(ext => url.toLowerCase().endsWith(ext))) {
+        return false;
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get or create Puppeteer browser instance
+   */
+  private async getBrowser(): Promise<Browser> {
+    if (!this.browser || !this.browser.isConnected()) {
+      this.logger.log('Launching Puppeteer browser...');
+      this.browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+        ],
+      });
+    }
+    return this.browser;
+  }
+
+  /**
+   * Find and parse sitemap URLs
+   */
+  private async findSitemapUrls(baseDomain: string): Promise<string[]> {
+    const sitemapUrls = [
+      `${baseDomain}/sitemap.xml`,
+      `${baseDomain}/sitemap_index.xml`,
+      `${baseDomain}/sitemap-index.xml`,
+      `${baseDomain}/docs/sitemap.xml`,
+    ];
+
+    for (const sitemapUrl of sitemapUrls) {
+      try {
+        this.logger.log(`Checking for sitemap at ${sitemapUrl}`);
+        const urls = await this.parseSitemap(sitemapUrl);
+        if (urls.length > 0) {
+          return urls;
+        }
+      } catch (error) {
+        // Sitemap not found or invalid, try next
+        continue;
+      }
+    }
+
+    return [];
+  }
+
+  /**
+   * Parse sitemap XML
+   */
+  private async parseSitemap(sitemapUrl: string): Promise<string[]> {
+    try {
+      const xml = await this.fetchContent(sitemapUrl);
+      const $ = load(xml, { xmlMode: true });
+      
+      const urls: string[] = [];
+      
+      // Check if this is a sitemap index
+      $('sitemapindex > sitemap > loc').each((i, elem) => {
+        const loc = $(elem).text().trim();
+        if (loc) {
+          urls.push(loc);
+        }
+      });
+
+      // If sitemap index found, recursively parse each sitemap
+      if (urls.length > 0) {
+        this.logger.log(`Found sitemap index with ${urls.length} sitemaps`);
+        const allUrls: string[] = [];
+        for (const url of urls) {
+          try {
+            const subUrls = await this.parseSitemap(url);
+            allUrls.push(...subUrls);
+          } catch (error) {
+            this.logger.warn(`Failed to parse sitemap ${url}: ${error.message}`);
+          }
+        }
+        return allUrls;
+      }
+
+      // Parse regular sitemap
+      $('urlset > url > loc').each((i, elem) => {
+        const loc = $(elem).text().trim();
+        if (loc) {
+          urls.push(loc);
+        }
+      });
+
+      this.logger.log(`Parsed ${urls.length} URLs from sitemap`);
+      return urls;
+    } catch (error) {
+      this.logger.debug(`Failed to parse sitemap ${sitemapUrl}: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Try to find documentation index page
+   */
+  private async findDocumentationIndex(baseUrl: string): Promise<string[]> {
+    const indexPaths = [
+      '/docs',
+      '/documentation',
+      '/api',
+      '/reference',
+      '/guide',
+      '/manual',
+    ];
+
+    for (const path of indexPaths) {
+      try {
+        const indexUrl = baseUrl + path;
+        const html = await this.fetchContent(indexUrl);
+        const $ = load(html);
+        
+        // Look for documentation links
+        const links: string[] = [];
+        $('nav a[href], .sidebar a[href], .toc a[href], .menu a[href]').each((i, elem) => {
+          const href = $(elem).attr('href');
+          if (href && !href.startsWith('#')) {
+            const fullUrl = this.resolveUrl(indexUrl, href);
+            links.push(fullUrl);
+          }
+        });
+
+        if (links.length > 0) {
+          this.logger.log(`Found ${links.length} links from index page ${indexUrl}`);
+          return links;
+        }
+      } catch (error) {
+        continue;
+      }
+    }
+
+    return [];
+  }
+
+  /**
+   * Close browser on service destruction
+   */
+  async onModuleDestroy() {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
   }
 
   /**
