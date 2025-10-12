@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import GradientColorPicker from '@/components/dev/GradientColorPicker';
 
 export default function TestCookiesPage() {
   const [cookies, setCookies] = useState<string>('');
@@ -72,7 +73,7 @@ export default function TestCookiesPage() {
       <div className="mb-4 space-x-2">
         <button 
           onClick={testLogin}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
+          className="bg-gradient-to-br from-indigo-50 to-purple-500 text-white px-4 py-2 rounded"
         >
           Test Login
         </button>

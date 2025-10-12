@@ -7,6 +7,7 @@ import { useAuthRedirect, authRedirectConfigs } from '@/hooks/useAuthRedirect';
 import ProtectedRoute, { protectionLevels } from '@/components/ProtectedRoute';
 import AuthStatus from '@/components/AuthStatus';
 import toast from 'react-hot-toast';
+import GradientColorPicker from '@/components/dev/GradientColorPicker';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,7 @@ function SettingsContent() {
   const { user, logout } = useAuthStore();
   const [activeTab, setActiveTab] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
+  const [showGradientPicker, setShowGradientPicker] = useState(false);
 
   const [profileData, setProfileData] = useState({
     username: user?.username || '',
@@ -102,22 +104,39 @@ function SettingsContent() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-emerald-50 to-purple-50 relative overflow-hidden">
+      {/* Animated Liquid Blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="blob blob-1"></div>
+        <div className="blob blob-2"></div>
+        <div className="blob blob-3"></div>
+        <div className="blob blob-4"></div>
+      </div>
+
+      {/* Noise Texture Overlay */}
+      <div 
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+          backgroundRepeat: 'repeat',
+        }}
+      />
+
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white/80 backdrop-blur-xl shadow-sm border-b border-white/20 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <h1 className="text-xl font-bold text-gray-900">Settings</h1>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Settings</h1>
             <AuthStatus />
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 relative z-10">
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Sidebar */}
           <div className="lg:w-64">
-            <nav className="bg-white rounded-lg shadow p-4">
+            <nav className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] p-4 border border-white/20">
               <ul className="space-y-2">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
@@ -125,10 +144,10 @@ function SettingsContent() {
                     <li key={tab.id}>
                       <button
                         onClick={() => setActiveTab(tab.id)}
-                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all ${
                           activeTab === tab.id
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                            : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
                         }`}
                       >
                         <Icon className="h-4 w-4 mr-3" />
@@ -143,7 +162,7 @@ function SettingsContent() {
 
           {/* Main Content */}
           <div className="flex-1">
-            <div className="bg-white rounded-lg shadow">
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white/20">
               {/* Profile Tab */}
               {activeTab === 'profile' && (
                 <div className="p-6">
@@ -157,7 +176,7 @@ function SettingsContent() {
                         type="text"
                         value={profileData.username}
                         onChange={(e) => setProfileData({ ...profileData, username: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                       />
                     </div>
                     <div>
@@ -168,7 +187,7 @@ function SettingsContent() {
                         type="email"
                         value={profileData.email}
                         onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                       />
                     </div>
                     <div>
@@ -179,7 +198,7 @@ function SettingsContent() {
                         type="text"
                         value={profileData.firstName}
                         onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                       />
                     </div>
                     <div>
@@ -190,7 +209,7 @@ function SettingsContent() {
                         type="text"
                         value={profileData.lastName}
                         onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                       />
                     </div>
                     <div className="md:col-span-2">
@@ -201,7 +220,7 @@ function SettingsContent() {
                         rows={4}
                         value={profileData.bio}
                         onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                         placeholder="Tell us about yourself..."
                       />
                     </div>
@@ -210,7 +229,7 @@ function SettingsContent() {
                     <button
                       onClick={handleSaveProfile}
                       disabled={isLoading}
-                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                      className="flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg disabled:opacity-50 transition-all"
                     >
                       <Save className="h-4 w-4 mr-2" />
                       {isLoading ? 'Saving...' : 'Save Changes'}
@@ -244,7 +263,7 @@ function SettingsContent() {
                             })}
                             className="sr-only peer"
                           />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-indigo-600 peer-checked:to-purple-600"></div>
                         </label>
                       </div>
                     ))}
@@ -253,7 +272,7 @@ function SettingsContent() {
                     <button
                       onClick={handleSaveNotifications}
                       disabled={isLoading}
-                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                      className="flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg disabled:opacity-50 transition-all"
                     >
                       <Save className="h-4 w-4 mr-2" />
                       {isLoading ? 'Saving...' : 'Save Changes'}
@@ -296,7 +315,7 @@ function SettingsContent() {
                           ...securitySettings,
                           sessionTimeout: parseInt(e.target.value)
                         })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white/60 backdrop-blur-sm border border-white/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                       >
                         <option value={15}>15 minutes</option>
                         <option value={30}>30 minutes</option>
@@ -329,7 +348,7 @@ function SettingsContent() {
                     <button
                       onClick={handleSaveSecurity}
                       disabled={isLoading}
-                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                      className="flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg disabled:opacity-50 transition-all"
                     >
                       <Save className="h-4 w-4 mr-2" />
                       {isLoading ? 'Saving...' : 'Save Changes'}
@@ -351,7 +370,7 @@ function SettingsContent() {
                     <Key className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No API Keys</h3>
                     <p className="text-gray-500 mb-4">You haven&apos;t created any API keys yet.</p>
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                    <button className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all">
                       Create API Key
                     </button>
                   </div>
@@ -360,10 +379,10 @@ function SettingsContent() {
             </div>
 
             {/* Danger Zone */}
-            <div className="mt-6 bg-white rounded-lg shadow border-l-4 border-red-500">
+            <div className="mt-6 bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border-l-4 border-red-500">
               <div className="p-6">
                 <h2 className="text-lg font-medium text-red-900 mb-4">Danger Zone</h2>
-                <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                <div className="bg-red-50/80 backdrop-blur-sm border border-red-200 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-sm font-medium text-red-900">Delete Account</h3>
@@ -374,7 +393,7 @@ function SettingsContent() {
                     <button
                       onClick={handleDeleteAccount}
                       disabled={isLoading}
-                      className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                      className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 hover:shadow-lg disabled:opacity-50 transition-all"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete Account
@@ -386,6 +405,80 @@ function SettingsContent() {
           </div>
         </div>
       </div>
+
+      {/* Gradient Color Picker */}
+      <GradientColorPicker 
+        isVisible={showGradientPicker}
+        onToggle={() => setShowGradientPicker(!showGradientPicker)}
+      />
+
+      {/* Animation Keyframes */}
+      <style jsx global>{`
+        @keyframes blob-float-1 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+        @keyframes blob-float-2 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(-40px, 30px) scale(0.9); }
+          66% { transform: translate(30px, -30px) scale(1.1); }
+        }
+        @keyframes blob-float-3 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(40px, 40px) scale(1.1); }
+          66% { transform: translate(-30px, -20px) scale(0.9); }
+        }
+        @keyframes blob-float-4 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(-35px, -40px) scale(0.9); }
+          66% { transform: translate(35px, 30px) scale(1.1); }
+        }
+
+        .blob {
+          position: absolute;
+          border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+          opacity: 0.15;
+          filter: blur(40px);
+          will-change: transform;
+        }
+
+        .blob-1 {
+          width: 500px;
+          height: 500px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          top: -10%;
+          left: -10%;
+          animation: blob-float-1 28s ease-in-out infinite;
+        }
+
+        .blob-2 {
+          width: 400px;
+          height: 400px;
+          background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+          top: 40%;
+          right: -5%;
+          animation: blob-float-2 32s ease-in-out infinite;
+        }
+
+        .blob-3 {
+          width: 450px;
+          height: 450px;
+          background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+          bottom: -10%;
+          left: 20%;
+          animation: blob-float-3 30s ease-in-out infinite;
+        }
+
+        .blob-4 {
+          width: 350px;
+          height: 350px;
+          background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+          bottom: 30%;
+          right: 20%;
+          animation: blob-float-4 25s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }

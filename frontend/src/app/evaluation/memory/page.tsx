@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import GradientColorPicker from '@/components/dev/GradientColorPicker';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import type { EvaluationCategory, EvaluationMemoryType } from '@agentdb9/shared';
@@ -76,7 +77,7 @@ export default function MemoryEvaluationPage() {
       <div className="mb-6">
         <button
           onClick={() => router.push('/evaluation')}
-          className="text-blue-600 hover:underline mb-2"
+          className="text-indigo-600 hover:underline mb-2"
         >
           ← Back to Evaluation
         </button>
@@ -86,7 +87,7 @@ export default function MemoryEvaluationPage() {
         </p>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white/20 p-6">
         {/* Agent Selection */}
         <div className="mb-6">
           <label className="block text-sm font-medium mb-2">Select Agent</label>
@@ -116,7 +117,7 @@ export default function MemoryEvaluationPage() {
                 onClick={() => setSelectedSuite(suite as EvaluationCategory)}
                 className={`p-4 rounded-lg border-2 transition-colors ${
                   selectedSuite === suite
-                    ? 'border-blue-500 bg-blue-50'
+                    ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
@@ -209,7 +210,7 @@ export default function MemoryEvaluationPage() {
         </div>
 
         {/* Info Box */}
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded">
+        <div className="mb-6 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 border border-blue-200 rounded">
           <h3 className="font-semibold mb-2">How it works:</h3>
           <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
             <li>
@@ -232,7 +233,7 @@ export default function MemoryEvaluationPage() {
         <button
           onClick={handleEvaluate}
           disabled={loading || !selectedAgent}
-          className="w-full bg-blue-600 text-white py-3 px-4 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+          className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded hover:shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
         >
           {loading ? 'Starting Evaluation...' : 'Start Memory Evaluation'}
         </button>

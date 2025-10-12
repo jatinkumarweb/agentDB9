@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import GradientColorPicker from '@/components/dev/GradientColorPicker';
 import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
 import type { EvaluationBatch, EvaluationResult } from '@agentdb9/shared';
@@ -87,7 +88,7 @@ export default function EvaluationResultsPage() {
           <p className="text-red-600">Batch not found</p>
           <button
             onClick={() => router.push('/evaluation')}
-            className="mt-4 text-blue-600 hover:underline"
+            className="mt-4 text-indigo-600 hover:underline"
           >
             Back to Evaluation
           </button>
@@ -108,7 +109,7 @@ export default function EvaluationResultsPage() {
       <div className="mb-6">
         <button
           onClick={() => router.push('/evaluation')}
-          className="text-blue-600 hover:underline mb-2"
+          className="text-indigo-600 hover:underline mb-2"
         >
           ← Back to Evaluation
         </button>
@@ -116,7 +117,7 @@ export default function EvaluationResultsPage() {
       </div>
 
       {/* Batch Status Card */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white/20 p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <div className="text-sm text-gray-600">Status</div>
@@ -149,7 +150,7 @@ export default function EvaluationResultsPage() {
         </div>
 
         {batch.progress.currentTask && batch.status === 'running' && (
-          <div className="mt-4 p-3 bg-blue-50 rounded">
+          <div className="mt-4 p-3 bg-gradient-to-br from-indigo-50 to-purple-50 rounded">
             <div className="text-sm text-gray-600">Current Task:</div>
             <div className="font-medium">{batch.progress.currentTask}</div>
           </div>
@@ -171,7 +172,7 @@ export default function EvaluationResultsPage() {
       </div>
 
       {/* Results Table */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white/20 p-6">
         <h2 className="text-xl font-semibold mb-4">Task Results</h2>
 
         {results.length === 0 ? (
@@ -259,7 +260,7 @@ export default function EvaluationResultsPage() {
 
       {/* Detailed Results */}
       {completedResults.length > 0 && (
-        <div className="mt-6 bg-white rounded-lg shadow p-6">
+        <div className="mt-6 bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white/20 p-6">
           <h2 className="text-xl font-semibold mb-4">Detailed Analysis</h2>
           <div className="space-y-4">
             {completedResults.slice(0, 3).map((result) => (

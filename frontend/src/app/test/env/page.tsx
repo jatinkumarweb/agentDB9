@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import GradientColorPicker from '@/components/dev/GradientColorPicker';
 import { EnvironmentHealth, TestSuite, ServiceStatus, ModelTest, DatabaseTest } from '@agentdb9/shared';
 
 interface TestResults {
@@ -83,7 +84,7 @@ export default function EnvironmentTestPage() {
 
   if (!isDevelopment) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-emerald-50 to-purple-50 relative overflow-hidden flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-md">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
           <p className="text-gray-600">
@@ -95,10 +96,10 @@ export default function EnvironmentTestPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-emerald-50 to-purple-50 relative overflow-hidden p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white/20-md p-6 mb-6">
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Environment Testing</h1>
@@ -133,7 +134,7 @@ export default function EnvironmentTestPage() {
               <button
                 onClick={runTests}
                 disabled={results.loading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:shadow-lg disabled:opacity-50"
               >
                 {results.loading ? 'Running Tests...' : 'Run Tests'}
               </button>
@@ -254,7 +255,7 @@ function TestSuiteCard({ suite }: { suite: TestSuite }) {
     switch (status) {
       case 'passed': return 'text-green-600';
       case 'failed': return 'text-red-600';
-      case 'running': return 'text-blue-600';
+      case 'running': return 'text-indigo-600';
       case 'skipped': return 'text-gray-600';
       default: return 'text-gray-600';
     }
@@ -265,10 +266,10 @@ function TestSuiteCard({ suite }: { suite: TestSuite }) {
     : 0;
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white/20-md p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">{suite.name}</h3>
-        <div className="text-2xl font-bold text-blue-600">{successRate}%</div>
+        <div className="text-2xl font-bold text-indigo-600">{successRate}%</div>
       </div>
       
       <div className="space-y-2 mb-4">
@@ -313,7 +314,7 @@ function TestSuiteCard({ suite }: { suite: TestSuite }) {
 
 function ServiceStatusCard({ services }: { services: ServiceStatus[] }) {
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white/20-md p-6">
       <h3 className="text-lg font-semibold mb-4">Service Status</h3>
       <div className="space-y-3">
         {services.map((service) => (
@@ -371,7 +372,7 @@ function ModelStatusCard({ models }: { models: ModelTest[] }) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white/20-md p-6">
       <h3 className="text-lg font-semibold mb-4">Model Availability</h3>
       <div className="space-y-3">
         {models.map((model) => (
