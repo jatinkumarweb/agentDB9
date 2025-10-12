@@ -1,14 +1,29 @@
-FROM node:22
+FROM node:22-slim
 
-# Install build dependencies for native modules
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+# Install build dependencies for native modules (node-pty requires python3, make, g++)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure npm for faster installs
+RUN npm config set fetch-timeout 300000 && \
+    npm config set fetch-retries 5 && \
+    npm config set loglevel warn
 
 WORKDIR /app
 
 # Copy and build shared package first
-COPY shared/ /shared/
+COPY shared/package*.json /shared/
 WORKDIR /shared
-RUN npm install && npm run build
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit 2>/dev/null || npm install --no-audit
+COPY shared/ /shared/
+RUN npm run build
 
 # Switch to MCP server directory
 WORKDIR /app
@@ -16,8 +31,11 @@ WORKDIR /app
 # Copy package files
 COPY mcp-server/package*.json ./
 
-# Install all dependencies locally (including dev for building, isolated container)
-RUN npm install
+# Install dependencies with cache mount for faster rebuilds
+# The cache mount persists npm cache between builds
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit --legacy-peer-deps 2>/dev/null || \
+    npm install --legacy-peer-deps --no-audit --verbose
 
 # Create symlink to shared package BEFORE copying source
 RUN mkdir -p node_modules/@agentdb9 && \
