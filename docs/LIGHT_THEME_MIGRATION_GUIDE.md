@@ -7,13 +7,13 @@ This guide provides a systematic approach to migrating all frontend pages to the
 ## Completed Pages
 
 ✅ `/auth/login` - Login page with light theme
+✅ `/auth/signup` - Signup page with light theme
+✅ `/auth/forgot-password` - Password reset page with light theme
 ✅ `/chat` - Chat interface with light theme
 
 ## Pages to Migrate
 
-### Priority 1 (Auth & Core)
-- [ ] `/auth/signup` - Signup page
-- [ ] `/auth/forgot-password` - Password reset page
+### Priority 1 (Core)
 - [ ] `/` - Home/landing page
 - [ ] `/dashboard` - Main dashboard
 
@@ -335,9 +335,9 @@ After migrating each page, update:
 | Page | Status | Tests | Docs | Notes |
 |------|--------|-------|------|-------|
 | /auth/login | ✅ Done | ✅ | ✅ | Reference implementation |
+| /auth/signup | ✅ Done | ⏳ | ✅ | Complete |
+| /auth/forgot-password | ✅ Done | ⏳ | ✅ | Complete |
 | /chat | ✅ Done | ✅ | ✅ | Reference implementation |
-| /auth/signup | 🔄 In Progress | ⏳ | ⏳ | |
-| /auth/forgot-password | ⏳ Pending | ⏳ | ⏳ | |
 | / (home) | ⏳ Pending | ⏳ | ⏳ | |
 | /dashboard | ⏳ Pending | ⏳ | ⏳ | |
 | /agents/[id]/settings | ⏳ Pending | ⏳ | ⏳ | |
