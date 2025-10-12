@@ -7,6 +7,7 @@ import { Eye, EyeOff, UserPlus, Mail, Lock, User } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useAuthRedirect, authRedirectConfigs } from '@/hooks/useAuthRedirect';
 import toast from 'react-hot-toast';
+import GradientColorPicker from '@/components/dev/GradientColorPicker';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showGradientPicker, setShowGradientPicker] = useState(false);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -101,14 +103,96 @@ export default function SignupPage() {
   const strengthColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-blue-500', 'bg-green-500'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-emerald-50 to-purple-50 flex items-center justify-center p-4 overflow-hidden relative font-['Inter',sans-serif]" data-gradient-bg>
+      {/* Animated liquid blobs */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div 
+          className="absolute top-0 left-0 w-[500px] h-[500px] bg-gradient-to-br from-blue-300 to-cyan-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40"
+          style={{ animation: 'blob1 25s ease-in-out infinite' }}
+          data-blob="1"
+        ></div>
+        <div 
+          className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-gradient-to-br from-purple-300 to-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40"
+          style={{ animation: 'blob2 30s ease-in-out infinite' }}
+          data-blob="2"
+        ></div>
+        <div 
+          className="absolute bottom-0 left-1/3 w-[500px] h-[500px] bg-gradient-to-br from-emerald-300 to-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40"
+          style={{ animation: 'blob3 28s ease-in-out infinite' }}
+          data-blob="3"
+        ></div>
+        <div 
+          className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-gradient-to-br from-indigo-200 to-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40"
+          style={{ animation: 'blob4 32s ease-in-out infinite' }}
+          data-blob="4"
+        ></div>
+      </div>
+
+      {/* Noise texture overlay */}
+      <div 
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+          backgroundRepeat: 'repeat',
+        }}
+      ></div>
+
+      <style>{`
+        @keyframes blob1 {
+          0%, 100% {
+            transform: translate(0, 0) scale(1);
+          }
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+        }
+        @keyframes blob2 {
+          0%, 100% {
+            transform: translate(0, 0) scale(1);
+          }
+          33% {
+            transform: translate(-40px, 30px) scale(1.15);
+          }
+          66% {
+            transform: translate(30px, -30px) scale(0.95);
+          }
+        }
+        @keyframes blob3 {
+          0%, 100% {
+            transform: translate(0, 0) scale(1);
+          }
+          33% {
+            transform: translate(50px, 20px) scale(0.9);
+          }
+          66% {
+            transform: translate(-30px, -40px) scale(1.1);
+          }
+        }
+        @keyframes blob4 {
+          0%, 100% {
+            transform: translate(0, 0) scale(1);
+          }
+          33% {
+            transform: translate(-25px, -35px) scale(1.05);
+          }
+          66% {
+            transform: translate(40px, 25px) scale(0.95);
+          }
+        }
+      `}</style>
+
+      <div className="relative z-10 max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <div className="mx-auto h-12 w-12 bg-green-600 rounded-lg flex items-center justify-center">
-            <UserPlus className="h-6 w-6 text-white" />
+          <div className="mx-auto h-16 w-16 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-2xl flex items-center justify-center transform rotate-12 shadow-lg">
+            <div className="transform -rotate-12">
+              <UserPlus className="h-8 w-8 text-gray-700" />
+            </div>
           </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">
+          <h2 className="mt-6 text-4xl font-bold text-gray-900">
             Create your account
           </h2>
           <p className="mt-2 text-sm text-gray-600">
@@ -117,7 +201,7 @@ export default function SignupPage() {
         </div>
 
         {/* Signup Form */}
-        <div className="bg-white py-8 px-6 shadow-lg rounded-lg">
+        <div className="bg-white/40 backdrop-blur-2xl rounded-3xl border border-white/60 p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Username Field */}
             <div>
@@ -136,9 +220,9 @@ export default function SignupPage() {
                   required
                   value={formData.username}
                   onChange={handleInputChange}
-                  className={`appearance-none block w-full pl-10 pr-3 py-2 border ${
-                    errors.username ? 'border-red-300' : 'border-gray-300'
-                  } rounded-md placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
+                  className={`appearance-none block w-full pl-10 pr-3 py-3 bg-white/50 backdrop-blur-sm rounded-xl border ${
+                    errors.username ? 'border-red-300' : 'border-white/80'
+                  } placeholder-gray-400 text-gray-900 outline-none focus:bg-white/60 focus:border-indigo-200 transition-all duration-300`}
                   placeholder="Choose a username"
                 />
               </div>
