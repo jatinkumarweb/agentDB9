@@ -1,5 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards, UploadedFile, UseInterceptors } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { KnowledgeService } from './knowledge.service';
@@ -15,36 +14,48 @@ export class KnowledgeController {
   constructor(private readonly knowledgeService: KnowledgeService) {}
 
   /**
-   * Upload and ingest a file
+   * Upload and ingest a file (base64 encoded)
+   * TODO: Add proper file upload with Multer when @types/multer is installed
    */
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
-    @UploadedFile() file: Express.Multer.File,
     @Body('agentId') agentId: string,
+    @Body('fileName') fileName: string,
+    @Body('fileContent') fileContent: string,
     @Body('title') title: string,
     @Body('description') description?: string,
   ) {
-    if (!file) {
-      return { success: false, error: 'No file provided' };
+    if (!fileContent || !fileName) {
+      return { success: false, error: 'File name and content are required' };
     }
 
     try {
-      const source: KnowledgeSource = {
-        type: 'file',
-        url: file.originalname,
-        content: file.buffer.toString('utf-8'),
+      // Determine type based on file extension
+      const ext = fileName.split('.').pop()?.toLowerCase();
+      let sourceType: 'pdf' | 'markdown' | 'website' | 'api' | 'github' | 'documentation' = 'markdown';
+      
+      if (ext === 'pdf') {
+        sourceType = 'pdf';
+      } else if (['md', 'markdown', 'txt', 'doc', 'docx'].includes(ext || '')) {
+        sourceType = 'markdown';
+      }
+
+      const source = {
+        type: sourceType,
+        url: fileName,
+        content: fileContent,
         metadata: {
-          title: title || file.originalname,
+          title: title || fileName,
           description: description || '',
-          mimeType: file.mimetype,
-          size: file.size,
+          tags: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       };
 
       const request: KnowledgeIngestionRequest = {
         agentId,
-        source,
+        source: source as any,
         options: {
           generateEmbeddings: true,
           chunkSize: 1000,

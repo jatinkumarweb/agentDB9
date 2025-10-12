@@ -37,15 +37,19 @@ export default function FileUploadModal({ agentId, isOpen, onClose, onSuccess }:
     setIsUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('agentId', agentId);
-      formData.append('title', title);
-      formData.append('description', description);
+      // Read file content as text
+      const fileContent = await selectedFile.text();
 
       const response = await fetchWithAuth('/api/knowledge/upload', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentId,
+          fileName: selectedFile.name,
+          fileContent,
+          title,
+          description,
+        }),
       });
 
       const data = await response.json();
