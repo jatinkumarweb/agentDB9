@@ -189,7 +189,7 @@ export default function SignupPage() {
         <div className="text-center">
           <div className="mx-auto h-16 w-16 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-2xl flex items-center justify-center transform rotate-12 shadow-lg">
             <div className="transform -rotate-12">
-              <UserPlus className="h-8 w-8 text-gray-700" />
+              <UserPlus className="h-8 w-8 text-gray-900" />
             </div>
           </div>
           <h2 className="mt-6 text-4xl font-bold text-gray-900">
@@ -205,12 +205,12 @@ export default function SignupPage() {
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Username Field */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-900">
                 Username
               </label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-400" />
+                  <User className="h-5 w-5 text-gray-500" />
                 </div>
                 <input
                   id="username"
@@ -233,12 +233,12 @@ export default function SignupPage() {
 
             {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-900">
                 Email address
               </label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
+                  <Mail className="h-5 w-5 text-gray-500" />
                 </div>
                 <input
                   id="email"
@@ -248,9 +248,9 @@ export default function SignupPage() {
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`appearance-none block w-full pl-10 pr-3 py-2 border ${
-                    errors.email ? 'border-red-300' : 'border-gray-300'
-                  } rounded-md placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
+                  className={`appearance-none block w-full pl-10 pr-3 py-3 bg-white/50 backdrop-blur-sm rounded-xl border ${
+                    errors.email ? 'border-red-300' : 'border-white/80'
+                  } placeholder-gray-400 text-gray-900 outline-none focus:bg-white/60 focus:border-indigo-200 transition-all duration-300`}
                   placeholder="Enter your email"
                 />
               </div>
@@ -261,12 +261,12 @@ export default function SignupPage() {
 
             {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-900">
                 Password
               </label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
+                  <Lock className="h-5 w-5 text-gray-500" />
                 </div>
                 <input
                   id="password"
@@ -276,9 +276,9 @@ export default function SignupPage() {
                   required
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`appearance-none block w-full pl-10 pr-10 py-2 border ${
-                    errors.password ? 'border-red-300' : 'border-gray-300'
-                  } rounded-md placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
+                  className={`appearance-none block w-full pl-10 pr-10 py-3 bg-white/50 backdrop-blur-sm rounded-xl border ${
+                    errors.password ? 'border-red-300' : 'border-white/80'
+                  } placeholder-gray-400 text-gray-900 outline-none focus:bg-white/60 focus:border-indigo-200 transition-all duration-300`}
                   placeholder="Create a password"
                 />
                 <button
@@ -287,9 +287,9 @@ export default function SignupPage() {
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    <EyeOff className="h-5 w-5 text-gray-500 hover:text-gray-600" />
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    <Eye className="h-5 w-5 text-gray-500 hover:text-gray-600" />
                   )}
                 </button>
               </div>
@@ -320,12 +320,12 @@ export default function SignupPage() {
 
             {/* Confirm Password Field */}
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-900">
                 Confirm Password
               </label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
+                  <Lock className="h-5 w-5 text-gray-500" />
                 </div>
                 <input
                   id="confirmPassword"
@@ -335,9 +335,9 @@ export default function SignupPage() {
                   required
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
-                  className={`appearance-none block w-full pl-10 pr-10 py-2 border ${
-                    errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                  } rounded-md placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
+                  className={`appearance-none block w-full pl-10 pr-10 py-3 bg-white/50 backdrop-blur-sm rounded-xl border ${
+                    errors.confirmPassword ? 'border-red-300' : 'border-white/80'
+                  } placeholder-gray-400 text-gray-900 outline-none focus:bg-white/60 focus:border-indigo-200 transition-all duration-300`}
                   placeholder="Confirm your password"
                 />
                 <button
@@ -346,9 +346,9 @@ export default function SignupPage() {
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 >
                   {showConfirmPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    <EyeOff className="h-5 w-5 text-gray-500 hover:text-gray-600" />
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    <Eye className="h-5 w-5 text-gray-500 hover:text-gray-600" />
                   )}
                 </button>
               </div>
@@ -364,15 +364,15 @@ export default function SignupPage() {
                 name="terms"
                 type="checkbox"
                 required
-                className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
               />
               <label htmlFor="terms" className="ml-2 block text-sm text-gray-900">
                 I agree to the{' '}
-                <Link href="/terms" className="text-green-600 hover:text-green-500">
+                <Link href="/terms" className="text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
                   Terms of Service
                 </Link>{' '}
                 and{' '}
-                <Link href="/privacy" className="text-green-600 hover:text-green-500">
+                <Link href="/privacy" className="text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
                   Privacy Policy
                 </Link>
               </label>
@@ -383,7 +383,7 @@ export default function SignupPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
               >
                 {isLoading ? (
                   <div className="flex items-center">
@@ -405,7 +405,7 @@ export default function SignupPage() {
                 Already have an account?{' '}
                 <Link
                   href="/auth/login"
-                  className="font-medium text-green-600 hover:text-green-500"
+                  className="font-medium text-gray-900 hover:text-indigo-600 transition-colors"
                 >
                   Sign in here
                 </Link>
@@ -413,7 +413,22 @@ export default function SignupPage() {
             </div>
           </form>
         </div>
+
+        {/* Gradient Picker Button */}
+        {process.env.NODE_ENV === 'development' && !showGradientPicker && (
+          <button
+            onClick={() => setShowGradientPicker(true)}
+            className="mt-4 w-full bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 p-3 shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:bg-white/50 transition-all duration-300 text-sm font-medium text-gray-900"
+          >
+            🎨 Open Gradient Color Picker
+          </button>
+        )}
       </div>
+
+      {/* Gradient Color Picker */}
+      {showGradientPicker && (
+        <GradientColorPicker onClose={() => setShowGradientPicker(false)} />
+      )}
     </div>
   );
 }
