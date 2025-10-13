@@ -228,10 +228,10 @@ export class WorkspacesController {
   @Get(':id/logs')
   async getLogs(
     @Param('id') id: string,
+    @Res() res: Response,
     @Query('tail') tail?: string,
     @Query('since') since?: string,
     @Query('timestamps') timestamps?: string,
-    @Res() res?: Response,
   ) {
     const logStream = await this.containerService.getContainerLogs(id, {
       tail: tail ? parseInt(tail, 10) : 100,
@@ -250,8 +250,8 @@ export class WorkspacesController {
   @Get(':id/logs/stream')
   async streamLogs(
     @Param('id') id: string,
+    @Res() res: Response,
     @Query('timestamps') timestamps?: string,
-    @Res() res?: Response,
   ) {
     const logStream = await this.containerService.getContainerLogs(id, {
       follow: true,
@@ -268,8 +268,8 @@ export class WorkspacesController {
   /**
    * Get workspace container stats
    */
-  @Get(':id/stats')
-  async getStats(@Param('id') id: string) {
+  @Get(':id/container-stats')
+  async getContainerStats(@Param('id') id: string) {
     const stats = await this.containerService.getContainerStats(id);
 
     return {

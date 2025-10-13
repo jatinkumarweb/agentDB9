@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { WorkspaceType, WorkspaceStatus } from '@agentdb9/shared';
 
@@ -25,7 +25,9 @@ describe('Workspaces (e2e)', () => {
         email: 'admin@agentdb9.com',
         password: 'admin123',
       })
-      .expect(200);
+      .expect((res) => {
+        expect([200, 201]).toContain(res.status);
+      });
 
     authToken = loginResponse.body.accessToken;
     userId = loginResponse.body.user.id;

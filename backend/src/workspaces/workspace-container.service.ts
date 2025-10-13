@@ -450,7 +450,7 @@ export class WorkspaceContainerService {
       }
 
       const stream = await container.logs(logOptions);
-      return stream as NodeJS.ReadableStream;
+      return stream as any as NodeJS.ReadableStream;
     } catch (error) {
       this.logger.error(`Failed to get logs for workspace ${workspaceId}:`, error);
       throw new InternalServerErrorException(
