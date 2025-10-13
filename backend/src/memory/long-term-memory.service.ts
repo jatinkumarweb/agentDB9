@@ -35,7 +35,7 @@ export class LongTermMemoryService {
   ): Promise<LongTermMemory> {
     try {
       const entity = this.ltmRepository.create({
-        id: generateId(),
+        // Don't set id - let PostgreSQL generate UUID
         agentId,
         category,
         summary,
