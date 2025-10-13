@@ -10,11 +10,20 @@ import { useAuth } from '@/hooks/useAuth';
 import { Loader2, Code, Table, BookOpen, Database, Palette, Settings, BarChart3 } from 'lucide-react';
 import GradientColorPicker from '@/components/dev/GradientColorPicker';
 
+interface WorkspaceState {
+  id: string | null;
+  type: string | null;
+  projectId: string | null;
+}
+
 export default function WorkspacePage() {
   const [isCollaborationOpen, setIsCollaborationOpen] = useState(false);
   const [showGradientPicker, setShowGradientPicker] = useState(false);
-  const [selectedWorkspaceType, setSelectedWorkspaceType] = useState<string | null>(null);
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [workspaceState, setWorkspaceState] = useState<WorkspaceState>({
+    id: null,
+    type: null,
+    projectId: null,
+  });
   const [showWorkspaceSelector, setShowWorkspaceSelector] = useState(true);
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
@@ -24,6 +33,52 @@ export default function WorkspacePage() {
       router.push('/auth/login?returnUrl=/workspace');
     }
   }, [isLoading, isAuthenticated, router]);
+
+  // Load workspace state from localStorage on mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('workspace-state');
+    if (savedState) {
+      try {
+        const parsed = JSON.parse(savedState);
+        setWorkspaceState(parsed);
+        if (parsed.type) {
+          setShowWorkspaceSelector(false);
+        }
+      } catch (e) {
+        console.error('Failed to parse workspace state:', e);
+      }
+    }
+  }, []);
+
+  // Save workspace state to localStorage
+  useEffect(() => {
+    if (workspaceState.type) {
+      localStorage.setItem('workspace-state', JSON.stringify(workspaceState));
+    }
+  }, [workspaceState]);
+
+  // Reset workspace when switching types
+  const handleWorkspaceTypeSelect = (typeId: string) => {
+    const newState = {
+      id: `${typeId}-${Date.now()}`,
+      type: typeId,
+      projectId: null,
+    };
+    setWorkspaceState(newState);
+    setShowWorkspaceSelector(false);
+  };
+
+  // Handle workspace switch
+  const handleWorkspaceSwitch = () => {
+    setWorkspaceState({
+      id: null,
+      type: null,
+      projectId: null,
+    });
+    setShowWorkspaceSelector(true);
+    setIsCollaborationOpen(false);
+    localStorage.removeItem('workspace-state');
+  };
 
   // Show loading spinner while checking authentication
   if (isLoading) {
@@ -77,20 +132,44 @@ export default function WorkspacePage() {
             }}
           />
 
-          {/* User info header */}
-          <div className="absolute top-4 left-4 z-50 bg-white/80 backdrop-blur-xl rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.08)] px-3 py-2 border border-white/20">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-sm font-medium text-gray-700">
-                {user?.username || user?.email}
-              </span>
-            </div>
-          </div>
+          {/* User info header - only show when workspace is active */}
+          {!showWorkspaceSelector && workspaceState.type && (
+            <>
+              <div className="absolute top-4 left-4 z-50 bg-white/80 backdrop-blur-xl rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.08)] px-3 py-2 border border-white/20">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-gray-700">
+                      {user?.username || user?.email}
+                    </span>
+                  </div>
+                  <div className="h-4 w-px bg-gray-300"></div>
+                  <button
+                    onClick={handleWorkspaceSwitch}
+                    className="text-xs text-gray-600 hover:text-indigo-600 transition-colors"
+                  >
+                    Switch Workspace
+                  </button>
+                </div>
+              </div>
+
+              {/* Workspace Type Badge */}
+              <div className="absolute top-4 right-4 z-50 bg-white/80 backdrop-blur-xl rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.08)] px-3 py-2 border border-white/20">
+                <div className="flex items-center space-x-2">
+                  {workspaceState.type === 'vscode' && <Code className="w-4 h-4 text-blue-600" />}
+                  {workspaceState.type === 'spreadsheet' && <Table className="w-4 h-4 text-green-600" />}
+                  <span className="text-sm font-medium text-gray-700 capitalize">
+                    {workspaceState.type}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Workspace Selector Overlay */}
           {showWorkspaceSelector && (
-            <div className="absolute inset-0 z-40 flex items-center justify-center p-4">
-              <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-white/20 p-8 max-w-4xl w-full">
+            <div className="absolute inset-0 z-40 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
+              <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-white/20 p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
@@ -115,8 +194,7 @@ export default function WorkspacePage() {
                         key={type.id}
                         onClick={() => {
                           if (type.available) {
-                            setSelectedWorkspaceType(type.id);
-                            setShowWorkspaceSelector(false);
+                            handleWorkspaceTypeSelect(type.id);
                           }
                         }}
                         disabled={!type.available}
@@ -164,18 +242,34 @@ export default function WorkspacePage() {
             </div>
           )}
 
-          <div className="relative z-10 h-full">
-            <VSCodeContainer 
-              className={`h-full transition-all duration-300 ${isCollaborationOpen ? 'mr-80' : ''}`}
-              showHeader={true}
-              allowPopout={true}
-            />
-            
-            <CollaborationPanel
-              isOpen={isCollaborationOpen}
-              onToggle={() => setIsCollaborationOpen(!isCollaborationOpen)}
-            />
-          </div>
+          {/* Only render workspace container when a type is selected */}
+          {!showWorkspaceSelector && workspaceState.type && (
+            <div className="relative z-10 h-full">
+              {workspaceState.type === 'vscode' && (
+                <VSCodeContainer 
+                  key={`workspace-${workspaceState.id || 'new'}`}
+                  className={`h-full transition-all duration-300 ${isCollaborationOpen ? 'mr-80' : ''}`}
+                  showHeader={true}
+                  allowPopout={true}
+                />
+              )}
+              
+              {workspaceState.type === 'spreadsheet' && (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <Table className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Spreadsheet Workspace</h3>
+                    <p className="text-gray-600">Coming soon...</p>
+                  </div>
+                </div>
+              )}
+              
+              <CollaborationPanel
+                isOpen={isCollaborationOpen}
+                onToggle={() => setIsCollaborationOpen(!isCollaborationOpen)}
+              />
+            </div>
+          )}
 
           {/* Gradient Color Picker */}
           {showGradientPicker && <GradientColorPicker />}
