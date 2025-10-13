@@ -6,6 +6,7 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log('Knowledge API: Ingesting source for agent:', body.agentId);
     
     const response = await fetch(`${BACKEND_URL}/knowledge/ingest`, {
       method: 'POST',
@@ -13,12 +14,22 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(body),
     });
     
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Knowledge API: Backend returned error:', response.status, errorText);
+      return NextResponse.json(
+        { success: false, error: `Backend error: ${response.status}` },
+        { status: response.status }
+      );
+    }
+    
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
     console.error('Knowledge API: Failed to ingest source:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { success: false, error: 'Failed to ingest knowledge source' },
+      { success: false, error: `Failed to ingest knowledge source: ${errorMessage}` },
       { status: 500 }
     );
   }
