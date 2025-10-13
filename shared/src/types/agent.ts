@@ -27,6 +27,14 @@ export interface AgentConfiguration {
   knowledgeBase?: KnowledgeBaseConfiguration;
   memory?: MemoryConfiguration;
   workspace?: WorkspaceConfiguration;
+  supportedWorkspaceTypes?: string[]; // Which workspace types this agent supports (imported from workspace.ts)
+  specializationContext?: AgentSpecializationContext;
+}
+
+export interface AgentSpecializationContext {
+  workspaceType?: string; // Primary workspace type specialization
+  customPrompts?: Record<string, string>; // Custom prompts per workspace type
+  toolPreferences?: Record<string, string[]>; // Preferred tools per workspace type
 }
 
 export interface WorkspaceConfiguration {
@@ -349,6 +357,9 @@ export interface Project {
   language: string;
   status: ProjectStatus;
   agents: string[]; // agent IDs
+  workspaceId?: string; // Which workspace this project belongs to
+  workspaceType?: string; // What type of workspace can use this project (imported from workspace.ts)
+  volumePath?: string; // Path to project files in volume
   createdAt: Date;
   updatedAt: Date;
 }

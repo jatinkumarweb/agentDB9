@@ -191,3 +191,4 @@ export * from './memory';
 export * from './mcp';
 export * from './api';
 export * from './evaluation';
+export * from './workspace';

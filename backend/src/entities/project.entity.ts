@@ -50,6 +50,19 @@ export class Project implements ProjectInterface {
   })
   agents: string[];
 
+  @Column({ nullable: true })
+  workspaceId?: string;
+
+  @Column({ 
+    type: 'varchar',
+    length: 50,
+    nullable: true 
+  })
+  workspaceType?: string;
+
+  @Column({ nullable: true, type: 'varchar', length: 500 })
+  volumePath?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
