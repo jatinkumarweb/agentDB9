@@ -171,14 +171,27 @@ export class ShortTermMemoryService {
     minAgeHours: number = 0, // Minimum age before consolidation (0 = consolidate immediately)
   ): Promise<ShortTermMemory[]> {
     const now = new Date();
-    const minAgeDate = new Date(now.getTime() - minAgeHours * 60 * 60 * 1000);
-
-    return Array.from(this.memoryStore.values())
+    const allMemories = Array.from(this.memoryStore.values());
+    
+    this.logger.log(`Finding consolidation candidates for agent ${agentId}`);
+    this.logger.log(`Total memories in store: ${allMemories.length}`);
+    this.logger.log(`Filters: minImportance=${minImportance}, minAgeHours=${minAgeHours}`);
+    
+    let candidates = allMemories
       .filter(m => m.agentId === agentId)
       .filter(m => m.importance >= minImportance)
-      .filter(m => m.createdAt <= minAgeDate) // Memory is at least minAge old
-      .filter(m => now <= m.expiresAt) // Memory hasn't expired
-      .sort((a, b) => b.importance - a.importance);
+      .filter(m => now <= m.expiresAt); // Memory hasn't expired
+
+    this.logger.log(`After filtering: ${candidates.length} candidates found`);
+
+    // Apply age filter only if minAgeHours > 0
+    if (minAgeHours > 0) {
+      const minAgeDate = new Date(now.getTime() - minAgeHours * 60 * 60 * 1000);
+      candidates = candidates.filter(m => m.createdAt <= minAgeDate);
+      this.logger.log(`After age filter: ${candidates.length} candidates`);
+    }
+
+    return candidates.sort((a, b) => b.importance - a.importance);
   }
 
   /**
