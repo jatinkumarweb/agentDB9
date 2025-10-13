@@ -645,31 +645,76 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   }
 
   return (
-    <motion.div
-      initial={{ x: 300, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: 300, opacity: 0 }}
-      className={cn(
-        "fixed top-0 right-0 h-full w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-lg z-40",
-        className
-      )}
-    >
-      <div className="flex flex-col h-full">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Collaboration
-          </h2>
-          <button
-            onClick={onToggle}
-            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <>
+      {/* Glassmorphism styles */}
+      <style>{`
+        .glass-card-collab {
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.05));
+          backdrop-filter: blur(60px) saturate(200%) brightness(110%);
+          -webkit-backdrop-filter: blur(60px) saturate(200%) brightness(110%);
+          box-shadow: 
+            0 8px 32px 0 rgba(31, 38, 135, 0.15),
+            inset 0 1px 2px 0 rgba(255, 255, 255, 0.3),
+            inset 0 -1px 1px 0 rgba(0, 0, 0, 0.05);
+        }
+        
+        .glass-input-collab {
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.08));
+          backdrop-filter: blur(30px) saturate(180%) brightness(105%);
+          -webkit-backdrop-filter: blur(30px) saturate(180%) brightness(105%);
+          box-shadow: 
+            0 2px 12px 0 rgba(31, 38, 135, 0.1),
+            inset 0 1px 1px 0 rgba(255, 255, 255, 0.25),
+            inset 0 -1px 1px 0 rgba(0, 0, 0, 0.03);
+        }
+
+        .glass-input-collab:focus-within {
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.15));
+          backdrop-filter: blur(40px) saturate(180%) brightness(110%);
+          -webkit-backdrop-filter: blur(40px) saturate(180%) brightness(110%);
+          box-shadow: 
+            0 4px 16px 0 rgba(99, 102, 241, 0.2),
+            inset 0 1px 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .glass-button-collab {
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.08));
+          backdrop-filter: blur(30px) saturate(180%) brightness(105%);
+          -webkit-backdrop-filter: blur(30px) saturate(180%) brightness(105%);
+        }
+
+        .glass-button-collab:hover {
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.12));
+        }
+      `}</style>
+      
+      <motion.div
+        initial={{ x: 300, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: 300, opacity: 0 }}
+        className={cn(
+          "fixed top-0 right-0 h-full w-80 glass-card-collab border-l border-white border-opacity-20 shadow-[-8px_0_32px_rgba(31,38,135,0.15)] z-40",
+          className
+        )}
+      >
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-white border-opacity-20">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Collaboration
+            </h2>
+            <button
+              onClick={onToggle}
+              className="p-1 rounded glass-button-collab border border-white border-opacity-50 hover:border-opacity-70 transition-all"
+            >
+              <X className="w-5 h-5 text-gray-800" />
+            </button>
+          </div>
+    </>
+  );
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 dark:border-gray-700">
+        <div className="flex border-b border-white border-opacity-20">
           {[
             { id: 'users', label: 'Users', icon: Users },
             { id: 'chat', label: 'Chat', icon: MessageSquare },
@@ -679,10 +724,10 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={cn(
-                "flex-1 flex items-center justify-center space-x-2 py-3 px-4 text-sm font-medium transition-colors",
+                "flex-1 flex items-center justify-center space-x-2 py-3 px-4 text-sm font-medium transition-all",
                 activeTab === tab.id
-                  ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50 dark:bg-blue-900/20"
-                  : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  ? "text-indigo-600 border-b-2 border-indigo-600 glass-button-collab"
+                  : "text-gray-700 hover:text-gray-900 glass-button-collab hover:border-opacity-70"
               )}
             >
               <tab.icon className="w-4 h-4" />
@@ -695,7 +740,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         <div className="flex-1 overflow-hidden">
           {activeTab === 'users' && (
             <div className="p-4 space-y-3">
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <h3 className="text-sm font-medium text-gray-900">
                 Active Users ({activeUsers.length})
               </h3>
               
@@ -703,7 +748,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                 {activeUsers.map(user => (
                   <div
                     key={user.id}
-                    className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    className="flex items-center space-x-3 p-2 rounded-lg glass-button-collab border border-white border-opacity-30 hover:border-opacity-50 transition-all"
                   >
                     <div className="relative">
                       {user.avatar ? (
@@ -723,18 +768,18 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2">
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                        <p className="text-sm font-medium text-gray-900 truncate">
                           {user.name}
                         </p>
                         {user.isAgent && (
-                          <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
+                          <span className="px-1.5 py-0.5 text-xs bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-800 rounded">
                             AI
                           </span>
                         )}
                       </div>
                       
                       {user.currentFile && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        <p className="text-xs text-gray-700 truncate">
                           <Eye className="w-3 h-3 inline mr-1" />
                           {user.currentFile.split('/').pop()}
                         </p>
@@ -884,12 +929,12 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
               {/* Response Timer */}
               {(isTimerRunning || responseTime) && (
-                <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                <div className="px-4 py-2 border-t border-white border-opacity-20 glass-button-collab">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-gray-700">
                       {isTimerRunning ? '⏱️ Generating response...' : '✅ Response completed'}
                     </span>
-                    <span className="font-mono text-gray-700 dark:text-gray-300">
+                    <span className="font-mono text-gray-900">
                       {isTimerRunning 
                         ? `${((Date.now() - (responseStartTime || 0)) / 1000).toFixed(1)}s`
                         : `${(responseTime! / 1000).toFixed(2)}s`
@@ -900,9 +945,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
               )}
 
               {/* Agent Selection */}
-              <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="p-4 border-t border-white border-opacity-20">
                 <div className="mb-3">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-xs font-medium text-gray-900 mb-1">
                     Select AI Agent
                   </label>
                   <select
@@ -914,7 +959,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                       setCurrentConversation(null);
                     }}
                     disabled={isLoadingAgents || availableAgents.length === 0}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
+                    className="w-full px-3 py-2 text-sm glass-input-collab border border-white border-opacity-50 rounded-xl text-gray-900 outline-none font-medium disabled:opacity-50"
                   >
                     {isLoadingAgents ? (
                       <option value="">Loading agents...</option>
@@ -944,12 +989,12 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     onKeyPress={handleKeyPress}
                     placeholder={selectedAgent ? `Chat with ${getSelectedAgentName()}...` : "Select an agent first..."}
                     disabled={!selectedAgent}
-                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
+                    className="flex-1 px-3 py-2 glass-input-collab border border-white border-opacity-50 rounded-xl text-gray-900 outline-none disabled:opacity-50"
                   />
                   {isGenerating ? (
                     <button
                       onClick={stopGeneration}
-                      className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-1"
+                      className="px-3 py-2 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all flex items-center space-x-1 shadow-md"
                     >
                       <Square className="w-4 h-4" />
                       <span className="text-xs">Stop</span>
@@ -958,7 +1003,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     <button
                       onClick={sendMessage}
                       disabled={!newMessage.trim() || !selectedAgent || isLoading}
-                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="px-3 py-2 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
                     >
                       {isLoading ? (
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -974,13 +1019,13 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
           {activeTab === 'share' && (
             <div className="p-4 space-y-4">
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <h3 className="text-sm font-medium text-gray-900">
                 Share Workspace
               </h3>
               
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-xs font-medium text-gray-900 mb-1">
                     Workspace URL
                   </label>
                   <div className="flex space-x-2">
@@ -988,11 +1033,11 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                       type="text"
                       value={window.location.href}
                       readOnly
-                      className="flex-1 px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      className="flex-1 px-3 py-2 text-xs glass-input-collab border border-white border-opacity-50 rounded-xl text-gray-900"
                     />
                     <button
                       onClick={() => navigator.clipboard.writeText(window.location.href)}
-                      className="px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                      className="px-3 py-2 bg-gradient-to-br from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all shadow-md"
                     >
                       Copy
                     </button>
@@ -1000,7 +1045,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-xs font-medium text-gray-900 mb-1">
                     VS Code URL (Authenticated)
                   </label>
                   <div className="flex space-x-2">
