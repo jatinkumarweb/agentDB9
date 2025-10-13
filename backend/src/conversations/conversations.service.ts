@@ -516,8 +516,68 @@ Error: ${error.message}`;
     }
   }
 
-  private buildSystemPrompt(agent: Agent): string {
+  private async buildSystemPrompt(agent: Agent, conversationId: string, userMessage: string): Promise<string> {
     let systemPrompt = agent.configuration?.systemPrompt || 'You are a helpful AI assistant.';
+    
+    // Add memory context if enabled
+    if (agent.configuration?.memory?.enabled) {
+      try {
+        console.log('🧠 [ReAct] Fetching memory context for agent:', agent.id);
+        const memoryContext = await this.memoryService.getMemoryContext(
+          agent.id,
+          conversationId,
+          userMessage
+        );
+        
+        if (memoryContext.totalMemories > 0) {
+          systemPrompt += `\n\n## Memory Context\n${memoryContext.summary}\n`;
+          
+          if (memoryContext.recentInteractions.length > 0) {
+            systemPrompt += `\nRecent interactions:\n`;
+            memoryContext.recentInteractions.slice(0, 3).forEach((interaction: any) => {
+              systemPrompt += `- ${interaction.summary || interaction.content}\n`;
+            });
+          }
+          
+          if (memoryContext.relevantLessons.length > 0) {
+            systemPrompt += `\nLearned lessons:\n`;
+            memoryContext.relevantLessons.slice(0, 3).forEach((lesson: any) => {
+              systemPrompt += `- ${lesson.summary || lesson.content}\n`;
+            });
+          }
+          
+          console.log(`✅ [ReAct] Added ${memoryContext.totalMemories} memory items to context`);
+        }
+      } catch (error) {
+        console.error('[ReAct] Failed to fetch memory context:', error);
+      }
+    }
+    
+    // Add knowledge base context if enabled
+    if (agent.configuration?.knowledgeBase?.enabled) {
+      try {
+        console.log('📚 [ReAct] Fetching knowledge base context for query:', userMessage.substring(0, 50));
+        const kbContext = await this.knowledgeService.getAgentKnowledgeContext(
+          agent.id,
+          userMessage,
+          agent.configuration.knowledgeBase.retrievalTopK || 5
+        );
+        
+        if (kbContext.relevantChunks.length > 0) {
+          systemPrompt += `\n\n## Knowledge Base Context\n`;
+          systemPrompt += `Retrieved ${kbContext.relevantChunks.length} relevant documents:\n\n`;
+          
+          kbContext.relevantChunks.forEach((chunk: any, index: number) => {
+            systemPrompt += `### Document ${index + 1}\n`;
+            systemPrompt += `${chunk.content}\n\n`;
+          });
+          
+          console.log(`✅ [ReAct] Added ${kbContext.relevantChunks.length} knowledge base chunks to context`);
+        }
+      } catch (error) {
+        console.error('[ReAct] Failed to fetch knowledge base context:', error);
+      }
+    }
     
     // Add ReAct pattern instructions for tool usage
     systemPrompt += '\n\nYou have access to workspace tools. Use them in a chain to complete complex tasks.\n\n';
@@ -619,7 +679,7 @@ Error: ${error.message}`;
     
     try {
       // Get system prompt
-      const systemPrompt = this.buildSystemPrompt(conversation.agent);
+      const systemPrompt = await this.buildSystemPrompt(conversation.agent, conversation.id, userMessage);
       console.log(`📝 ReAct: System prompt length: ${systemPrompt.length} chars`);
       
       // Get conversation history
@@ -1809,7 +1869,7 @@ You: TOOL_CALL:
     
     try {
       // Get system prompt
-      const systemPrompt = this.buildSystemPrompt(conversation.agent);
+      const systemPrompt = await this.buildSystemPrompt(conversation.agent, conversation.id, userMessage);
       console.log(`📝 ReAct (External LLM): System prompt length: ${systemPrompt.length} chars`);
       
       // Get conversation history
