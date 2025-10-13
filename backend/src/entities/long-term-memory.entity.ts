@@ -22,7 +22,19 @@ export class LongTermMemoryEntity {
   @Column({ type: 'text' })
   details: string;
 
-  @Column({ type: 'text' })
+  @Column({ 
+    type: 'text',
+    transformer: {
+      to: (value: any) => JSON.stringify(value),
+      from: (value: string) => {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return {};
+        }
+      }
+    }
+  })
   metadata: any;
 
   @Column({ type: 'real', default: 0.5 })
@@ -34,10 +46,38 @@ export class LongTermMemoryEntity {
   @Column({ type: 'timestamp', nullable: true })
   lastAccessedAt?: Date;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ 
+    type: 'text', 
+    nullable: true,
+    transformer: {
+      to: (value: number[] | undefined) => value ? JSON.stringify(value) : null,
+      from: (value: string | null) => {
+        if (!value) return undefined;
+        try {
+          return JSON.parse(value);
+        } catch {
+          return undefined;
+        }
+      }
+    }
+  })
   embedding?: number[];
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ 
+    type: 'text', 
+    nullable: true,
+    transformer: {
+      to: (value: string[] | undefined) => value ? JSON.stringify(value) : null,
+      from: (value: string | null) => {
+        if (!value) return undefined;
+        try {
+          return JSON.parse(value);
+        } catch {
+          return undefined;
+        }
+      }
+    }
+  })
   consolidatedFrom?: string[];
 
   @CreateDateColumn()
