@@ -32,7 +32,7 @@ export class MemoryConsolidationService {
       const candidates = await this.stmService.getConsolidationCandidates(
         request.agentId,
         request.minImportance || 0.4, // Lower threshold to include more conversations
-        request.maxAge || 1, // Allow consolidation after 1 hour instead of 24
+        request.maxAge || 0.01, // Allow consolidation after ~36 seconds for testing (0.01 hours)
       );
 
       this.logger.log(`Found ${candidates.length} STM candidates for consolidation`);

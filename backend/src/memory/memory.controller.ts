@@ -26,22 +26,23 @@ export class MemoryController {
   }
 
   /**
-   * Create a memory entry for specific agent (alternative endpoint)
+   * Consolidate memories (must come before :agentId route)
    */
-  @Post(':agentId')
-  async createMemoryForAgent(
-    @Param('agentId') agentId: string,
-    @Body() body: Omit<CreateMemoryRequest, 'agentId'>,
-  ) {
-    const request: CreateMemoryRequest = {
-      ...body,
-      agentId,
-    };
-    const result = await this.memoryService.createMemory(request);
+  @Post('consolidate')
+  async consolidate(@Body() request: MemoryConsolidationRequest) {
+    const result = await this.memoryService.consolidate(request);
     return {
       success: true,
       data: result,
     };
+  }
+
+  /**
+   * Query memories (must come before :agentId route)
+   */
+  @Post('query')
+  async queryMemories(@Body() query: MemoryQuery) {
+    return this.memoryService.queryMemories(query);
   }
 
   /**
@@ -57,11 +58,28 @@ export class MemoryController {
   }
 
   /**
-   * Query memories
+   * Get memory statistics
    */
-  @Post('query')
-  async queryMemories(@Body() query: MemoryQuery) {
-    return this.memoryService.queryMemories(query);
+  @Get(':agentId/stats')
+  async getStats(@Param('agentId') agentId: string) {
+    const stats = await this.memoryService.getStats(agentId);
+    
+    // Transform stats to match frontend expectations
+    return {
+      success: true,
+      data: {
+        shortTerm: {
+          total: stats.shortTerm.total,
+          byCategory: stats.shortTerm.byCategory,
+        },
+        longTerm: {
+          total: stats.longTerm.total,
+          byCategory: stats.longTerm.byCategory,
+        },
+        averageImportance: stats.longTerm.averageImportance || 0,
+        lastConsolidation: stats.consolidation?.lastRun,
+      }
+    };
   }
 
   /**
@@ -107,36 +125,18 @@ export class MemoryController {
   }
 
   /**
-   * Get memory statistics
+   * Create a memory entry for specific agent (alternative endpoint)
    */
-  @Get(':agentId/stats')
-  async getStats(@Param('agentId') agentId: string) {
-    const stats = await this.memoryService.getStats(agentId);
-    
-    // Transform stats to match frontend expectations
-    return {
-      success: true,
-      data: {
-        shortTerm: {
-          total: stats.shortTerm.total,
-          byCategory: stats.shortTerm.byCategory,
-        },
-        longTerm: {
-          total: stats.longTerm.total,
-          byCategory: stats.longTerm.byCategory,
-        },
-        averageImportance: stats.longTerm.averageImportance || 0,
-        lastConsolidation: stats.consolidation?.lastRun,
-      }
+  @Post(':agentId')
+  async createMemoryForAgent(
+    @Param('agentId') agentId: string,
+    @Body() body: Omit<CreateMemoryRequest, 'agentId'>,
+  ) {
+    const request: CreateMemoryRequest = {
+      ...body,
+      agentId,
     };
-  }
-
-  /**
-   * Consolidate memories
-   */
-  @Post('consolidate')
-  async consolidate(@Body() request: MemoryConsolidationRequest) {
-    const result = await this.memoryService.consolidate(request);
+    const result = await this.memoryService.createMemory(request);
     return {
       success: true,
       data: result,

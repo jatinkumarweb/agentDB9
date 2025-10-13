@@ -709,14 +709,14 @@ Error: ${error.message}`;
       // Store final conversation summary in memory and consolidate to long-term
       if (conversation.agent?.configuration?.memory?.enabled) {
         try {
-          // Save conversation summary directly to long-term memory (database)
+          // Save conversation to short-term memory first (will be consolidated to long-term later)
           const summary = `Conversation: ${userMessage.substring(0, 100)}...`;
           const details = `User: ${userMessage}\n\nAgent: ${result.finalAnswer}\n\nTools used: ${result.toolsUsed.join(', ')}`;
           
           await this.memoryService.createMemory({
             agentId: conversation.agentId,
             sessionId: conversation.id,
-            type: 'long-term',
+            type: 'short-term',
             category: 'interaction',
             content: `${summary}\n\n${details}`,
             importance: result.toolsUsed.length > 0 ? 0.8 : 0.5,
@@ -728,7 +728,7 @@ Error: ${error.message}`;
               source: 'conversation' as any
             }
           });
-          console.log('✅ Stored ReAct conversation summary in database');
+          console.log('✅ Stored ReAct conversation in short-term memory');
         } catch (error) {
           console.error('Failed to store ReAct interaction in memory:', error);
         }
@@ -1906,14 +1906,14 @@ You: TOOL_CALL:
       // Store final conversation summary in memory and consolidate to long-term
       if (conversation.agent?.configuration?.memory?.enabled) {
         try {
-          // Save conversation summary directly to long-term memory (database)
+          // Save conversation to short-term memory first (will be consolidated to long-term later)
           const summary = `Conversation: ${userMessage.substring(0, 100)}...`;
           const details = `User: ${userMessage}\n\nAgent: ${result.finalAnswer}\n\nTools used: ${result.toolsUsed.join(', ')}`;
           
           await this.memoryService.createMemory({
             agentId: conversation.agentId,
             sessionId: conversation.id,
-            type: 'long-term',
+            type: 'short-term',
             category: 'interaction',
             content: `${summary}\n\n${details}`,
             importance: result.toolsUsed.length > 0 ? 0.8 : 0.5,
@@ -1925,7 +1925,7 @@ You: TOOL_CALL:
               source: 'conversation' as any
             }
           });
-          console.log('✅ Stored ReAct (External LLM) conversation summary in database');
+          console.log('✅ Stored ReAct (External LLM) conversation in short-term memory');
         } catch (error) {
           console.error('Failed to store ReAct (External LLM) interaction in memory:', error);
         }
@@ -2334,11 +2334,11 @@ TOOL_CALL:
         ? `Tool: ${toolName}\nResult: Success\nObservation: ${observation.substring(0, 500)}`
         : `Tool: ${toolName}\nResult: Error\nError: ${toolResult?.error || observation}`;
       
-      // Save directly to long-term memory (database) for persistence
+      // Save to short-term memory first (will be consolidated to long-term later)
       await this.memoryService.createMemory({
         agentId,
         sessionId,
-        type: 'long-term',
+        type: 'short-term',
         category: 'interaction' as any,
         content: `${summary}\n\n${content}`,
         importance: success ? 0.7 : 0.9, // Higher importance for errors
@@ -2350,7 +2350,7 @@ TOOL_CALL:
           source: 'tool-execution' as any
         }
       });
-      console.log(`✅ Saved tool execution memory to database: ${toolName} (${success ? 'success' : 'error'})`);
+      console.log(`✅ Saved tool execution to short-term memory: ${toolName} (${success ? 'success' : 'error'})`);
     } catch (error) {
       console.error(`Failed to save tool execution memory for ${toolName}:`, error);
     }
