@@ -18,7 +18,30 @@ export class MemoryController {
    */
   @Post()
   async createMemory(@Body() request: CreateMemoryRequest) {
-    return this.memoryService.createMemory(request);
+    const result = await this.memoryService.createMemory(request);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  /**
+   * Create a memory entry for specific agent (alternative endpoint)
+   */
+  @Post(':agentId')
+  async createMemoryForAgent(
+    @Param('agentId') agentId: string,
+    @Body() body: Omit<CreateMemoryRequest, 'agentId'>,
+  ) {
+    const request: CreateMemoryRequest = {
+      ...body,
+      agentId,
+    };
+    const result = await this.memoryService.createMemory(request);
+    return {
+      success: true,
+      data: result,
+    };
   }
 
   /**
@@ -112,8 +135,12 @@ export class MemoryController {
    * Consolidate memories
    */
   @Post('consolidate')
-  async consolidate(@Body() request: MemoryConsolidationRequest): Promise<MemoryConsolidationResult> {
-    return this.memoryService.consolidate(request);
+  async consolidate(@Body() request: MemoryConsolidationRequest) {
+    const result = await this.memoryService.consolidate(request);
+    return {
+      success: true,
+      data: result,
+    };
   }
 
   /**

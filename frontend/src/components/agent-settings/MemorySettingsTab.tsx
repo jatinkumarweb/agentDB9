@@ -49,15 +49,25 @@ export default function MemorySettingsTab({ agentId, configuration = {}, onChang
         body: JSON.stringify({
           agentId,
           strategy: 'summarize',
+          minImportance: 0.3, // Include most memories
+          maxAge: 0.1, // Allow very recent memories (6 minutes)
         }),
       });
 
       const data = await response.json();
       
       if (data.success) {
-        toast.success(`Consolidated ${data.data.stmProcessed} memories`);
+        const result = data.data || data;
+        const processed = result.stmProcessed || 0;
+        const created = result.ltmCreated || 0;
+        
+        if (processed > 0) {
+          toast.success(`Consolidated ${processed} memories into ${created} long-term entries`);
+        } else {
+          toast.info('No memories ready for consolidation');
+        }
       } else {
-        toast.error('Failed to consolidate memories');
+        toast.error(data.error || 'Failed to consolidate memories');
       }
     } catch (error) {
       console.error('Failed to consolidate:', error);
@@ -287,17 +297,16 @@ export default function MemorySettingsTab({ agentId, configuration = {}, onChang
       )}
 
       {/* Memory Creator Modal */}
-      {/* TODO: Fix MemoryCreator component props
       {showCreator && (
         <MemoryCreator
           agentId={agentId}
+          isOpen={showCreator}
           onClose={() => setShowCreator(false)}
           onSuccess={() => {
             setShowCreator(false);
-            toast.success('Memory added successfully');
           }}
         />
-      )}*/}
+      )}
       {showCreator && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6">

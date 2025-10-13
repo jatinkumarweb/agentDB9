@@ -2,14 +2,25 @@
 
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
+import { fetchWithAuth } from '@/utils/fetch-with-auth';
+import toast from 'react-hot-toast';
 
 interface MemoryCreatorProps {
   agentId: string;
-  onMemoryCreated: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onSuccess?: () => void;
+  onMemoryCreated?: () => void;
 }
 
-export default function MemoryCreator({ agentId, onMemoryCreated }: MemoryCreatorProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function MemoryCreator({ 
+  agentId, 
+  isOpen: externalIsOpen, 
+  onClose: externalOnClose,
+  onSuccess,
+  onMemoryCreated 
+}: MemoryCreatorProps) {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -18,6 +29,12 @@ export default function MemoryCreator({ agentId, onMemoryCreated }: MemoryCreato
     importance: 0.5,
     tags: '',
   });
+
+  // Use external control if provided, otherwise use internal state
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+  const setIsOpen = externalOnClose ? (value: boolean) => {
+    if (!value) externalOnClose();
+  } : setInternalIsOpen;
 
   const categories = [
     { value: 'interaction', label: 'Interaction' },
@@ -37,36 +54,70 @@ export default function MemoryCreator({ agentId, onMemoryCreated }: MemoryCreato
     setError(null);
 
     try {
-      // This would call the API to create a memory
-      // For now, just simulate success
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setIsOpen(false);
-      setFormData({
-        category: 'lesson',
-        content: '',
-        importance: 0.5,
-        tags: '',
+      const tagsArray = formData.tags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+
+      const response = await fetchWithAuth(`/api/memory/${agentId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'ltm',
+          category: formData.category,
+          content: formData.content,
+          importance: formData.importance,
+          tags: tagsArray,
+          metadata: {
+            source: 'manual',
+            createdAt: new Date().toISOString(),
+          },
+        }),
       });
-      onMemoryCreated();
-    } catch (err) {
+
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success('Memory created successfully');
+        setIsOpen(false);
+        setFormData({
+          category: 'lesson',
+          content: '',
+          importance: 0.5,
+          tags: '',
+        });
+        
+        // Call all success callbacks
+        if (onSuccess) onSuccess();
+        if (onMemoryCreated) onMemoryCreated();
+      } else {
+        throw new Error(data.error || 'Failed to create memory');
+      }
+    } catch (err: any) {
       console.error('Failed to create memory:', err);
-      setError('Failed to create memory');
+      setError(err.message || 'Failed to create memory');
+      toast.error(err.message || 'Failed to create memory');
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!isOpen) {
+  // If external control is not provided and modal is closed, show button
+  if (externalIsOpen === undefined && !internalIsOpen) {
     return (
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={() => setInternalIsOpen(true)}
         className="flex items-center px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
       >
         <Plus className="w-4 h-4 mr-2" />
         Add Memory
       </button>
     );
+  }
+
+  // Don't render modal if externally controlled and closed
+  if (!isOpen) {
+    return null;
   }
 
   return (

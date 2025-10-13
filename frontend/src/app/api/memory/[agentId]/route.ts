@@ -31,3 +31,28 @@ export async function GET(
     );
   }
 }
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { agentId: string } }
+) {
+  try {
+    const { agentId } = params;
+    const body = await request.json();
+    
+    const response = await fetch(`${BACKEND_URL}/memory/${agentId}`, {
+      method: 'POST',
+      headers: createBackendHeaders(request),
+      body: JSON.stringify(body),
+    });
+    
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error('Memory API: Failed to create memory:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to create memory' },
+      { status: 500 }
+    );
+  }
+}
