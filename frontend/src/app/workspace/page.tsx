@@ -7,7 +7,7 @@ import CollaborationPanel from '@/components/CollaborationPanel';
 import { AgentActivityProvider } from '@/contexts/AgentActivityContext';
 import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2, Code, Table, BookOpen, Database, Palette, Settings, BarChart3 } from 'lucide-react';
+import { Loader2, Code, Table, BookOpen, Database, Palette, Settings, BarChart3, FolderOpen, MessageSquare, X } from 'lucide-react';
 import GradientColorPicker from '@/components/dev/GradientColorPicker';
 
 interface WorkspaceState {
@@ -25,6 +25,9 @@ export default function WorkspacePage() {
     projectId: null,
   });
   const [showWorkspaceSelector, setShowWorkspaceSelector] = useState(true);
+  const [showProjectSelector, setShowProjectSelector] = useState(false);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
@@ -57,6 +60,28 @@ export default function WorkspacePage() {
     }
   }, [workspaceState]);
 
+  // Fetch projects when workspace type is selected
+  const fetchProjects = async () => {
+    setLoadingProjects(true);
+    try {
+      const token = localStorage.getItem('auth-token');
+      const response = await fetch('/api/projects', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch projects:', error);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
   // Reset workspace when switching types
   const handleWorkspaceTypeSelect = (typeId: string) => {
     const newState = {
@@ -66,6 +91,17 @@ export default function WorkspacePage() {
     };
     setWorkspaceState(newState);
     setShowWorkspaceSelector(false);
+    setShowProjectSelector(true);
+    fetchProjects();
+  };
+
+  // Handle project selection
+  const handleProjectSelect = (projectId: string | null) => {
+    setWorkspaceState(prev => ({
+      ...prev,
+      projectId,
+    }));
+    setShowProjectSelector(false);
   };
 
   // Handle workspace switch
@@ -133,7 +169,7 @@ export default function WorkspacePage() {
           />
 
           {/* User info header - only show when workspace is active */}
-          {!showWorkspaceSelector && workspaceState.type && (
+          {!showWorkspaceSelector && !showProjectSelector && workspaceState.type && (
             <>
               <div className="absolute top-4 left-4 z-50 bg-white/80 backdrop-blur-xl rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.08)] px-3 py-2 border border-white/20">
                 <div className="flex items-center space-x-3">
@@ -150,20 +186,138 @@ export default function WorkspacePage() {
                   >
                     Switch Workspace
                   </button>
+                  <div className="h-4 w-px bg-gray-300"></div>
+                  <button
+                    onClick={() => setShowProjectSelector(true)}
+                    className="flex items-center space-x-1 text-xs text-gray-600 hover:text-indigo-600 transition-colors"
+                  >
+                    <FolderOpen className="w-3 h-3" />
+                    <span>Project</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Workspace Type Badge */}
-              <div className="absolute top-4 right-4 z-50 bg-white/80 backdrop-blur-xl rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.08)] px-3 py-2 border border-white/20">
-                <div className="flex items-center space-x-2">
-                  {workspaceState.type === 'vscode' && <Code className="w-4 h-4 text-blue-600" />}
-                  {workspaceState.type === 'spreadsheet' && <Table className="w-4 h-4 text-green-600" />}
-                  <span className="text-sm font-medium text-gray-700 capitalize">
-                    {workspaceState.type}
-                  </span>
+              {/* Workspace Type Badge and Chat Toggle */}
+              <div className="absolute top-4 right-4 z-50 flex items-center space-x-2">
+                <button
+                  onClick={() => setIsCollaborationOpen(!isCollaborationOpen)}
+                  className={`bg-white/80 backdrop-blur-xl rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.08)] px-3 py-2 border border-white/20 transition-all ${
+                    isCollaborationOpen ? 'bg-indigo-500 text-white' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <MessageSquare className="w-4 h-4" />
+                    <span className="text-sm font-medium">Chat</span>
+                  </div>
+                </button>
+                
+                <div className="bg-white/80 backdrop-blur-xl rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.08)] px-3 py-2 border border-white/20">
+                  <div className="flex items-center space-x-2">
+                    {workspaceState.type === 'vscode' && <Code className="w-4 h-4 text-blue-600" />}
+                    {workspaceState.type === 'spreadsheet' && <Table className="w-4 h-4 text-green-600" />}
+                    <span className="text-sm font-medium text-gray-700 capitalize">
+                      {workspaceState.type}
+                    </span>
+                  </div>
                 </div>
               </div>
             </>
+          )}
+
+          {/* Project Selector Modal */}
+          {showProjectSelector && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
+              <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-white/20 p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                      Select Project
+                    </h2>
+                    <p className="text-gray-600 mt-1">Choose a project to work on</p>
+                  </div>
+                  <button
+                    onClick={() => setShowProjectSelector(false)}
+                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {loadingProjects ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* No Project Option */}
+                    <button
+                      onClick={() => handleProjectSelect(null)}
+                      className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-indigo-300 hover:shadow-lg transition-all bg-white text-left"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center">
+                          <Code className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900">No Project</h3>
+                          <p className="text-sm text-gray-600">Start with an empty workspace</p>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Project List */}
+                    {projects.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <FolderOpen className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                        <p>No projects found</p>
+                        <button
+                          onClick={() => router.push('/projects')}
+                          className="mt-4 text-sm text-indigo-600 hover:text-indigo-700"
+                        >
+                          Create a project →
+                        </button>
+                      </div>
+                    ) : (
+                      projects.map((project) => (
+                        <button
+                          key={project.id}
+                          onClick={() => handleProjectSelect(project.id)}
+                          className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-indigo-300 hover:shadow-lg transition-all bg-white text-left"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+                              <FolderOpen className="w-5 h-5 text-white" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-gray-900">{project.name}</h3>
+                              <p className="text-sm text-gray-600">{project.description || 'No description'}</p>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      setShowProjectSelector(false);
+                      handleWorkspaceSwitch();
+                    }}
+                    className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    ← Back to Workspace Selection
+                  </button>
+                  <button
+                    onClick={() => handleProjectSelect(null)}
+                    className="text-sm text-indigo-600 hover:text-indigo-700 transition-colors"
+                  >
+                    Skip for now →
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Workspace Selector Overlay */}
