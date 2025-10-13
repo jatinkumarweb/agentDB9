@@ -8,7 +8,7 @@ import { KnowledgeSource, KnowledgeSourceMetadata, CodeBlock } from './agent';
  * Document chunk with embeddings
  */
 export interface DocumentChunk {
-  id: string;
+  id?: string;
   sourceId: string;
   agentId: string;
   content: string;
