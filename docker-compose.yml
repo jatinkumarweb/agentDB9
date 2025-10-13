@@ -7,6 +7,39 @@ services:
     working_dir: /workspace
     command: sleep infinity
 
+  # Dynamic workspace containers are created by the backend service
+  # They are not defined here but managed programmatically
+  # Example workspace container configuration:
+  # agentdb9-workspace-{id}:
+  #   image: codercom/code-server:latest (or other workspace type image)
+  #   environment:
+  #     - WORKSPACE_TYPE=vscode
+  #     - WORKSPACE_ID={id}
+  #     - PROJECT_ID={projectId}
+  #   volumes:
+  #     - agentdb9-project-{projectId}:/workspace
+  #   networks:
+  #     - default
+  #   labels:
+  #     - agentdb9.workspace.id={id}
+  #     - agentdb9.workspace.type={type}
+  #     - agentdb9.managed=true
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '2.0'
+  #         memory: 2G
+  #       reservations:
+  #         cpus: '0.5'
+  #         memory: 512M
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 60s
+
   frontend:
     build:
       context: .

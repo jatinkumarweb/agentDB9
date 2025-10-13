@@ -175,6 +175,165 @@ export class DockerVolumeService {
     }
   }
 
+  async backupProjectVolume(projectId: string, backupPath?: string): Promise<string> {
+    const volumeName = this.getVolumeName(projectId);
+    const volume = await this.getVolume(volumeName);
+
+    if (!volume) {
+      throw new InternalServerErrorException(`Volume ${volumeName} not found`);
+    }
+
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupName = backupPath || `/tmp/agentdb9-backup-${projectId}-${timestamp}.tar`;
+
+      this.logger.log(`Creating backup of volume ${volumeName} to ${backupName}`);
+
+      // Create a temporary container to access the volume
+      const container = await this.docker.createContainer({
+        Image: 'alpine:latest',
+        Cmd: ['tar', 'czf', '/backup/backup.tar.gz', '-C', '/data', '.'],
+        HostConfig: {
+          Binds: [
+            `${volumeName}:/data:ro`,
+            `${backupName}:/backup/backup.tar.gz`,
+          ],
+          AutoRemove: true,
+        },
+      });
+
+      await container.start();
+      await container.wait();
+
+      this.logger.log(`Backup created successfully: ${backupName}`);
+      return backupName;
+    } catch (error) {
+      this.logger.error(`Failed to backup volume ${volumeName}:`, error);
+      throw new InternalServerErrorException(
+        `Failed to backup volume: ${error.message}`,
+      );
+    }
+  }
+
+  async restoreProjectVolume(projectId: string, backupPath: string): Promise<void> {
+    const volumeName = this.getVolumeName(projectId);
+
+    try {
+      // Ensure volume exists
+      await this.ensureProjectVolume(projectId);
+
+      this.logger.log(`Restoring volume ${volumeName} from ${backupPath}`);
+
+      // Create a temporary container to restore the volume
+      const container = await this.docker.createContainer({
+        Image: 'alpine:latest',
+        Cmd: ['tar', 'xzf', '/backup/backup.tar.gz', '-C', '/data'],
+        HostConfig: {
+          Binds: [
+            `${volumeName}:/data`,
+            `${backupPath}:/backup/backup.tar.gz:ro`,
+          ],
+          AutoRemove: true,
+        },
+      });
+
+      await container.start();
+      await container.wait();
+
+      this.logger.log(`Volume ${volumeName} restored successfully`);
+    } catch (error) {
+      this.logger.error(`Failed to restore volume ${volumeName}:`, error);
+      throw new InternalServerErrorException(
+        `Failed to restore volume: ${error.message}`,
+      );
+    }
+  }
+
+  async cloneProjectVolume(sourceProjectId: string, targetProjectId: string): Promise<string> {
+    const sourceVolumeName = this.getVolumeName(sourceProjectId);
+    const targetVolumeName = this.getVolumeName(targetProjectId);
+
+    const sourceVolume = await this.getVolume(sourceVolumeName);
+    if (!sourceVolume) {
+      throw new InternalServerErrorException(`Source volume ${sourceVolumeName} not found`);
+    }
+
+    try {
+      this.logger.log(`Cloning volume ${sourceVolumeName} to ${targetVolumeName}`);
+
+      // Create target volume
+      await this.createProjectVolume(targetProjectId);
+
+      // Copy data from source to target using a temporary container
+      const container = await this.docker.createContainer({
+        Image: 'alpine:latest',
+        Cmd: ['sh', '-c', 'cp -a /source/. /target/'],
+        HostConfig: {
+          Binds: [
+            `${sourceVolumeName}:/source:ro`,
+            `${targetVolumeName}:/target`,
+          ],
+          AutoRemove: true,
+        },
+      });
+
+      await container.start();
+      await container.wait();
+
+      this.logger.log(`Volume cloned successfully: ${targetVolumeName}`);
+      return targetVolumeName;
+    } catch (error) {
+      this.logger.error(`Failed to clone volume ${sourceVolumeName}:`, error);
+      throw new InternalServerErrorException(
+        `Failed to clone volume: ${error.message}`,
+      );
+    }
+  }
+
+  async getVolumeSize(projectId: string): Promise<number> {
+    const volumeName = this.getVolumeName(projectId);
+    const volume = await this.getVolume(volumeName);
+
+    if (!volume) {
+      throw new InternalServerErrorException(`Volume ${volumeName} not found`);
+    }
+
+    try {
+      // Use a temporary container to calculate volume size
+      const container = await this.docker.createContainer({
+        Image: 'alpine:latest',
+        Cmd: ['du', '-sb', '/data'],
+        HostConfig: {
+          Binds: [`${volumeName}:/data:ro`],
+          AutoRemove: true,
+        },
+      });
+
+      await container.start();
+      const stream = await container.logs({
+        stdout: true,
+        stderr: true,
+        follow: true,
+      });
+
+      let output = '';
+      stream.on('data', (chunk) => {
+        output += chunk.toString();
+      });
+
+      await container.wait();
+
+      // Parse du output (format: "12345\t/data")
+      const match = output.match(/(\d+)/);
+      const sizeBytes = match ? parseInt(match[1], 10) : 0;
+
+      return sizeBytes;
+    } catch (error) {
+      this.logger.error(`Failed to get volume size for ${volumeName}:`, error);
+      return 0;
+    }
+  }
+
   private getVolumeName(projectId: string): string {
     return `agentdb9-project-${projectId}`;
   }

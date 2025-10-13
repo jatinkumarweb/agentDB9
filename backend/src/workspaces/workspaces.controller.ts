@@ -5,6 +5,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { WorkspacesService } from './workspaces.service';
 import { WorkspaceContainerService } from './workspace-container.service';
 import { ProjectWorkspaceService } from './project-workspace.service';
+import { DockerVolumeService } from './docker-volume.service';
+import { WorkspaceCleanupService } from './workspace-cleanup.service';
 import {
   CreateWorkspaceRequest,
   UpdateWorkspaceRequest,
@@ -21,6 +23,8 @@ export class WorkspacesController {
     private readonly workspacesService: WorkspacesService,
     private readonly containerService: WorkspaceContainerService,
     private readonly projectWorkspaceService: ProjectWorkspaceService,
+    private readonly volumeService: DockerVolumeService,
+    private readonly cleanupService: WorkspaceCleanupService,
   ) {}
 
   /**
@@ -206,6 +210,75 @@ export class WorkspacesController {
   }
 
   /**
+   * Get workspace container health
+   */
+  @Get(':id/health')
+  async getHealth(@Param('id') id: string) {
+    const health = await this.containerService.getContainerHealth(id);
+
+    return {
+      success: true,
+      data: health,
+    };
+  }
+
+  /**
+   * Get workspace container logs
+   */
+  @Get(':id/logs')
+  async getLogs(
+    @Param('id') id: string,
+    @Query('tail') tail?: string,
+    @Query('since') since?: string,
+    @Query('timestamps') timestamps?: string,
+    @Res() res?: Response,
+  ) {
+    const logStream = await this.containerService.getContainerLogs(id, {
+      tail: tail ? parseInt(tail, 10) : 100,
+      since: since ? parseInt(since, 10) : undefined,
+      timestamps: timestamps === 'true',
+      follow: false,
+    });
+
+    res.setHeader('Content-Type', 'text/plain');
+    logStream.pipe(res);
+  }
+
+  /**
+   * Stream workspace container logs
+   */
+  @Get(':id/logs/stream')
+  async streamLogs(
+    @Param('id') id: string,
+    @Query('timestamps') timestamps?: string,
+    @Res() res?: Response,
+  ) {
+    const logStream = await this.containerService.getContainerLogs(id, {
+      follow: true,
+      timestamps: timestamps === 'true',
+    });
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    
+    logStream.pipe(res);
+  }
+
+  /**
+   * Get workspace container stats
+   */
+  @Get(':id/stats')
+  async getStats(@Param('id') id: string) {
+    const stats = await this.containerService.getContainerStats(id);
+
+    return {
+      success: true,
+      data: stats,
+    };
+  }
+
+  /**
    * Switch workspace project
    */
   @Post(':id/switch-project')
@@ -275,6 +348,93 @@ export class WorkspacesController {
       success: true,
       data: project,
       message: 'Project assigned to workspace',
+    };
+  }
+
+  /**
+   * Backup project volume
+   */
+  @Post('projects/:projectId/backup')
+  async backupVolume(
+    @Param('projectId') projectId: string,
+    @Body() body: { backupPath?: string },
+  ) {
+    const backupPath = await this.volumeService.backupProjectVolume(
+      projectId,
+      body.backupPath,
+    );
+
+    return {
+      success: true,
+      data: { backupPath },
+      message: 'Volume backup created',
+    };
+  }
+
+  /**
+   * Restore project volume
+   */
+  @Post('projects/:projectId/restore')
+  async restoreVolume(
+    @Param('projectId') projectId: string,
+    @Body() body: { backupPath: string },
+  ) {
+    await this.volumeService.restoreProjectVolume(projectId, body.backupPath);
+
+    return {
+      success: true,
+      message: 'Volume restored successfully',
+    };
+  }
+
+  /**
+   * Clone project volume
+   */
+  @Post('projects/:projectId/clone')
+  async cloneVolume(
+    @Param('projectId') projectId: string,
+    @Body() body: { targetProjectId: string },
+  ) {
+    const volumeName = await this.volumeService.cloneProjectVolume(
+      projectId,
+      body.targetProjectId,
+    );
+
+    return {
+      success: true,
+      data: { volumeName },
+      message: 'Volume cloned successfully',
+    };
+  }
+
+  /**
+   * Get project volume size
+   */
+  @Get('projects/:projectId/volume-size')
+  async getVolumeSize(@Param('projectId') projectId: string) {
+    const sizeBytes = await this.volumeService.getVolumeSize(projectId);
+
+    return {
+      success: true,
+      data: {
+        sizeBytes,
+        sizeMB: Math.round(sizeBytes / 1024 / 1024 * 100) / 100,
+        sizeGB: Math.round(sizeBytes / 1024 / 1024 / 1024 * 100) / 100,
+      },
+    };
+  }
+
+  /**
+   * Trigger manual cleanup
+   */
+  @Post('cleanup')
+  async triggerCleanup() {
+    const results = await this.cleanupService.triggerManualCleanup();
+
+    return {
+      success: true,
+      data: results,
+      message: 'Cleanup completed',
     };
   }
 

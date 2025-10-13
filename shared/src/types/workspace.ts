@@ -22,6 +22,16 @@ export enum WorkspaceStatus {
 }
 
 /**
+ * Container resource limits
+ */
+export interface ContainerResourceLimits {
+  cpus?: number;              // CPU limit (e.g., 1.5 = 1.5 cores)
+  memory?: number;            // Memory limit in MB
+  memorySwap?: number;        // Memory + swap limit in MB
+  memoryReservation?: number; // Soft memory limit in MB
+}
+
+/**
  * Configuration for a workspace type
  */
 export interface WorkspaceTypeConfig {
@@ -34,6 +44,13 @@ export interface WorkspaceTypeConfig {
   mcpTools: string[];          // MCP tools available for this type
   supportedLanguages?: string[];
   features: string[];
+  resourceLimits?: ContainerResourceLimits; // Container resource constraints
+  healthCheck?: {
+    enabled: boolean;
+    interval?: number;        // Health check interval in seconds
+    timeout?: number;         // Health check timeout in seconds
+    retries?: number;         // Number of retries before unhealthy
+  };
 }
 
 /**
@@ -113,7 +130,18 @@ export const WORKSPACE_TYPE_CONFIGS: Record<WorkspaceType, WorkspaceTypeConfig> 
       'Git integration',
       'Terminal access',
       'Extensions'
-    ]
+    ],
+    resourceLimits: {
+      cpus: 2,
+      memory: 2048,
+      memoryReservation: 512,
+    },
+    healthCheck: {
+      enabled: true,
+      interval: 30,
+      timeout: 10,
+      retries: 3,
+    }
   },
   [WorkspaceType.SPREADSHEET]: {
     type: WorkspaceType.SPREADSHEET,
@@ -139,7 +167,18 @@ export const WORKSPACE_TYPE_CONFIGS: Record<WorkspaceType, WorkspaceTypeConfig> 
       'Statistical analysis',
       'Chart creation',
       'Data import/export'
-    ]
+    ],
+    resourceLimits: {
+      cpus: 1.5,
+      memory: 1536,
+      memoryReservation: 384,
+    },
+    healthCheck: {
+      enabled: true,
+      interval: 30,
+      timeout: 10,
+      retries: 3,
+    }
   },
   [WorkspaceType.NOTEBOOK]: {
     type: WorkspaceType.NOTEBOOK,
