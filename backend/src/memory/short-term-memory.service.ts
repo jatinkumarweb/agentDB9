@@ -168,15 +168,16 @@ export class ShortTermMemoryService {
   async getConsolidationCandidates(
     agentId: string,
     minImportance: number = 0.6,
-    maxAgeHours: number = 24,
+    minAgeHours: number = 0, // Minimum age before consolidation (0 = consolidate immediately)
   ): Promise<ShortTermMemory[]> {
-    const cutoffDate = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
+    const now = new Date();
+    const minAgeDate = new Date(now.getTime() - minAgeHours * 60 * 60 * 1000);
 
     return Array.from(this.memoryStore.values())
       .filter(m => m.agentId === agentId)
       .filter(m => m.importance >= minImportance)
-      .filter(m => m.createdAt <= cutoffDate)
-      .filter(m => new Date() <= m.expiresAt)
+      .filter(m => m.createdAt <= minAgeDate) // Memory is at least minAge old
+      .filter(m => now <= m.expiresAt) // Memory hasn't expired
       .sort((a, b) => b.importance - a.importance);
   }
 

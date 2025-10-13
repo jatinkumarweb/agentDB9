@@ -50,7 +50,7 @@ export default function MemorySettingsTab({ agentId, configuration = {}, onChang
           agentId,
           strategy: 'summarize',
           minImportance: 0.3, // Include most memories
-          maxAge: 0.1, // Allow very recent memories (6 minutes)
+          maxAge: 0, // Consolidate immediately (0 = no minimum age)
         }),
       });
 

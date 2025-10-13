@@ -138,7 +138,7 @@ export interface MemoryConsolidationRequest {
   agentId: string;
   sessionId?: string;
   minImportance?: number;
-  maxAge?: number; // in hours
+  maxAge?: number; // Minimum age in hours before consolidation (0 = consolidate immediately)
   strategy?: ConsolidationStrategy;
 }
 
