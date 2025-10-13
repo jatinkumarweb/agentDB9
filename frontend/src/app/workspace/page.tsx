@@ -7,12 +7,15 @@ import CollaborationPanel from '@/components/CollaborationPanel';
 import { AgentActivityProvider } from '@/contexts/AgentActivityContext';
 import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Code, Table, BookOpen, Database, Palette, Settings, BarChart3 } from 'lucide-react';
 import GradientColorPicker from '@/components/dev/GradientColorPicker';
 
 export default function WorkspacePage() {
   const [isCollaborationOpen, setIsCollaborationOpen] = useState(false);
   const [showGradientPicker, setShowGradientPicker] = useState(false);
+  const [selectedWorkspaceType, setSelectedWorkspaceType] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [showWorkspaceSelector, setShowWorkspaceSelector] = useState(true);
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
@@ -45,6 +48,14 @@ export default function WorkspacePage() {
     );
   }
 
+  const workspaceTypes = [
+    { id: 'vscode', name: 'VS Code', icon: Code, color: 'from-blue-500 to-cyan-500', available: true },
+    { id: 'spreadsheet', name: 'Spreadsheet', icon: Table, color: 'from-green-500 to-emerald-500', available: true },
+    { id: 'notebook', name: 'Notebook', icon: BookOpen, color: 'from-orange-500 to-amber-500', available: false },
+    { id: 'database', name: 'Database', icon: Database, color: 'from-purple-500 to-pink-500', available: false },
+    { id: 'design', name: 'Design', icon: Palette, color: 'from-rose-500 to-red-500', available: false },
+  ];
+
   return (
     <WorkspaceProvider>
       <AgentActivityProvider>
@@ -75,6 +86,83 @@ export default function WorkspacePage() {
               </span>
             </div>
           </div>
+
+          {/* Workspace Selector Overlay */}
+          {showWorkspaceSelector && (
+            <div className="absolute inset-0 z-40 flex items-center justify-center p-4">
+              <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-white/20 p-8 max-w-4xl w-full">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                      Select Workspace Type
+                    </h2>
+                    <p className="text-gray-600 mt-1">Choose your development environment</p>
+                  </div>
+                  <button
+                    onClick={() => router.push('/workspace/manage')}
+                    className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>Manage</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                  {workspaceTypes.map((type) => {
+                    const Icon = type.icon;
+                    return (
+                      <button
+                        key={type.id}
+                        onClick={() => {
+                          if (type.available) {
+                            setSelectedWorkspaceType(type.id);
+                            setShowWorkspaceSelector(false);
+                          }
+                        }}
+                        disabled={!type.available}
+                        className={`relative group p-6 rounded-xl border-2 transition-all duration-300 ${
+                          type.available
+                            ? 'border-gray-200 hover:border-indigo-300 hover:shadow-lg cursor-pointer bg-white'
+                            : 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60'
+                        }`}
+                      >
+                        <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${type.color} flex items-center justify-center mb-4 ${
+                          type.available ? 'group-hover:scale-110' : ''
+                        } transition-transform`}>
+                          <Icon className="w-6 h-6 text-white" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1">{type.name}</h3>
+                        <p className="text-sm text-gray-600">
+                          {type.available ? 'Ready to use' : 'Coming soon'}
+                        </p>
+                        {!type.available && (
+                          <div className="absolute top-3 right-3 px-2 py-1 bg-gray-200 rounded text-xs font-medium text-gray-600">
+                            Soon
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => router.push('/dashboard')}
+                    className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    ← Back to Dashboard
+                  </button>
+                  <button
+                    onClick={() => router.push('/workspace/manage')}
+                    className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    <span>View Analytics</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="relative z-10 h-full">
             <VSCodeContainer 
