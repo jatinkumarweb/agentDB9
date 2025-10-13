@@ -20,8 +20,7 @@ COPY shared/ /shared/
 
 # Build shared package
 WORKDIR /shared
-RUN npm install
-RUN npm install --save-dev @types/node || true
+RUN npm install --include=dev
 RUN npm run build
 
 # Switch back to app directory
@@ -52,6 +51,10 @@ COPY backend/.prettierrc ./
 # Build the NestJS application
 RUN npm run build
 
+# Copy entrypoint script
+COPY backend/docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Expose port
 EXPOSE 8000
 
@@ -59,5 +62,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -q --spider http://localhost:8000/health || exit 1
 
+# Use entrypoint to ensure dependencies are installed
+ENTRYPOINT ["docker-entrypoint.sh"]
+
 # Start the application
-CMD ["npm", "run", "start:prod"]
+CMD ["npm", "run", "start:dev"]
