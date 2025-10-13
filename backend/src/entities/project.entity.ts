@@ -63,6 +63,9 @@ export class Project implements ProjectInterface {
   @Column({ nullable: true, type: 'varchar', length: 500 })
   volumePath?: string;
 
+  @Column({ nullable: true, type: 'varchar', length: 255 })
+  volumeName?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

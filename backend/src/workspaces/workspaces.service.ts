@@ -5,6 +5,7 @@ import { WorkspaceEntity } from '../entities/workspace.entity';
 import {
   Workspace,
   WorkspaceType,
+  WorkspaceStatus,
   CreateWorkspaceRequest,
   UpdateWorkspaceRequest,
   getWorkspaceTypeConfig,
@@ -50,7 +51,7 @@ export class WorkspacesService {
       userId,
       type: request.type,
       config,
-      status: 'active',
+      status: WorkspaceStatus.ACTIVE,
       isDefault,
       currentProjectId: request.projectId,
     });

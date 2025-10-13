@@ -1,7 +1,10 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req, Res, All } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { WorkspacesService } from './workspaces.service';
+import { WorkspaceContainerService } from './workspace-container.service';
+import { ProjectWorkspaceService } from './project-workspace.service';
 import {
   CreateWorkspaceRequest,
   UpdateWorkspaceRequest,
@@ -9,11 +12,16 @@ import {
   getAvailableWorkspaceTypes,
   WORKSPACE_TYPE_CONFIGS,
 } from '@agentdb9/shared';
+import axios from 'axios';
 
 @Controller('api/workspaces')
 @UseGuards(JwtAuthGuard)
 export class WorkspacesController {
-  constructor(private readonly workspacesService: WorkspacesService) {}
+  constructor(
+    private readonly workspacesService: WorkspacesService,
+    private readonly containerService: WorkspaceContainerService,
+    private readonly projectWorkspaceService: ProjectWorkspaceService,
+  ) {}
 
   /**
    * Get available workspace types
@@ -140,5 +148,185 @@ export class WorkspacesController {
       success: true,
       message: 'Workspace deleted',
     };
+  }
+
+  /**
+   * Start workspace container
+   */
+  @Post(':id/start')
+  async start(@Param('id') id: string) {
+    const workspace = await this.containerService.startWorkspace(id);
+
+    return {
+      success: true,
+      data: workspace,
+      message: 'Workspace started',
+    };
+  }
+
+  /**
+   * Stop workspace container
+   */
+  @Post(':id/stop')
+  async stop(@Param('id') id: string) {
+    const workspace = await this.containerService.stopWorkspace(id);
+
+    return {
+      success: true,
+      data: workspace,
+      message: 'Workspace stopped',
+    };
+  }
+
+  /**
+   * Restart workspace container
+   */
+  @Post(':id/restart')
+  async restart(@Param('id') id: string) {
+    const workspace = await this.containerService.restartWorkspace(id);
+
+    return {
+      success: true,
+      data: workspace,
+      message: 'Workspace restarted',
+    };
+  }
+
+  /**
+   * Get workspace status
+   */
+  @Get(':id/status')
+  async getStatus(@Param('id') id: string) {
+    const status = await this.containerService.getWorkspaceStatus(id);
+
+    return {
+      success: true,
+      data: status,
+    };
+  }
+
+  /**
+   * Switch workspace project
+   */
+  @Post(':id/switch-project')
+  async switchProject(
+    @Param('id') id: string,
+    @Body() body: { projectId: string },
+  ) {
+    const workspace = await this.containerService.switchProjectVolume(
+      id,
+      body.projectId,
+    );
+
+    return {
+      success: true,
+      data: workspace,
+      message: 'Project switched successfully',
+    };
+  }
+
+  /**
+   * Get workspace projects
+   */
+  @Get(':id/projects')
+  async getProjects(@Param('id') id: string) {
+    const projects = await this.projectWorkspaceService.getProjectsByWorkspace(id);
+
+    return {
+      success: true,
+      data: projects,
+    };
+  }
+
+  /**
+   * Get compatible projects for workspace
+   */
+  @Get(':id/compatible-projects')
+  async getCompatibleProjects(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    const workspace = await this.workspacesService.findOne(id);
+    const projects = await this.projectWorkspaceService.getCompatibleProjects(
+      user.id,
+      workspace.type,
+    );
+
+    return {
+      success: true,
+      data: projects,
+    };
+  }
+
+  /**
+   * Assign project to workspace
+   */
+  @Post(':id/assign-project')
+  async assignProject(
+    @Param('id') id: string,
+    @Body() body: { projectId: string },
+  ) {
+    const project = await this.projectWorkspaceService.assignProjectToWorkspace(
+      body.projectId,
+      id,
+    );
+
+    return {
+      success: true,
+      data: project,
+      message: 'Project assigned to workspace',
+    };
+  }
+
+  /**
+   * Proxy requests to workspace container
+   */
+  @All(':id/proxy/*')
+  async proxyToWorkspace(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    try {
+      const workspace = await this.workspacesService.findOne(id);
+      const status = await this.containerService.getWorkspaceStatus(id);
+
+      if (!status.containerRunning) {
+        return res.status(503).json({
+          success: false,
+          error: 'Workspace container is not running',
+        });
+      }
+
+      const config = workspace.config as any;
+      const port = config.defaultPort || 8080;
+      const containerName = workspace.containerName;
+      
+      const path = req.url.replace(`/api/workspaces/${id}/proxy`, '');
+      const targetUrl = `http://${containerName}:${port}${path}`;
+
+      const proxyResponse = await axios({
+        method: req.method,
+        url: targetUrl,
+        data: req.body,
+        headers: {
+          ...req.headers,
+          host: `${containerName}:${port}`,
+        },
+        responseType: 'stream',
+        validateStatus: () => true,
+      });
+
+      res.status(proxyResponse.status);
+      Object.entries(proxyResponse.headers).forEach(([key, value]) => {
+        res.setHeader(key, value as string);
+      });
+      proxyResponse.data.pipe(res);
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        error: `Proxy error: ${error.message}`,
+      });
+    }
   }
 }

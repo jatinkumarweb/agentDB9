@@ -12,7 +12,14 @@ export enum WorkspaceType {
 /**
  * Workspace status
  */
-export type WorkspaceStatus = 'active' | 'inactive' | 'archived';
+export enum WorkspaceStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  ARCHIVED = 'archived',
+  RUNNING = 'running',
+  STOPPED = 'stopped',
+  ERROR = 'error',
+}
 
 /**
  * Configuration for a workspace type

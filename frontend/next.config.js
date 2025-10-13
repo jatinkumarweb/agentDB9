@@ -15,7 +15,23 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: false,
   },
-  // Removed rewrites to use proper API routes instead
+  // Proxy workspace ports through Next.js
+  async rewrites() {
+    return [
+      {
+        source: '/workspace-proxy/:workspaceId/:path*',
+        destination: 'http://localhost:8000/api/workspaces/:workspaceId/proxy/:path*',
+      },
+      {
+        source: '/vscode/:path*',
+        destination: 'http://localhost:8080/:path*',
+      },
+      {
+        source: '/spreadsheet/:path*',
+        destination: 'http://localhost:8081/:path*',
+      },
+    ];
+  },
 }
 
 module.exports = nextConfig
