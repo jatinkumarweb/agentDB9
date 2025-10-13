@@ -164,7 +164,7 @@ services:
       - ./llm-service:/app
       - ./shared:/shared
       - ./models:/models
-      - /app/node_modules
+      - llm_service_node_modules:/app/node_modules
       # Mount root node_modules as read-only for hoisted package resolution
       - ./node_modules:/workspace/node_modules:ro
     depends_on:
@@ -398,6 +398,7 @@ services:
 
 volumes:
   backend_node_modules:
+  llm_service_node_modules:
   vscode-extensions:
   vscode-data:
 

@@ -10,7 +10,7 @@ COPY shared/ /shared/
 
 # Build shared package
 WORKDIR /shared
-RUN npm install && npm run build
+RUN npm install --include=dev && npm run build
 
 # Switch back to app directory
 WORKDIR /app
@@ -31,14 +31,21 @@ RUN mkdir -p node_modules/@agentdb9 && ln -sf /shared node_modules/@agentdb9/sha
 # Build the application
 RUN npm run build
 
-# Remove dev dependencies to reduce image size
-RUN npm prune --production
+# Don't prune dev dependencies in development mode
+# RUN npm prune --production
 
 # Create models directory
 RUN mkdir -p /models
 
+# Copy entrypoint script
+COPY llm-service/docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Expose port
 EXPOSE 9000
+
+# Use entrypoint to ensure dependencies are installed
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 # Start the application
 CMD ["npm", "run", "dev"]
