@@ -68,7 +68,6 @@ export default function ModelSelector({
               m && m.provider === p && (
                 m.status === 'available' || 
                 (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
-                (m.status === 'unavailable' && !m.requiresApiKey) ||
                 (m.requiresApiKey && m.apiKeyConfigured) // API-based models with configured keys
               )
             )
@@ -92,7 +91,6 @@ export default function ModelSelector({
             m && (
               m.status === 'available' || 
               (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
-              (m.status === 'unavailable' && !m.requiresApiKey) ||
               (m.requiresApiKey && m.apiKeyConfigured) // API-based models with configured keys
             )
           );
@@ -110,11 +108,6 @@ export default function ModelSelector({
     if (model.status === 'available') return '✅';
     if (model.status === 'disabled') return '⚠️';
     if (model.status === 'error') return '❌';
-    if (model.status === 'unavailable') {
-      // Ollama models that aren't downloaded yet but can be used
-      if (!model.requiresApiKey) return '📥'; // Download icon
-      return '⚠️';
-    }
     if (model.status === 'unknown') {
       // Show as available if no API key required or API key is configured
       if (!model.requiresApiKey || model.apiKeyConfigured) return '✅';
@@ -157,7 +150,6 @@ export default function ModelSelector({
       const firstAvailable = providerModels.find(m => 
         m.status === 'available' || 
         (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
-        (m.status === 'unavailable' && !m.requiresApiKey) ||
         (m.requiresApiKey && m.apiKeyConfigured) // API-based models with configured keys
       );
       if (firstAvailable) {
@@ -215,9 +207,7 @@ export default function ModelSelector({
   );
   
   // Unavailable but selectable: Ollama models that can be downloaded
-  const unavailableSelectableModels = (filteredModels || []).filter(m =>
-    m && m.status === 'unavailable' && !m.requiresApiKey
-  );
+  const unavailableSelectableModels: ModelOption[] = [];
   
   // Disabled models: Cannot be used without configuration
   const disabledModels = (filteredModels || []).filter(m => 
@@ -251,9 +241,7 @@ export default function ModelSelector({
                   (m.requiresApiKey && m.apiKeyConfigured) // API-based models with configured keys are ready
                 )
               ).length;
-              const downloadableCount = providerModels.filter(m =>
-                m && m.status === 'unavailable' && !m.requiresApiKey
-              ).length;
+              const downloadableCount = 0;
               const totalCount = providerModels.length;
               
               return (

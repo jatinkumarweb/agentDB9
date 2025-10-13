@@ -11,7 +11,8 @@ import {
   Activity,
   Code,
   Database,
-  Zap
+  Zap,
+  Container
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useAuthRedirect, authRedirectConfigs } from '@/hooks/useAuthRedirect';
@@ -123,6 +124,24 @@ function DashboardContent() {
                   <div className="ml-4">
                     <h3 className="text-lg font-medium text-gray-900">Start Chat</h3>
                     <p className="text-sm text-gray-500">Chat with your agents</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            {/* Workspace Management */}
+            <Link
+              href="/workspace/manage"
+              className="bg-white/80 backdrop-blur-xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.08)] rounded-2xl hover:shadow-[0_12px_48px_rgba(0,0,0,0.12)] transition-all duration-300 border border-white/20 hover:scale-[1.02] group"
+            >
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <Container className="h-8 w-8 text-cyan-600 group-hover:scale-110 transition-transform" />
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-lg font-medium text-gray-900">Workspaces</h3>
+                    <p className="text-sm text-gray-500">Manage dev environments</p>
                   </div>
                 </div>
               </div>
@@ -240,10 +259,7 @@ function DashboardContent() {
       </main>
 
       {/* Gradient Color Picker */}
-      <GradientColorPicker 
-        isVisible={showGradientPicker}
-        onToggle={() => setShowGradientPicker(!showGradientPicker)}
-      />
+      {showGradientPicker && <GradientColorPicker />}
 
       {/* Animation Keyframes */}
       <style jsx global>{`

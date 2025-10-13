@@ -64,7 +64,7 @@ export default function MemorySettingsTab({ agentId, configuration = {}, onChang
         if (processed > 0) {
           toast.success(`Consolidated ${processed} memories into ${created} long-term entries`);
         } else {
-          toast.info('No memories ready for consolidation');
+          toast('No memories ready for consolidation');
         }
       } else {
         toast.error(data.error || 'Failed to consolidate memories');

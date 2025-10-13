@@ -407,10 +407,7 @@ function SettingsContent() {
       </div>
 
       {/* Gradient Color Picker */}
-      <GradientColorPicker 
-        isVisible={showGradientPicker}
-        onToggle={() => setShowGradientPicker(!showGradientPicker)}
-      />
+      {showGradientPicker && <GradientColorPicker />}
 
       {/* Animation Keyframes */}
       <style jsx global>{`
