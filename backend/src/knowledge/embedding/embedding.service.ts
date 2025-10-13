@@ -280,14 +280,14 @@ class OllamaEmbeddingProvider implements EmbeddingProvider {
 
   async generateSingle(text: string): Promise<number[]> {
     try {
-      const response = await fetch(`${this.apiUrl}/api/embeddings`, {
+      const response = await fetch(`${this.apiUrl}/api/embed`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           model: this.model,
-          prompt: text,
+          input: text,
         }),
       });
 
@@ -296,7 +296,7 @@ class OllamaEmbeddingProvider implements EmbeddingProvider {
       }
 
       const data = await response.json();
-      return data.embedding;
+      return data.embeddings[0];
     } catch (error) {
       this.logger.error('Failed to generate Ollama embeddings:', error);
       throw error;
