@@ -7,8 +7,9 @@ import CollaborationPanel from '@/components/CollaborationPanel';
 import { AgentActivityProvider } from '@/contexts/AgentActivityContext';
 import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2, Code, Table, BookOpen, Database, Palette, Settings, BarChart3, FolderOpen, MessageSquare, X } from 'lucide-react';
+import { Loader2, Code, Table, BookOpen, Database, Palette, Settings, BarChart3, FolderOpen, MessageSquare, X, Plus, FolderPlus } from 'lucide-react';
 import GradientColorPicker from '@/components/dev/GradientColorPicker';
+import { cn } from '@/utils/cn';
 
 interface WorkspaceState {
   id: string | null;
@@ -26,8 +27,13 @@ export default function WorkspacePage() {
   });
   const [showWorkspaceSelector, setShowWorkspaceSelector] = useState(true);
   const [showProjectSelector, setShowProjectSelector] = useState(false);
+  const [showCreateProject, setShowCreateProject] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
@@ -102,6 +108,41 @@ export default function WorkspacePage() {
       projectId,
     }));
     setShowProjectSelector(false);
+  };
+
+  // Handle create project
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) return;
+    
+    setCreatingProject(true);
+    try {
+      const token = localStorage.getItem('auth-token');
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newProjectName,
+          description: newProjectDescription,
+          language: 'typescript', // Default
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        await fetchProjects();
+        setShowCreateProject(false);
+        setNewProjectName('');
+        setNewProjectDescription('');
+        handleProjectSelect(data.data.id);
+      }
+    } catch (error) {
+      console.error('Failed to create project:', error);
+    } finally {
+      setCreatingProject(false);
+    }
   };
 
   // Handle workspace switch
@@ -224,6 +265,73 @@ export default function WorkspacePage() {
             </>
           )}
 
+          {/* Create Project Modal */}
+          {showCreateProject && (
+            <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
+              <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-white/20 p-8 max-w-md w-full">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                    Create Project
+                  </h2>
+                  <button
+                    onClick={() => setShowCreateProject(false)}
+                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Project Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      placeholder="My Awesome Project"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      value={newProjectDescription}
+                      onChange={(e) => setNewProjectDescription(e.target.value)}
+                      placeholder="What's this project about?"
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="flex space-x-3 pt-4">
+                    <button
+                      onClick={() => setShowCreateProject(false)}
+                      className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCreateProject}
+                      disabled={!newProjectName.trim() || creatingProject}
+                      className="flex-1 px-4 py-2 text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {creatingProject ? (
+                        <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                      ) : (
+                        'Create Project'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Project Selector Modal */}
           {showProjectSelector && (
             <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
@@ -235,12 +343,21 @@ export default function WorkspacePage() {
                     </h2>
                     <p className="text-gray-600 mt-1">Choose a project to work on</p>
                   </div>
-                  <button
-                    onClick={() => setShowProjectSelector(false)}
-                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setShowCreateProject(true)}
+                      className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>New Project</span>
+                    </button>
+                    <button
+                      onClick={() => setShowProjectSelector(false)}
+                      className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
 
                 {loadingProjects ? (
@@ -400,12 +517,19 @@ export default function WorkspacePage() {
           {!showWorkspaceSelector && workspaceState.type && (
             <div className="relative z-10 h-full">
               {workspaceState.type === 'vscode' && (
-                <VSCodeContainer 
-                  key={`workspace-${workspaceState.id || 'new'}`}
-                  className={`h-full transition-all duration-300 ${isCollaborationOpen ? 'mr-80' : ''}`}
-                  showHeader={true}
-                  allowPopout={true}
-                />
+                <div className={cn(
+                  "h-full transition-all duration-300 rounded-2xl overflow-hidden",
+                  "bg-white/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white/20",
+                  "m-4",
+                  isCollaborationOpen ? 'mr-[400px]' : 'mr-4'
+                )}>
+                  <VSCodeContainer 
+                    key={`workspace-${workspaceState.id || 'new'}`}
+                    className="h-full"
+                    showHeader={true}
+                    allowPopout={true}
+                  />
+                </div>
               )}
               
               {workspaceState.type === 'spreadsheet' && (
@@ -418,10 +542,17 @@ export default function WorkspacePage() {
                 </div>
               )}
               
-              <CollaborationPanel
-                isOpen={isCollaborationOpen}
-                onToggle={() => setIsCollaborationOpen(!isCollaborationOpen)}
-              />
+              <div className={cn(
+                "fixed right-0 top-0 h-full transition-all duration-300 z-30",
+                isCollaborationOpen ? "w-96" : "w-0"
+              )}>
+                <div className="h-full bg-white/90 backdrop-blur-xl border-l border-white/20 shadow-[-8px_0_32px_rgba(0,0,0,0.08)]">
+                  <CollaborationPanel
+                    isOpen={isCollaborationOpen}
+                    onToggle={() => setIsCollaborationOpen(!isCollaborationOpen)}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
