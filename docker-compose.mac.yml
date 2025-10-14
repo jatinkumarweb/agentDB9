@@ -1,0 +1,15 @@
+# Docker Compose override for macOS
+# Workaround for Docker Desktop "mount options is too long" issue
+# Use this file on Mac: docker-compose -f docker-compose.yml -f docker-compose.mac.yml up
+
+version: '3.8'
+
+services:
+  vscode:
+    # Use base image directly without building
+    # This avoids the "mount options is too long" error on Mac
+    image: codercom/code-server:latest
+    build: null  # Disable build
+    # Override working directory via command instead of Dockerfile
+    working_dir: /home/coder/workspace
+    user: coder

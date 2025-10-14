@@ -5,11 +5,31 @@
 set -e
 
 echo "=========================================="
-echo "Building VSCode container for Mac (ARM64)"
+echo "VSCode Setup for Mac"
 echo "=========================================="
 echo ""
-echo "Detecting Docker Desktop version..."
-docker version --format '{{.Server.Version}}'
+echo "Due to Docker Desktop for Mac limitations, we'll use the base image directly."
+echo "This avoids the 'mount options is too long' error."
+echo ""
+echo "Pulling base image..."
+docker pull codercom/code-server:latest
+
+if [ $? -eq 0 ]; then
+    docker tag codercom/code-server:latest agentdb9-vscode:latest
+    echo ""
+    echo "✅ SUCCESS: VSCode image ready"
+    echo ""
+    echo "Note: Using base code-server image (Node.js may be v18 instead of v22)"
+    echo "You can install Node.js 22 inside the container if needed."
+    echo ""
+    echo "Next steps:"
+    echo "  npm run dev"
+    echo ""
+    exit 0
+fi
+
+echo ""
+echo "Failed to pull base image. Trying alternative approaches..."
 echo ""
 
 # Function to try building with a specific Dockerfile

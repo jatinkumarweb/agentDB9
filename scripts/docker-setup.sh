@@ -31,6 +31,13 @@ COMPOSE_FILES="-f docker-compose.yml"
 if [[ "$ARCH" == "arm64" ]] || [[ "$ARCH" == "aarch64" ]]; then
     echo "🍎 Apple Silicon (ARM64) detected - using ARM64 configuration"
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.arm64.yml"
+    
+    # Check if running on macOS (Darwin)
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "🍎 macOS detected - adding Mac-specific overrides"
+        echo "   (Workaround for Docker Desktop 'mount options is too long' issue)"
+        COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.mac.yml"
+    fi
 elif [[ "$ARCH" == "x86_64" ]]; then
     echo "🖥️  x86_64 architecture detected"
     
@@ -62,9 +69,24 @@ if [[ $# -gt 0 ]]; then
     # Check if --build flag is present and VSCode image doesn't exist
     if [[ "$*" == *"--build"* ]] && ! docker images agentdb9-vscode:latest | grep -q agentdb9-vscode; then
         echo "⚠️  Build requested but VSCode image not found."
-        echo "   Building VSCode with legacy builder to avoid BuildKit bug..."
-        ./scripts/build-vscode.sh
+        
+        # On Mac, just pull the base image
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            echo "   macOS detected - pulling base image (workaround for Docker Desktop issue)"
+            docker pull codercom/code-server:latest
+            docker tag codercom/code-server:latest agentdb9-vscode:latest
+        else
+            echo "   Building VSCode with legacy builder to avoid BuildKit bug..."
+            ./scripts/build-vscode.sh
+        fi
         echo ""
+    fi
+    
+    # On Mac, remove --build flag to avoid build attempts
+    if [[ "$OSTYPE" == "darwin"* ]] && [[ "$*" == *"--build"* ]]; then
+        echo "ℹ️  Removing --build flag on macOS (using pre-built images)"
+        # Remove --build from arguments
+        set -- "${@/--build/}"
     fi
     
     run_compose "$@"
