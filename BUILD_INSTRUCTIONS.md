@@ -1,6 +1,6 @@
 # Build Instructions
 
-## ⚠️ Important: BuildKit Bug Workaround
+## ⚠️ Important: Build Errors
 
 If you encounter this error when running `npm run dev` or `docker-compose build`:
 
@@ -9,7 +9,9 @@ ERROR [vscode 3/3] WORKDIR /home/coder/workspace
 failed to solve: mount options is too long
 ```
 
-This is a **known bug in BuildKit v0.24.0**. Follow the workaround below.
+**On Linux/Gitpod**: This is a BuildKit v0.24.0 bug. Follow the workaround below.
+
+**On macOS**: This is a Docker Desktop limitation. See [docs/MAC_SETUP.md](docs/MAC_SETUP.md) for Mac-specific solutions.
 
 ## Quick Fix (Recommended)
 

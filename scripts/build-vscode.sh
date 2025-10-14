@@ -5,6 +5,12 @@
 
 set -e
 
+# Detect if running on Mac
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "🍎 macOS detected - using Mac-specific build script"
+    exec ./scripts/build-vscode-mac.sh
+fi
+
 echo "=========================================="
 echo "Building VSCode container with legacy builder"
 echo "=========================================="
