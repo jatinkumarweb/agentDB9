@@ -1,21 +1,58 @@
 /**
- * Backend API client with DNS cache prevention
+ * Backend API client with retry logic and error handling
  * 
  * Provides a centralized way to make requests to the backend API
- * with proper DNS resolution and error handling.
+ * with automatic retries, exponential backoff, and proper error handling.
  */
 
 import { fetchNoCache } from './fetch-no-cache';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
+const MAX_RETRY_DELAY = 10000; // 10 seconds
+const RETRY_BACKOFF_MULTIPLIER = 2;
+
 export interface BackendRequestOptions extends Omit<RequestInit, 'body'> {
   body?: any;
   token?: string;
+  retries?: number;
+  retryDelay?: number;
 }
 
 /**
- * Make a request to the backend API
+ * Sleep for specified milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Check if error is retryable (network errors, 5xx errors, connection refused)
+ */
+function isRetryableError(error: any, response?: Response): boolean {
+  // Network errors (connection refused, timeout, etc.)
+  if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+    return true;
+  }
+  
+  // Fetch failed errors
+  if (error.message?.includes('fetch failed') || error.message?.includes('ECONNREFUSED')) {
+    return true;
+  }
+  
+  // 5xx server errors (but not 501 Not Implemented)
+  if (response && response.status >= 500 && response.status !== 501) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Make a request to the backend API with retry logic
  * 
  * @param path - API path (e.g., '/api/auth/login')
  * @param options - Request options
@@ -25,7 +62,14 @@ export async function backendFetch(
   path: string,
   options: BackendRequestOptions = {}
 ): Promise<Response> {
-  const { body, token, headers = {}, ...fetchOptions } = options;
+  const { 
+    body, 
+    token, 
+    headers = {}, 
+    retries = MAX_RETRIES,
+    retryDelay = INITIAL_RETRY_DELAY,
+    ...fetchOptions 
+  } = options;
 
   const requestHeaders: HeadersInit = {
     'Content-Type': 'application/json',
@@ -37,25 +81,54 @@ export async function backendFetch(
   }
 
   const requestBody = body ? JSON.stringify(body) : undefined;
-
   const url = `${BACKEND_URL}${path}`;
   
-  console.log(`Backend API: ${options.method || 'GET'} ${url}`);
+  let lastError: any;
+  let currentDelay = retryDelay;
 
-  try {
-    const response = await fetchNoCache(url, {
-      ...fetchOptions,
-      headers: requestHeaders,
-      body: requestBody,
-    });
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      if (attempt > 0) {
+        console.log(`Backend API: Retry attempt ${attempt}/${retries} for ${url} after ${currentDelay}ms`);
+        await sleep(currentDelay);
+        currentDelay = Math.min(currentDelay * RETRY_BACKOFF_MULTIPLIER, MAX_RETRY_DELAY);
+      } else {
+        console.log(`Backend API: ${options.method || 'GET'} ${url}`);
+      }
 
-    console.log(`Backend API: Response ${response.status} ${response.statusText}`);
-    
-    return response;
-  } catch (error) {
-    console.error(`Backend API: Request failed for ${url}:`, error);
-    throw error;
+      const response = await fetchNoCache(url, {
+        ...fetchOptions,
+        headers: requestHeaders,
+        body: requestBody,
+      });
+
+      console.log(`Backend API: Response ${response.status} ${response.statusText}`);
+      
+      // Check if we should retry on this response
+      if (isRetryableError(null, response) && attempt < retries) {
+        lastError = new Error(`Server error: ${response.status} ${response.statusText}`);
+        continue;
+      }
+      
+      return response;
+    } catch (error: any) {
+      lastError = error;
+      
+      // Check if we should retry
+      if (isRetryableError(error) && attempt < retries) {
+        console.warn(`Backend API: Request failed (attempt ${attempt + 1}/${retries + 1}):`, error.message);
+        continue;
+      }
+      
+      // No more retries or non-retryable error
+      console.error(`Backend API: Request failed for ${url} after ${attempt + 1} attempts:`, error);
+      throw error;
+    }
   }
+
+  // All retries exhausted
+  console.error(`Backend API: All ${retries + 1} attempts failed for ${url}`);
+  throw lastError;
 }
 
 /**

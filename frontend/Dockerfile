@@ -8,11 +8,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=development
 ENV FORCE_COLOR=1
 
-# Install system dependencies
+# Install system dependencies including curl for healthchecks
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy shared package first
@@ -44,8 +45,12 @@ RUN mkdir -p node_modules/@agentdb9 && \
 COPY frontend/src ./src
 COPY frontend/next.config.js frontend/tsconfig.json frontend/tailwind.config.js frontend/postcss.config.js frontend/next-env.d.ts ./
 
+# Copy wait script
+COPY frontend/wait-for-backend.sh /usr/local/bin/wait-for-backend.sh
+RUN chmod +x /usr/local/bin/wait-for-backend.sh
+
 # Expose port
 EXPOSE 3000
 
-# Start development server
-CMD ["npm", "run", "dev"]
+# Start development server with wait script
+CMD ["/usr/local/bin/wait-for-backend.sh", "npm", "run", "dev"]
