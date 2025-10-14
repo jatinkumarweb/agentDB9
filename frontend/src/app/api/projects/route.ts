@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// Use BACKEND_URL for server-side API calls (works in Docker with service names)
-// NEXT_PUBLIC_API_URL is for client-side calls
-const API_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { backendGet } from '@/lib/backend-client';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,12 +12,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const response = await fetch(`${API_URL}/api/projects`, {
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-      },
-    });
+    const token = authHeader.replace('Bearer ', '');
+    const response = await backendGet('/api/projects', token);
 
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
@@ -44,16 +37,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const token = authHeader.replace('Bearer ', '');
     const body = await request.json();
-
-    const response = await fetch(`${API_URL}/api/projects`, {
-      method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
+    const response = await backendPost('/api/projects', body, token);
 
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
