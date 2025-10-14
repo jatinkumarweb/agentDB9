@@ -270,9 +270,12 @@ services:
         max-file: "2"
 
   vscode:
+    # Note: BuildKit v0.24.0 has a bug causing "mount options is too long" error
+    # Use scripts/build-vscode.sh to build with legacy builder if needed
     build:
       context: ./vscode
       dockerfile: Dockerfile
+    image: agentdb9-vscode:latest
     platform: linux/amd64
     restart: unless-stopped
     # Make IPC namespace shareable for mcp-server
