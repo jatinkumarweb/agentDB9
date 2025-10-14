@@ -70,7 +70,14 @@ export default function WorkspacePage() {
   const fetchProjects = async () => {
     setLoadingProjects(true);
     try {
-      const token = localStorage.getItem('auth-token');
+      // Get token from auth-storage (zustand persist)
+      const authState = localStorage.getItem('auth-storage');
+      let token = null;
+      if (authState) {
+        const parsed = JSON.parse(authState);
+        token = parsed.state?.token || null;
+      }
+      
       const response = await fetch('/api/projects', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -116,7 +123,14 @@ export default function WorkspacePage() {
     
     setCreatingProject(true);
     try {
-      const token = localStorage.getItem('auth-token');
+      // Get token from auth-storage (zustand persist)
+      const authState = localStorage.getItem('auth-storage');
+      let token = null;
+      if (authState) {
+        const parsed = JSON.parse(authState);
+        token = parsed.state?.token || null;
+      }
+      
       const response = await fetch('/api/projects', {
         method: 'POST',
         headers: {
