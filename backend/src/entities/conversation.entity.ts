@@ -22,6 +22,9 @@ export class Conversation implements Omit<AgentConversation, 'messages'> {
   @Column({ nullable: true })
   projectId?: string;
 
+  @Column({ nullable: true })
+  workspaceId?: string;
+
   @Column()
   title: string;
 

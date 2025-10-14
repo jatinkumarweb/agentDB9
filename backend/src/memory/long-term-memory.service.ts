@@ -32,6 +32,8 @@ export class LongTermMemoryService {
     metadata: any,
     importance: number = 0.7,
     consolidatedFrom?: string[],
+    projectId?: string,
+    workspaceId?: string,
   ): Promise<LongTermMemory> {
     try {
       const entity = this.ltmRepository.create({
@@ -44,6 +46,8 @@ export class LongTermMemoryService {
         importance,
         accessCount: 0,
         consolidatedFrom,
+        projectId,
+        workspaceId,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -238,14 +242,32 @@ export class LongTermMemoryService {
   /**
    * Search memories by text
    */
-  async search(agentId: string, searchText: string, limit: number = 10): Promise<LongTermMemory[]> {
-    const entities = await this.ltmRepository
+  async search(
+    agentId: string, 
+    searchText: string, 
+    limit: number = 10,
+    projectId?: string,
+    workspaceId?: string,
+  ): Promise<LongTermMemory[]> {
+    const query = this.ltmRepository
       .createQueryBuilder('ltm')
       .where('ltm.agentId = :agentId', { agentId })
       .andWhere(
         '(ltm.summary ILIKE :search OR ltm.details ILIKE :search)',
         { search: `%${searchText}%` },
-      )
+      );
+
+    // Filter by project if provided
+    if (projectId) {
+      query.andWhere('(ltm.projectId = :projectId OR ltm.projectId IS NULL)', { projectId });
+    }
+
+    // Filter by workspace if provided
+    if (workspaceId) {
+      query.andWhere('(ltm.workspaceId = :workspaceId OR ltm.workspaceId IS NULL)', { workspaceId });
+    }
+
+    const entities = await query
       .orderBy('ltm.importance', 'DESC')
       .limit(limit)
       .getMany();
@@ -260,6 +282,8 @@ export class LongTermMemoryService {
     return {
       id: entity.id,
       agentId: entity.agentId,
+      projectId: entity.projectId,
+      workspaceId: entity.workspaceId,
       category: entity.category,
       summary: entity.summary,
       details: entity.details,

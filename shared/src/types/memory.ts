@@ -48,6 +48,8 @@ export interface ShortTermMemory {
 export interface LongTermMemory {
   id: string;
   agentId: string;
+  projectId?: string;
+  workspaceId?: string;
   category: MemoryCategory;
   summary: string;
   details: string;

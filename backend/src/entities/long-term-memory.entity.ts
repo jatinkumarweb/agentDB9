@@ -10,6 +10,14 @@ export class LongTermMemoryEntity {
   @Index()
   agentId: string;
 
+  @Column({ nullable: true })
+  @Index()
+  projectId?: string;
+
+  @Column({ nullable: true })
+  @Index()
+  workspaceId?: string;
+
   @Column({
     type: 'varchar',
     length: 50,
