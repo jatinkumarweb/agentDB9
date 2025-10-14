@@ -34,12 +34,12 @@ function sleep(ms: number): Promise<void> {
  */
 function isRetryableError(error: any, response?: Response): boolean {
   // Network errors (connection refused, timeout, etc.)
-  if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+  if (error && (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND')) {
     return true;
   }
   
   // Fetch failed errors
-  if (error.message?.includes('fetch failed') || error.message?.includes('ECONNREFUSED')) {
+  if (error && (error.message?.includes('fetch failed') || error.message?.includes('ECONNREFUSED'))) {
     return true;
   }
   
