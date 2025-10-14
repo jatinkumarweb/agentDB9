@@ -169,6 +169,26 @@ export class WorkspacesController {
   }
 
   /**
+   * Switch workspace project
+   */
+  @Post(':id/switch-project')
+  async switchProject(
+    @Param('id') id: string,
+    @Body() body: { projectId: string },
+  ) {
+    const workspace = await this.projectWorkspaceService.switchWorkspaceProject(
+      id,
+      body.projectId,
+    );
+
+    return {
+      success: true,
+      data: workspace,
+      message: 'Project switched successfully',
+    };
+  }
+
+  /**
    * Stop workspace container
    */
   @Post(':id/stop')

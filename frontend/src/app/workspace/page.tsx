@@ -29,6 +29,7 @@ export default function WorkspacePage() {
   const [showProjectSelector, setShowProjectSelector] = useState(false);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
@@ -113,12 +114,49 @@ export default function WorkspacePage() {
   };
 
   // Handle project selection
-  const handleProjectSelect = (projectId: string | null) => {
+  const handleProjectSelect = async (projectId: string | null) => {
+    const project = projectId ? projects.find(p => p.id === projectId) : null;
+    setSelectedProject(project);
     setWorkspaceState(prev => ({
       ...prev,
       projectId,
     }));
     setShowProjectSelector(false);
+    
+    // Reload VSCode container with new project volume
+    if (projectId && workspaceState.id) {
+      try {
+        console.log('Switching workspace project to:', project?.name);
+        
+        // Get token from auth-storage
+        const authState = localStorage.getItem('auth-storage');
+        let token = null;
+        if (authState) {
+          const parsed = JSON.parse(authState);
+          token = parsed.state?.token || null;
+        }
+        
+        // Call backend API to switch project
+        const response = await fetch(`/api/workspaces/${workspaceState.id}/switch-project`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ projectId }),
+        });
+        
+        if (response.ok) {
+          console.log('Project switched successfully, reloading workspace...');
+          // Reload the page to refresh the VSCode iframe with new volume
+          window.location.reload();
+        } else {
+          console.error('Failed to switch project:', response.status);
+        }
+      } catch (error) {
+        console.error('Error switching project:', error);
+      }
+    }
   };
 
   // Handle create project
@@ -247,9 +285,13 @@ export default function WorkspacePage() {
                   <div className="h-4 w-px bg-gray-300"></div>
                   <button
                     onClick={handleWorkspaceSwitch}
-                    className="text-xs text-gray-600 hover:text-indigo-600 transition-colors"
+                    className="flex items-center space-x-1 text-xs text-gray-600 hover:text-indigo-600 transition-colors"
                   >
-                    Switch Workspace
+                    <span className="font-medium">
+                      {workspaceTypes.find(w => w.id === workspaceState.type)?.name || 'Workspace'}
+                    </span>
+                    <span className="text-gray-400">•</span>
+                    <span>Switch</span>
                   </button>
                   <div className="h-4 w-px bg-gray-300"></div>
                   <button
@@ -257,7 +299,11 @@ export default function WorkspacePage() {
                     className="flex items-center space-x-1 text-xs text-gray-600 hover:text-indigo-600 transition-colors"
                   >
                     <FolderOpen className="w-3 h-3" />
-                    <span>Project</span>
+                    <span className="font-medium">
+                      {selectedProject ? selectedProject.name : 'No Project'}
+                    </span>
+                    <span className="text-gray-400">•</span>
+                    <span>Change</span>
                   </button>
                 </div>
               </div>
