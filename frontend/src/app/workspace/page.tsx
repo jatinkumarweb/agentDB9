@@ -87,6 +87,10 @@ export default function WorkspacePage() {
       if (response.ok) {
         const data = await response.json();
         setProjects(data.data || []);
+      } else {
+        console.error(`Failed to fetch projects: ${response.status} ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error details:', errorData);
       }
     } catch (error) {
       console.error('Failed to fetch projects:', error);
@@ -151,9 +155,15 @@ export default function WorkspacePage() {
         setNewProjectName('');
         setNewProjectDescription('');
         handleProjectSelect(data.data.id);
+      } else {
+        console.error(`Failed to create project: ${response.status} ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error details:', errorData);
+        alert(`Failed to create project: ${errorData.message || response.statusText}`);
       }
     } catch (error) {
       console.error('Failed to create project:', error);
+      alert('Failed to create project. Please try again.');
     } finally {
       setCreatingProject(false);
     }
