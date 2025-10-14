@@ -654,10 +654,12 @@ export default function WorkspacePage() {
                   isCollaborationOpen ? 'mr-[400px]' : 'mr-4'
                 )}>
                   <VSCodeContainer 
-                    key={`workspace-${workspaceState.id || 'new'}`}
+                    key={`workspace-${workspaceState.id || 'new'}-${workspaceState.projectId || 'no-project'}`}
                     className="h-full"
                     showHeader={true}
                     allowPopout={true}
+                    workspaceId={workspaceState.id}
+                    projectId={workspaceState.projectId}
                   />
                 </div>
               )}

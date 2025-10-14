@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 export async function seedDemoData(dataSource: DataSource): Promise<void> {
   const userRepository = dataSource.getRepository('User');
   const agentRepository = dataSource.getRepository('Agent');
+  const projectRepository = dataSource.getRepository('Project');
   
   // Create demo user
   let demoUser = await userRepository.findOne({
@@ -130,5 +131,57 @@ export async function seedDemoData(dataSource: DataSource): Promise<void> {
     console.log('✅ Demo agents created');
   } else {
     console.log('ℹ️  Demo agents already exist');
+  }
+
+  // Create demo projects
+  const existingProject = await projectRepository.findOne({
+    where: { name: 'E-Commerce Platform' }
+  });
+
+  if (!existingProject) {
+    await projectRepository.save([
+      {
+        name: 'E-Commerce Platform',
+        description: 'Full-stack e-commerce application with React and Node.js',
+        userId: demoUser.id,
+        language: 'TypeScript',
+        framework: 'React + Express',
+        status: 'active',
+        agents: [],
+        repositoryUrl: 'https://github.com/demo/ecommerce-platform',
+      },
+      {
+        name: 'Data Analytics Dashboard',
+        description: 'Python-based analytics dashboard with FastAPI and Plotly',
+        userId: demoUser.id,
+        language: 'Python',
+        framework: 'FastAPI + React',
+        status: 'active',
+        agents: [],
+        repositoryUrl: 'https://github.com/demo/analytics-dashboard',
+      },
+      {
+        name: 'Mobile App Backend',
+        description: 'REST API backend for mobile applications',
+        userId: demoUser.id,
+        language: 'TypeScript',
+        framework: 'NestJS',
+        status: 'active',
+        agents: [],
+      },
+      {
+        name: 'Machine Learning Pipeline',
+        description: 'ML training and inference pipeline with Python',
+        userId: demoUser.id,
+        language: 'Python',
+        framework: 'TensorFlow + Flask',
+        status: 'active',
+        agents: [],
+      }
+    ]);
+
+    console.log('✅ Demo projects created');
+  } else {
+    console.log('ℹ️  Demo projects already exist');
   }
 }

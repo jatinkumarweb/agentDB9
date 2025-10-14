@@ -10,12 +10,16 @@ interface VSCodeContainerProps {
   className?: string;
   showHeader?: boolean;
   allowPopout?: boolean;
+  workspaceId?: string | null;
+  projectId?: string | null;
 }
 
 export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({ 
   className = '',
   showHeader = true,
-  allowPopout = true
+  allowPopout = true,
+  workspaceId = null,
+  projectId = null
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,9 +34,15 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
     // Use VSCode directly without proxy - simpler and no authentication issues
     const baseUrl = process.env.NEXT_PUBLIC_VSCODE_URL || 'http://localhost:8080';
     
-    // code-server automatically opens /home/coder/workspace
-    setVscodeUrl(baseUrl);
-  }, [currentWorkspace]);
+    // Add timestamp to force reload when workspace/project changes
+    // This ensures VSCode reloads its content when switching projects
+    const timestamp = Date.now();
+    const workspaceParam = workspaceId ? `&workspace=${workspaceId}` : '';
+    const projectParam = projectId ? `&project=${projectId}` : '';
+    const url = `${baseUrl}?t=${timestamp}${workspaceParam}${projectParam}`;
+    
+    setVscodeUrl(url);
+  }, [workspaceId, projectId]);
 
   const handleIframeLoad = () => {
     setIsLoading(false);
