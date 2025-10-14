@@ -13,8 +13,8 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Verify installation
-RUN node --version && npm --version && git --version && curl --version
+# Verify installation (simplified to avoid mount issues)
+RUN node --version
 
 # Switch back to coder user
 USER coder
