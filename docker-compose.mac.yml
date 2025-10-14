@@ -8,4 +8,8 @@ services:
     # This avoids the "mount options is too long" error on Mac
     image: codercom/code-server:latest
     build: {}  # Disable build (empty object instead of null)
-    # Note: working_dir and user are already set in base docker-compose.yml
+    # Run as root to avoid permission issues on Mac
+    user: root
+    environment:
+      - PUID=1000
+      - PGID=1000

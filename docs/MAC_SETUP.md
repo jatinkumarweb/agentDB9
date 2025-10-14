@@ -10,20 +10,28 @@ failed to mount /var/lib/docker/rootfs/overlayfs/...: mount options is too long
 
 This occurs **even with the legacy builder** and is a Docker Desktop for Mac limitation, not a BuildKit bug.
 
-## Quick Fix (Automatic)
+## Quick Fix (Recommended)
 
-Just run:
+Use the Mac-specific start script:
+
+```bash
+./scripts/start-mac.sh
+```
+
+This script:
+1. Pulls the base `codercom/code-server` image
+2. Starts services with Mac-specific overrides
+3. Shows service status and access URLs
+
+**No building required!** This completely avoids the Docker Desktop issue.
+
+## Alternative: npm run dev
 
 ```bash
 npm run dev
 ```
 
-The script automatically detects macOS and:
-1. Pulls the base `codercom/code-server` image
-2. Uses it directly without building
-3. Applies Mac-specific docker-compose overrides
-
-**No building required!** This completely avoids the Docker Desktop issue.
+This also works but may show some warnings during the build process.
 
 ## Manual Setup
 
