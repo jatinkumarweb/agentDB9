@@ -82,14 +82,22 @@ if [[ $# -gt 0 ]]; then
         echo ""
     fi
     
-    # On Mac, remove --build flag to avoid build attempts
+    # On Mac with --build flag, build other services but not vscode
     if [[ "$OSTYPE" == "darwin"* ]] && [[ "$*" == *"--build"* ]]; then
-        echo "ℹ️  Removing --build flag on macOS (using pre-built images)"
-        # Remove --build from arguments
-        set -- "${@/--build/}"
+        echo "ℹ️  macOS detected: building services except vscode (using pre-built image)"
+        # Build all services except vscode
+        run_compose build backend frontend llm-service mcp-server
+        # Then run the original command without --build
+        local args=()
+        for arg in "$@"; do
+            if [[ "$arg" != "--build" ]]; then
+                args+=("$arg")
+            fi
+        done
+        run_compose "${args[@]}"
+    else
+        run_compose "$@"
     fi
-    
-    run_compose "$@"
 else
     echo "Usage examples:"
     echo "  $0 up -d                 # Start services in background"
