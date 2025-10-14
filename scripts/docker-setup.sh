@@ -88,7 +88,7 @@ if [[ $# -gt 0 ]]; then
         # Build all services except vscode
         run_compose build backend frontend llm-service mcp-server
         # Then run the original command without --build
-        local args=()
+        args=()
         for arg in "$@"; do
             if [[ "$arg" != "--build" ]]; then
                 args+=("$arg")
