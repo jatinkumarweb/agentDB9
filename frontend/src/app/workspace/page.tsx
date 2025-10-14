@@ -101,16 +101,69 @@ export default function WorkspacePage() {
   };
 
   // Reset workspace when switching types
-  const handleWorkspaceTypeSelect = (typeId: string) => {
-    const newState = {
-      id: `${typeId}-${Date.now()}`,
-      type: typeId,
-      projectId: null,
-    };
-    setWorkspaceState(newState);
-    setShowWorkspaceSelector(false);
-    setShowProjectSelector(true);
-    fetchProjects();
+  const handleWorkspaceTypeSelect = async (typeId: string) => {
+    try {
+      // Get token from auth-storage
+      const authState = localStorage.getItem('auth-storage');
+      let token = null;
+      if (authState) {
+        const parsed = JSON.parse(authState);
+        token = parsed.state?.token || null;
+      }
+      
+      // Create workspace in backend
+      console.log('Creating workspace of type:', typeId);
+      const response = await fetch('/api/workspaces', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: typeId,
+          projectId: null,
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Workspace created:', data.data);
+        
+        const newState = {
+          id: data.data.id, // Use actual backend workspace ID
+          type: typeId,
+          projectId: null,
+        };
+        setWorkspaceState(newState);
+        setShowWorkspaceSelector(false);
+        setShowProjectSelector(true);
+        fetchProjects();
+      } else {
+        console.error('Failed to create workspace:', response.status);
+        // Fallback to client-side ID for now
+        const newState = {
+          id: `${typeId}-${Date.now()}`,
+          type: typeId,
+          projectId: null,
+        };
+        setWorkspaceState(newState);
+        setShowWorkspaceSelector(false);
+        setShowProjectSelector(true);
+        fetchProjects();
+      }
+    } catch (error) {
+      console.error('Error creating workspace:', error);
+      // Fallback to client-side ID
+      const newState = {
+        id: `${typeId}-${Date.now()}`,
+        type: typeId,
+        projectId: null,
+      };
+      setWorkspaceState(newState);
+      setShowWorkspaceSelector(false);
+      setShowProjectSelector(true);
+      fetchProjects();
+    }
   };
 
   // Handle project selection
@@ -124,7 +177,10 @@ export default function WorkspacePage() {
     setShowProjectSelector(false);
     
     // Reload VSCode container with new project volume
-    if (projectId && workspaceState.id) {
+    // Only call API if we have a real workspace ID (UUID format)
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceState.id || '');
+    
+    if (projectId && workspaceState.id && isValidUUID) {
       try {
         console.log('Switching workspace project to:', project?.name);
         
@@ -152,10 +208,14 @@ export default function WorkspacePage() {
           window.location.reload();
         } else {
           console.error('Failed to switch project:', response.status);
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Error details:', errorData);
         }
       } catch (error) {
         console.error('Error switching project:', error);
       }
+    } else if (projectId && !isValidUUID) {
+      console.log('Workspace not yet created in backend, skipping volume switch');
     }
   };
 
