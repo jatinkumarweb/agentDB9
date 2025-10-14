@@ -67,7 +67,8 @@ services:
       # Mount root node_modules as read-only for hoisted package resolution
       - ./node_modules:/workspace/node_modules:ro
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -123,6 +124,12 @@ services:
       # Mount root node_modules as read-only for hoisted package resolution
       - ./node_modules:/workspace/node_modules:ro
     command: ["npm", "run", "start:dev"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       - qdrant
       - postgres
