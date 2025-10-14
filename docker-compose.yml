@@ -271,10 +271,14 @@ services:
 
   vscode:
     # Note: BuildKit v0.24.0 has a bug causing "mount options is too long" error
-    # Use scripts/build-vscode.sh to build with legacy builder if needed
+    # If build fails, use: DOCKER_BUILDKIT=0 docker-compose build vscode
+    # Or use: ./scripts/build-vscode.sh
     build:
       context: ./vscode
       dockerfile: Dockerfile
+      # Try to work around BuildKit bug by using minimal build args
+      args:
+        BUILDKIT_INLINE_CACHE: 0
     image: agentdb9-vscode:latest
     platform: linux/amd64
     restart: unless-stopped

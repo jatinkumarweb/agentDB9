@@ -10,6 +10,8 @@ failed to solve: process "/bin/sh -c node --version" did not complete successful
 
 This error occurs even with simple Dockerfiles and is related to how BuildKit handles mount options internally.
 
+**Important**: This issue persists even after running `docker builder prune -af` in some environments, confirming it's a genuine BuildKit bug, not cache corruption.
+
 ## Root Cause
 
 - **BuildKit Version**: v0.24.0
@@ -19,7 +21,15 @@ This error occurs even with simple Dockerfiles and is related to how BuildKit ha
 
 ## Workaround
 
-### Option 1: Use the Build Script (Recommended)
+### Option 1: Use Make (Easiest)
+
+```bash
+make build-vscode
+```
+
+This uses the Makefile target that automatically builds with the legacy builder.
+
+### Option 2: Use the Build Script
 
 We've created a helper script that builds the VSCode container using the legacy Docker builder:
 
@@ -31,14 +41,25 @@ This script:
 1. Uses `DOCKER_BUILDKIT=0` to disable BuildKit
 2. Builds the VSCode image with the legacy builder
 3. Tags it as `agentdb9-vscode:latest`
+4. Verifies Node.js and npm installation
 
-### Option 2: Manual Build with Legacy Builder
+### Option 3: Manual Build with Legacy Builder
 
 ```bash
 DOCKER_BUILDKIT=0 docker build -t agentdb9-vscode:latest vscode/
 ```
 
-### Option 3: Build All Services Except VSCode
+### Option 4: Build All Services with Legacy Builder
+
+If the issue affects multiple services:
+
+```bash
+make build-legacy
+# OR
+DOCKER_BUILDKIT=0 docker-compose build
+```
+
+### Option 5: Build All Services Except VSCode
 
 If you need to rebuild other services but VSCode is already built:
 

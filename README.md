@@ -2,6 +2,12 @@
 
 A multi-container TypeScript development environment for building AI-powered coding agents.
 
+## 🚀 Quick Start
+
+**New to this project?** See [QUICKSTART.md](QUICKSTART.md) for a 3-step setup guide.
+
+**Build Issues?** See [docs/BUILDKIT_WORKAROUND.md](docs/BUILDKIT_WORKAROUND.md) for BuildKit v0.24.0 workarounds.
+
 ## Architecture
 
 This project implements a comprehensive microservices architecture with the following components:
