@@ -7,44 +7,47 @@
 - 8GB+ RAM available
 - 20GB+ disk space
 
-## Quick Start (3 Steps)
+## Quick Start (2 Steps)
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Start Development Environment
+
+```bash
+npm run dev
+```
+
+That's it! The script will automatically:
+- Detect if VSCode image needs building
+- Build it with the legacy builder (workaround for BuildKit bug)
+- Start all services
+
+**Note**: First run takes 5-10 minutes to build all containers.
+
+## Alternative: Manual Build
+
+If you prefer to build VSCode separately:
 
 ### 1. Build VSCode Container
 
-Due to a BuildKit v0.24.0 bug, build the VSCode container first using the legacy builder:
-
 ```bash
+npm run build:vscode
+# OR
 make build-vscode
-```
-
-Or manually:
-
-```bash
+# OR
 ./scripts/build-vscode.sh
 ```
 
-### 2. Build Other Services
+### 2. Start Services
 
 ```bash
-docker-compose build
-```
-
-Or build everything with legacy builder:
-
-```bash
-make build-legacy
-```
-
-### 3. Start Services
-
-```bash
+npm run dev
+# OR
 docker-compose up -d
-```
-
-Or:
-
-```bash
-make up
 ```
 
 ## Verify Services

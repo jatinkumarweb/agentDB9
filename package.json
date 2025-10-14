@@ -19,6 +19,7 @@
     "build": "npm run build:shared && npm run build:services",
     "build:shared": "npm run build --workspace=shared",
     "build:services": "npm run build --workspace=frontend & npm run build --workspace=backend & npm run build --workspace=llm-service & npm run build --workspace=mcp-server & npm run build --workspace=vscode-proxy & wait",
+    "build:vscode": "./scripts/build-vscode.sh",
     "dev": "./scripts/dev-with-cleanup.sh up --build",
     "dev:frontend": "./scripts/docker-setup.sh exec frontend npm run dev",
     "dev:backend": "./scripts/docker-setup.sh exec backend npm run dev",

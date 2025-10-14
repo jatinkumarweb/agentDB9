@@ -13,26 +13,28 @@ This is a **known bug in BuildKit v0.24.0**. Follow the workaround below.
 
 ## Quick Fix (Recommended)
 
-### Option 1: Use the Build Script
+### Option 1: Use npm (Easiest)
+
+```bash
+npm run build:vscode
+npm run dev
+```
+
+### Option 2: Use the Build Script
 
 ```bash
 ./scripts/build-vscode.sh
-```
-
-Then start services:
-
-```bash
 docker-compose up -d
 ```
 
-### Option 2: Use Make
+### Option 3: Use Make
 
 ```bash
 make build-vscode
 make up
 ```
 
-### Option 3: Manual Build with Legacy Builder
+### Option 4: Manual Build with Legacy Builder
 
 ```bash
 DOCKER_BUILDKIT=0 docker build -t agentdb9-vscode:latest vscode/
@@ -46,13 +48,16 @@ docker-compose up -d
 **Choose one method:**
 
 ```bash
-# Method A: Build script (recommended)
+# Method A: npm (easiest)
+npm run build:vscode
+
+# Method B: Build script
 ./scripts/build-vscode.sh
 
-# Method B: Make
+# Method C: Make
 make build-vscode
 
-# Method C: Manual
+# Method D: Manual
 DOCKER_BUILDKIT=0 docker build -t agentdb9-vscode:latest vscode/
 ```
 

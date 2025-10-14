@@ -59,6 +59,14 @@ run_compose() {
 
 # If script is called with arguments, run docker-compose
 if [[ $# -gt 0 ]]; then
+    # Check if --build flag is present and VSCode image doesn't exist
+    if [[ "$*" == *"--build"* ]] && ! docker images agentdb9-vscode:latest | grep -q agentdb9-vscode; then
+        echo "⚠️  Build requested but VSCode image not found."
+        echo "   Building VSCode with legacy builder to avoid BuildKit bug..."
+        ./scripts/build-vscode.sh
+        echo ""
+    fi
+    
     run_compose "$@"
 else
     echo "Usage examples:"
