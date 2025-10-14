@@ -527,6 +527,16 @@ These settings provide optimal performance out of the box. Adjust resource limit
 - **Testing**: Generate test cases and scenarios
 - **Refactoring**: Suggest and apply code improvements
 
+## 📚 Documentation
+
+- [Quick Start Guide](QUICKSTART.md) - Get started in 3 steps
+- [Build Instructions](BUILD_INSTRUCTIONS.md) - Detailed build troubleshooting
+- [Mac Setup Guide](docs/MAC_SETUP.md) - macOS-specific instructions
+- [Volume Management](docs/VOLUMES.md) - Docker volume organization
+- [Database Reset Guide](docs/DATABASE_RESET.md) - Database management
+- [Storage Management](DOCKER_STORAGE_MANAGEMENT.md) - Docker storage optimization
+- [Local Setup Troubleshooting](LOCAL_SETUP_TROUBLESHOOTING.md) - Common issues
+
 ## Contributing
 
 1. Follow TypeScript strict mode guidelines

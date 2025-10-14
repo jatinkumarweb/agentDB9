@@ -104,13 +104,16 @@ Thumbs.db
 # Docker
 .dockerignore
 
-# Data directories
+# Data directories (legacy)
 postgres_data/
 qdrant_data/
 redis_data/
 ollama_data/
 models/
 vscode-config/
+
+# Project-specific volumes
+.volumes/
 
 # User workspace (keep README.md only)
 workspace/*

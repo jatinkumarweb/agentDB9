@@ -19,9 +19,10 @@ Use the Mac-specific start script:
 ```
 
 This script:
-1. Pulls the base `codercom/code-server` image
+1. Pulls the ARM64 `codercom/code-server` image
 2. Starts services with Mac-specific overrides
-3. Shows service status and access URLs
+3. Opens workspace at `/home/coder/workspace`
+4. Shows service status and access URLs
 
 **No building required!** This completely avoids the Docker Desktop issue.
 
@@ -38,9 +39,9 @@ This also works but may show some warnings during the build process.
 If you want to set up manually:
 
 ```bash
-# Pull base image
-docker pull codercom/code-server:latest
-docker tag codercom/code-server:latest agentdb9-vscode:latest
+# Pull ARM64 image (important for Apple Silicon)
+docker pull codercom/code-server@sha256:3ba1f602193c3ab4902fe0d2a26d9c16cd98c8e472095d4173954002c07dd4ae
+docker tag codercom/code-server@sha256:3ba1f602193c3ab4902fe0d2a26d9c16cd98c8e472095d4173954002c07dd4ae agentdb9-vscode:latest
 
 # Start services with Mac overrides
 docker-compose -f docker-compose.yml -f docker-compose.arm64.yml -f docker-compose.mac.yml up -d
@@ -50,10 +51,11 @@ docker-compose -f docker-compose.yml -f docker-compose.arm64.yml -f docker-compo
 
 The project now automatically handles macOS:
 
-1. **No Building**: Uses base image directly (no Dockerfile build)
+1. **No Building**: Uses base ARM64 image directly (no Dockerfile build)
 2. **Auto-Detection**: Scripts detect macOS and adjust automatically  
-3. **Mac Override**: `docker-compose.mac.yml` disables build step
-4. **Base Image**: Uses `codercom/code-server:latest` as-is
+3. **Mac Override**: `docker-compose.mac.yml` disables build and sets workspace path
+4. **Base Image**: Uses ARM64 `codercom/code-server` with specific digest
+5. **Workspace Fix**: Automatically opens `/home/coder/workspace` in VSCode
 
 **Note**: The base image includes Node.js v18. If you need v22, you can install it inside the running container.
 

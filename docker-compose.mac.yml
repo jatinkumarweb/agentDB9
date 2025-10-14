@@ -10,6 +10,14 @@ services:
     build: {}  # Disable build (empty object instead of null)
     # Use ARM64 for Apple Silicon Macs
     platform: linux/arm64
-    # Don't override entrypoint/command - let base image handle it
-    # The workspace volume mount will make /home/coder/workspace available
-    # User can open it from VSCode UI
+    # Override command to open workspace directory instead of current directory
+    # Base image defaults to "." which causes "Workspace does not exist" error
+    command: >
+      --bind-addr 0.0.0.0:8080
+      --auth none
+      --disable-telemetry
+      --disable-update-check
+      --disable-workspace-trust
+      --disable-file-downloads
+      --disable-getting-started-override
+      /home/coder/workspace
