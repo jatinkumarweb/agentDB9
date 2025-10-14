@@ -4,6 +4,8 @@ A multi-container TypeScript development environment for building AI-powered cod
 
 ## 🚀 Quick Start
 
+**⚠️ Build Error?** If you see `"mount options is too long"`, run: `./scripts/build-vscode.sh` first. See [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md)
+
 **New to this project?** See [QUICKSTART.md](QUICKSTART.md) for a 3-step setup guide.
 
 **Build Issues?** See [docs/BUILDKIT_WORKAROUND.md](docs/BUILDKIT_WORKAROUND.md) for BuildKit v0.24.0 workarounds.
