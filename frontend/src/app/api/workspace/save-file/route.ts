@@ -12,7 +12,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Call MCP server to save file
-    const mcpServerUrl = process.env.MCP_SERVER_URL || 'http://mcp-server:9001';
+    // In Docker: use service name (vscode:9001)
+    // Locally: use localhost:9001
+    const mcpServerUrl = process.env.MCP_SERVER_URL || 'http://localhost:9001';
+    
+    console.log(`Saving file to: ${path} via ${mcpServerUrl}`);
     
     const response = await fetch(`${mcpServerUrl}/api/tools/execute`, {
       method: 'POST',

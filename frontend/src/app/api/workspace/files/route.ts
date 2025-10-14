@@ -5,10 +5,12 @@ export async function POST(request: NextRequest) {
     const { path } = await request.json();
     
     // Call MCP server to list files
-    const mcpServerUrl = process.env.MCP_SERVER_URL || 'http://mcp-server:9001';
+    // In Docker: use service name (vscode:9001)
+    // Locally: use localhost:9001
+    const mcpServerUrl = process.env.MCP_SERVER_URL || 'http://localhost:9001';
     const workspacePath = path || '/workspace';
     
-    console.log(`Listing workspace files from: ${workspacePath}`);
+    console.log(`Listing workspace files from: ${workspacePath} via ${mcpServerUrl}`);
     
     const response = await fetch(`${mcpServerUrl}/api/tools/execute`, {
       method: 'POST',

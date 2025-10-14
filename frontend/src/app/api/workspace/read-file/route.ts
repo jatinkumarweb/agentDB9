@@ -12,7 +12,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Call MCP server to read file
+    // In Docker: use service name (vscode:9001)
+    // Locally: use localhost:9001
     const mcpServerUrl = process.env.MCP_SERVER_URL || 'http://localhost:9001';
+    
+    console.log(`Reading file from: ${path} via ${mcpServerUrl}`);
     
     const response = await fetch(`${mcpServerUrl}/api/tools/execute`, {
       method: 'POST',

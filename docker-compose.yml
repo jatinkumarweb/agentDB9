@@ -54,6 +54,7 @@ services:
       - NEXT_PUBLIC_VSCODE_URL=http://localhost:8080
       - NEXT_PUBLIC_MCP_WS_URL=ws://localhost:9002
       - BACKEND_URL=http://backend:8000
+      - MCP_SERVER_URL=http://vscode:9001
       - NODE_OPTIONS=--dns-result-order=ipv4first
       - HOSTNAME=0.0.0.0
       # Allow Node.js to resolve hoisted packages from root node_modules
