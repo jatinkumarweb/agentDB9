@@ -128,6 +128,22 @@ coverage/
         await fs.writeFile(gitignorePath, gitignoreContent);
       }
       
+      // Create a .code-workspace file for VSCode
+      const workspaceFilePath = path.join(projectFolderPath, `${safeFolderName}.code-workspace`);
+      const workspaceFileExists = await fs.access(workspaceFilePath).then(() => true).catch(() => false);
+      
+      if (!workspaceFileExists) {
+        const workspaceConfig = {
+          folders: [
+            {
+              path: "."
+            }
+          ],
+          settings: {}
+        };
+        await fs.writeFile(workspaceFilePath, JSON.stringify(workspaceConfig, null, 2));
+      }
+      
       // Update project with local path
       project.localPath = projectFolderPath;
       await this.projectsRepository.save(project);

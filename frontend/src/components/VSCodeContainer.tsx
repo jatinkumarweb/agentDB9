@@ -36,24 +36,24 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
     // Use VSCode directly without proxy - simpler and no authentication issues
     const baseUrl = process.env.NEXT_PUBLIC_VSCODE_URL || 'http://localhost:8080';
     
-    // Determine which folder to open
-    // If projectName is provided, use it for the folder name
-    // Otherwise, open the default workspace
-    let folderPath = '/home/coder/workspace';
+    // Determine which folder/workspace to open
+    // If projectName is provided, use the workspace file
+    // Otherwise, open the default workspace folder
+    let workspacePath = '/home/coder/workspace';
     if (projectName) {
       // Create safe folder name (same logic as backend)
       const safeFolderName = projectName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
-      folderPath = `/home/coder/workspace/projects/${safeFolderName}`;
+      // Use the .code-workspace file for better VSCode integration
+      workspacePath = `/home/coder/workspace/projects/${safeFolderName}/${safeFolderName}.code-workspace`;
     }
     
     // Use folder parameter for code-server
-    // Note: Don't encode the folder path - code-server expects it unencoded
-    const url = `${baseUrl}?folder=${folderPath}`;
+    const url = `${baseUrl}/?folder=${workspacePath}`;
     
-    console.log('[VSCodeContainer] Opening folder:', folderPath);
+    console.log('[VSCodeContainer] Opening workspace:', workspacePath);
     console.log('[VSCodeContainer] URL:', url);
     console.log('[VSCodeContainer] Project:', { projectId, projectName });
     
