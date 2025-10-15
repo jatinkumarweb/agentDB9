@@ -66,9 +66,14 @@ export class ProjectsService {
     const workspaceBasePath = process.env.WORKSPACE_PATH || '/workspace';
     const projectFolderPath = path.join(workspaceBasePath, 'projects', safeFolderName);
     
+    console.log(`[initWorkspaceFolder] Creating project folder at: ${projectFolderPath}`);
+    console.log(`[initWorkspaceFolder] Workspace base path: ${workspaceBasePath}`);
+    console.log(`[initWorkspaceFolder] Safe folder name: ${safeFolderName}`);
+    
     try {
       // Create project folder if it doesn't exist
       await fs.mkdir(projectFolderPath, { recursive: true });
+      console.log(`[initWorkspaceFolder] ✅ Project folder created successfully`);
       
       // Create a README for the project
       const readmePath = path.join(projectFolderPath, 'README.md');
@@ -147,9 +152,12 @@ coverage/
       // Update project with local path
       project.localPath = projectFolderPath;
       await this.projectsRepository.save(project);
+      console.log(`[initWorkspaceFolder] ✅ Project localPath updated in database: ${projectFolderPath}`);
       
     } catch (error) {
-      console.error(`Failed to initialize workspace folder for project ${id}:`, error);
+      console.error(`[initWorkspaceFolder] ❌ Failed to initialize workspace folder for project ${id}:`, error);
+      console.error(`[initWorkspaceFolder] Error details:`, error.message);
+      console.error(`[initWorkspaceFolder] Stack:`, error.stack);
       throw error;
     }
   }
