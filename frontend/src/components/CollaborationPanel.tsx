@@ -14,7 +14,9 @@ import {
   Send,
   UserCircle,
   Dot,
-  Square
+  Square,
+  Bot,
+  User
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import wsManager from '@/lib/websocket';
@@ -59,7 +61,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   const [activeUsers, setActiveUsers] = useState<User[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'users' | 'chat' | 'share'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'chat' | 'share'>('chat'); // Default to chat
   const [selectedAgent, setSelectedAgent] = useState<CodingAgent | null>(null);
   const [availableAgents, setAvailableAgents] = useState<CodingAgent[]>([]);
   const [isLoadingAgents, setIsLoadingAgents] = useState(false);
@@ -688,6 +690,37 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         .glass-button-collab:hover {
           background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.12));
         }
+
+        .thinking-dots span {
+          animation: thinking 1.4s ease-in-out infinite;
+        }
+        .thinking-dots span:nth-child(1) {
+          animation-delay: 0s;
+        }
+        .thinking-dots span:nth-child(2) {
+          animation-delay: 0.2s;
+        }
+        .thinking-dots span:nth-child(3) {
+          animation-delay: 0.4s;
+        }
+        @keyframes thinking {
+          0%, 60%, 100% {
+            transform: translateY(0);
+            opacity: 0.75;
+          }
+          30% {
+            transform: translateY(-8px);
+            opacity: 1;
+          }
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
       `}</style>
       
       <motion.div
@@ -701,10 +734,20 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-white border-opacity-20">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Collaboration
-            </h2>
+          <div className="flex items-center justify-between p-4 border-b border-white border-opacity-30">
+            <div className="flex items-center">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center shadow-md mr-3">
+                <Bot className="w-5 h-5 text-gray-700" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {selectedAgent?.name || 'Workspace Chat'}
+                </h2>
+                <p className="text-xs text-gray-700">
+                  {selectedAgent?.configuration?.model || 'Select an agent'}
+                </p>
+              </div>
+            </div>
             <button
               onClick={onToggle}
               className="p-1 rounded glass-button-collab border border-white border-opacity-50 hover:border-opacity-70 transition-all"
@@ -713,121 +756,22 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
             </button>
           </div>
 
-          {/* Tabs */}
-        <div className="flex border-b border-white border-opacity-20">
-          {[
-            { id: 'users', label: 'Users', icon: Users },
-            { id: 'chat', label: 'Chat', icon: MessageSquare },
-            { id: 'share', label: 'Share', icon: Share2 }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={cn(
-                "flex-1 flex items-center justify-center space-x-2 py-3 px-4 text-sm font-medium transition-all",
-                activeTab === tab.id
-                  ? "text-indigo-600 border-b-2 border-indigo-600 glass-button-collab"
-                  : "text-gray-700 hover:text-gray-900 glass-button-collab hover:border-opacity-70"
-              )}
-            >
-              <tab.icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Content */}
+        {/* Content - Chat Only */}
         <div className="flex-1 overflow-hidden">
-          {activeTab === 'users' && (
-            <div className="p-4 space-y-3">
-              <h3 className="text-sm font-medium text-gray-900">
-                Active Users ({activeUsers.length})
-              </h3>
-              
-              <div className="space-y-2">
-                {activeUsers.map(user => (
-                  <div
-                    key={user.id}
-                    className="flex items-center space-x-3 p-2 rounded-lg glass-button-collab border border-white border-opacity-30 hover:border-opacity-50 transition-all"
-                  >
-                    <div className="relative">
-                      {user.avatar ? (
-                        <img
-                          src={user.avatar}
-                          alt={user.name}
-                          className="w-8 h-8 rounded-full"
-                        />
-                      ) : (
-                        <UserCircle className="w-8 h-8 text-gray-400" />
-                      )}
-                      <div className={cn(
-                        "absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900",
-                        getStatusColor(user.status)
-                      )} />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {user.name}
-                        </p>
-                        {user.isAgent && (
-                          <span className="px-1.5 py-0.5 text-xs bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-800 rounded">
-                            AI
-                          </span>
-                        )}
-                      </div>
-                      
-                      {user.currentFile && (
-                        <p className="text-xs text-gray-700 truncate">
-                          <Eye className="w-3 h-3 inline mr-1" />
-                          {user.currentFile.split('/').pop()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                
-                {/* Typing indicator - only show if generating and no agent message exists yet */}
-                {isGenerating && !currentConversation?.messages?.some(m => m.role === 'agent' && m.metadata?.streaming) && (
-                  <div className="flex space-x-2">
-                    <div className="flex-shrink-0">
-                      <UserCircle className="w-6 h-6 text-blue-500" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                          {getSelectedAgentName()}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          {formatTime(new Date())}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-1 mt-1">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                        </div>
-                        <span className="text-xs text-gray-500 ml-2">thinking...</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Scroll anchor */}
-                <div ref={messagesEndRef} />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'chat' && (
+          {(
             <div className="flex flex-col h-full">
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
                 {(!currentConversation?.messages || currentConversation.messages.length === 0) && (
-                  <div className="text-center text-gray-500 py-8">
-                    No messages yet. Start a conversation!
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center shadow-lg mx-auto mb-4">
+                        <Bot className="w-8 h-8 text-gray-700" />
+                      </div>
+                      <p className="text-gray-700 font-medium">
+                        No messages yet. Start a conversation!
+                      </p>
+                    </div>
                   </div>
                 )}
                 {currentConversation?.messages?.map((msg) => {
@@ -842,29 +786,28 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                   return (
                     <div
                       key={`${msg.id}-${msg._lastUpdated || 0}`}
-                      className="flex space-x-2"
+                      className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className="flex-shrink-0">
-                        <UserCircle className={cn(
-                          "w-6 h-6",
-                          isAgent ? "text-blue-500" : "text-gray-400"
-                        )} />
-                      </div>
-                      
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <span className={cn(
-                            "text-xs font-medium",
-                            isAgent ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"
-                          )}>
-                            {isUser ? 'You' : getSelectedAgentName()}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            {formatTime(new Date(msg.timestamp))}
-                          </span>
+                      <div className={`max-w-[85%] px-4 py-3 rounded-2xl ${
+                        isUser 
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md' 
+                          : 'glass-input-collab border border-white border-opacity-50 text-gray-900'
+                      }`}>
+                        <div className="flex items-center mb-2">
+                          {isUser ? (
+                            <div className="w-5 h-5 rounded-full bg-white bg-opacity-20 flex items-center justify-center mr-2">
+                              <User className="w-3 h-3" />
+                            </div>
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center mr-2">
+                              <Bot className="w-3 h-3 text-gray-700" />
+                            </div>
+                          )}
+                          <span className="text-xs font-medium opacity-75 mr-2">{isUser ? 'You' : getSelectedAgentName()}</span>
+                          <span className="text-xs opacity-75">{formatTime(new Date(msg.timestamp))}</span>
                         </div>
                         <div 
-                          className="text-sm text-gray-900 dark:text-gray-100 mt-1 whitespace-pre-wrap"
+                          className="whitespace-pre-wrap text-sm"
                           key={`content-${msg.id}-${msg._lastUpdated || 0}`}
                         >
                           {msg.content || (msg.metadata?.streaming ? 'Thinking...' : '')}
@@ -872,19 +815,19 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                         
                         {/* Streaming indicator */}
                         {msg.metadata?.streaming && msg.content && (
-                          <div className="flex items-center justify-between mt-2">
-                            <div className="flex items-center space-x-1">
-                              <div className="flex space-x-1">
-                                <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" />
-                                <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                                <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-white border-opacity-20">
+                            <div className="flex items-center">
+                              <div className="thinking-dots flex space-x-1 mr-2">
+                                <span className="w-1.5 h-1.5 bg-current rounded-full opacity-75"></span>
+                                <span className="w-1.5 h-1.5 bg-current rounded-full opacity-75"></span>
+                                <span className="w-1.5 h-1.5 bg-current rounded-full opacity-75"></span>
                               </div>
-                              <span className="text-xs text-gray-500">Streaming...</span>
+                              <span className="text-xs opacity-75">Streaming...</span>
                             </div>
                             {generatingMessageId === msg.id && (
                               <button 
                                 onClick={stopGeneration} 
-                                className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                                className="text-xs px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                               >
                                 Stop
                               </button>
@@ -897,27 +840,21 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                 })}
                 
                 {/* Typing indicator - only show if generating and no agent message exists yet */}
-                {isGenerating && !currentConversation?.messages?.some(m => m.role === 'agent' && m.metadata?.streaming) && (
-                  <div className="flex space-x-2">
-                    <div className="flex-shrink-0">
-                      <UserCircle className="w-6 h-6 text-blue-500" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                          {getSelectedAgentName()}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          {formatTime(new Date())}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-1 mt-1">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                {(isLoading || (isGenerating && !currentConversation?.messages?.some(m => m.role === 'agent' && m.metadata?.streaming))) && (
+                  <div className="flex justify-start">
+                    <div className="glass-input-collab border border-white border-opacity-50 text-gray-900 max-w-[85%] px-4 py-3 rounded-2xl">
+                      <div className="flex items-center">
+                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center mr-2">
+                          <Bot className="w-3 h-3 text-gray-700" />
                         </div>
-                        <span className="text-xs text-gray-500 ml-2">thinking...</span>
+                        <div className="flex items-center space-x-2">
+                          <div className="thinking-dots flex space-x-1">
+                            <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
+                            <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
+                            <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
+                          </div>
+                          <span className="text-sm text-gray-700">{isLoading ? 'Sending message...' : 'AI is thinking...'}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -929,12 +866,12 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
               {/* Response Timer */}
               {(isTimerRunning || responseTime) && (
-                <div className="px-4 py-2 border-t border-white border-opacity-20 glass-button-collab">
+                <div className="px-4 py-2 glass-button-collab border-t border-white border-opacity-30">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-700">
                       {isTimerRunning ? '⏱️ Generating response...' : '✅ Response completed'}
                     </span>
-                    <span className="font-mono text-gray-900">
+                    <span className="font-mono text-gray-900 font-medium">
                       {isTimerRunning 
                         ? `${((Date.now() - (responseStartTime || 0)) / 1000).toFixed(1)}s`
                         : `${(responseTime! / 1000).toFixed(2)}s`
@@ -1012,62 +949,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                       )}
                     </button>
                   )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'share' && (
-            <div className="p-4 space-y-4">
-              <h3 className="text-sm font-medium text-gray-900">
-                Share Workspace
-              </h3>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-900 mb-1">
-                    Workspace URL
-                  </label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      value={window.location.href}
-                      readOnly
-                      className="flex-1 px-3 py-2 text-xs glass-input-collab border border-white border-opacity-50 rounded-xl text-gray-900"
-                    />
-                    <button
-                      onClick={() => navigator.clipboard.writeText(window.location.href)}
-                      className="px-3 py-2 bg-gradient-to-br from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all shadow-md"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-900 mb-1">
-                    VS Code URL (Authenticated)
-                  </label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      value={process.env.NEXT_PUBLIC_VSCODE_PROXY_URL || 'http://localhost:8081'}
-                      readOnly
-                      className="flex-1 px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    />
-                    <button
-                      onClick={() => navigator.clipboard.writeText(process.env.NEXT_PUBLIC_VSCODE_PROXY_URL || 'http://localhost:8081')}
-                      className="px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Share these URLs with team members to collaborate on the workspace.
-                  </p>
                 </div>
               </div>
             </div>
