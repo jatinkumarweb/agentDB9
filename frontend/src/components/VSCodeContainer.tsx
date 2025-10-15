@@ -37,21 +37,26 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
     const baseUrl = process.env.NEXT_PUBLIC_VSCODE_URL || 'http://localhost:8080';
     
     // Determine which folder/workspace to open
-    // If projectName is provided, use the workspace file
+    // If projectName is provided, open the project folder directly
     // Otherwise, open the default workspace folder
     let workspacePath = '/home/coder/workspace';
     if (projectName) {
-      // Create safe folder name (same logic as backend)
+      // Create safe folder name (same logic as backend ProjectsService.initWorkspaceFolder)
+      // This must match the backend logic exactly to open the correct folder
       const safeFolderName = projectName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
-      // Use the .code-workspace file for better VSCode integration
-      workspacePath = `/home/coder/workspace/projects/${safeFolderName}/${safeFolderName}.code-workspace`;
+      
+      // Open the project folder directly (not a .code-workspace file)
+      // Path matches backend: /workspace/projects/${safeFolderName}
+      // In VSCode container, /workspace is mounted at /home/coder/workspace
+      workspacePath = `/home/coder/workspace/projects/${safeFolderName}`;
     }
     
-    // Use folder parameter for code-server
-    const url = `${baseUrl}/?folder=${workspacePath}`;
+    // Use folder parameter for code-server to open the folder directly
+    // This tells VSCode to open the folder immediately without showing "Open Folder" dialog
+    const url = `${baseUrl}/?folder=${encodeURIComponent(workspacePath)}`;
     
     console.log('[VSCodeContainer] Opening workspace:', workspacePath);
     console.log('[VSCodeContainer] URL:', url);
