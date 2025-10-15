@@ -176,13 +176,10 @@ export default function WorkspacePage() {
     }));
     setShowProjectSelector(false);
     
-    // Reload VSCode container with new project volume
-    // Only call API if we have a real workspace ID (UUID format)
-    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceState.id || '');
-    
-    if (projectId && workspaceState.id && isValidUUID) {
+    // Initialize project folder in workspace if needed
+    if (projectId && project) {
       try {
-        console.log('Switching workspace project to:', project?.name);
+        console.log('Initializing project folder for:', project.name);
         
         // Get token from auth-storage
         const authState = localStorage.getItem('auth-storage');
@@ -192,30 +189,33 @@ export default function WorkspacePage() {
           token = parsed.state?.token || null;
         }
         
-        // Call backend API to switch project
-        const response = await fetch(`/api/workspaces/${workspaceState.id}/switch-project`, {
+        // Call backend API to initialize project folder
+        const response = await fetch(`/api/projects/${projectId}/init-workspace`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ projectId }),
         });
         
         if (response.ok) {
-          console.log('Project switched successfully, reloading workspace...');
-          // Reload the page to refresh the VSCode iframe with new volume
+          console.log('Project folder initialized, reloading VSCode...');
+          // Just reload the page to refresh VSCode iframe
+          // VSCode will open the project folder automatically
           window.location.reload();
         } else {
-          console.error('Failed to switch project:', response.status);
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Error details:', errorData);
+          console.warn('Failed to initialize project folder:', response.status);
+          // Still reload to show the project
+          window.location.reload();
         }
       } catch (error) {
-        console.error('Error switching project:', error);
+        console.error('Error initializing project folder:', error);
+        // Still reload to show the project
+        window.location.reload();
       }
-    } else if (projectId && !isValidUUID) {
-      console.log('Workspace not yet created in backend, skipping volume switch');
+    } else {
+      // No project selected, just reload to show default workspace
+      window.location.reload();
     }
   };
 

@@ -115,4 +115,25 @@ export class ProjectsController {
       );
     }
   }
+
+  @Post(':id/init-workspace')
+  @ApiOperation({ summary: 'Initialize project workspace folder' })
+  @ApiResponse({ status: 200, description: 'Workspace folder initialized' })
+  async initWorkspace(@Param('id') id: string): Promise<APIResponse> {
+    try {
+      await this.projectsService.initWorkspaceFolder(id);
+      return {
+        success: true,
+        message: 'Workspace folder initialized',
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

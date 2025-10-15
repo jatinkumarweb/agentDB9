@@ -73,4 +73,5 @@ EOF
 fi
 
 # Execute the original entrypoint
-exec "$@"
+# Use /usr/bin/entrypoint.sh from the base image with the command arguments
+exec /usr/bin/entrypoint.sh "$@"

@@ -118,6 +118,8 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:-your_session_secret_key_here_make_it_long_and_secure_for_production_use_at_least_32_chars}
       # Allow Node.js to resolve hoisted packages from root node_modules
       - NODE_PATH=/workspace/node_modules
+      # Workspace path for project folders
+      - WORKSPACE_PATH=/workspace
     volumes:
       - ./backend:/app
       - ./shared:/shared

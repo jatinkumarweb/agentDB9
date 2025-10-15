@@ -34,12 +34,17 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
     // Use VSCode directly without proxy - simpler and no authentication issues
     const baseUrl = process.env.NEXT_PUBLIC_VSCODE_URL || 'http://localhost:8080';
     
+    // Determine which folder to open
+    // If projectId is provided, open the project folder
+    // Otherwise, open the default workspace
+    let folderPath = '/home/coder/workspace';
+    if (projectId) {
+      folderPath = `/home/coder/workspace/projects/${projectId}`;
+    }
+    
     // Add timestamp to force reload when workspace/project changes
-    // This ensures VSCode reloads its content when switching projects
     const timestamp = Date.now();
-    const workspaceParam = workspaceId ? `&workspace=${workspaceId}` : '';
-    const projectParam = projectId ? `&project=${projectId}` : '';
-    const url = `${baseUrl}?t=${timestamp}${workspaceParam}${projectParam}`;
+    const url = `${baseUrl}?folder=${encodeURIComponent(folderPath)}&t=${timestamp}`;
     
     setVscodeUrl(url);
   }, [workspaceId, projectId]);
