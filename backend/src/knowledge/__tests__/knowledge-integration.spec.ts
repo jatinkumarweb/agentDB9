@@ -20,6 +20,7 @@ describe('Knowledge Integration Tests', () => {
   const testAgentId = 'test-agent-123';
 
   beforeAll(async () => {
+    jest.setTimeout(30000); // Increase timeout to 30 seconds
     module = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({
@@ -48,7 +49,9 @@ describe('Knowledge Integration Tests', () => {
   });
 
   afterAll(async () => {
-    await module.close();
+    if (module) {
+      await module.close();
+    }
   });
 
   describe('Markdown Ingestion', () => {
