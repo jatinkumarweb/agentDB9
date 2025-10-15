@@ -525,8 +525,8 @@ Error: ${error.message}`;
   /**
    * Get the working directory for a conversation based on its project
    */
-  private async getWorkingDirectory(conversation: Conversation): Promise<string> {
-    if (conversation.projectId) {
+  private async getWorkingDirectory(conversation?: Conversation): Promise<string> {
+    if (conversation?.projectId) {
       try {
         const project = await this.projectsRepository.findOne({ where: { id: conversation.projectId } });
         if (project?.localPath) {
@@ -790,7 +790,8 @@ Error: ${error.message}`;
               model
             ).catch(err => console.error('Failed to save tool memory:', err));
           }
-        }
+        },
+        conversation
       );
       
       // Update the temporary message with final response
@@ -1990,7 +1991,8 @@ You: TOOL_CALL:
               model
             ).catch(err => console.error('Failed to save tool memory:', err));
           }
-        }
+        },
+        conversation
       );
       
       // Update the temporary message with final response
@@ -2060,7 +2062,8 @@ You: TOOL_CALL:
     conversationId?: string,
     progressCallback?: (status: string) => void,
     maxIterations: number = 5,
-    toolExecutionCallback?: (toolName: string, toolResult: any, observation: string) => Promise<void>
+    toolExecutionCallback?: (toolName: string, toolResult: any, observation: string) => Promise<void>,
+    conversation?: Conversation
   ): Promise<{ finalAnswer: string; steps: any[]; toolsUsed: string[] }> {
     const steps: any[] = [];
     const toolsUsed: string[] = [];
