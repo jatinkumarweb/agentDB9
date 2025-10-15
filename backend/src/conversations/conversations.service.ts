@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Conversation } from '../entities/conversation.entity';
 import { Message } from '../entities/message.entity';
 import { Agent } from '../entities/agent.entity';
+import { Project } from '../entities/project.entity';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
 import { WebSocketGateway } from '../websocket/websocket.gateway';
 import { MCPService } from '../mcp/mcp.service';
@@ -42,6 +43,8 @@ export class ConversationsService {
     private conversationsRepository: Repository<Conversation>,
     @InjectRepository(Message)
     private messagesRepository: Repository<Message>,
+    @InjectRepository(Project)
+    private projectsRepository: Repository<Project>,
     @Inject(forwardRef(() => WebSocketGateway))
     private websocketGateway: WebSocketGateway,
     private mcpService: MCPService,
@@ -341,9 +344,12 @@ Error: ${error.message}`;
       if (toolCalls.length > 0) {
         console.log(`Found ${toolCalls.length} tool calls in agent response`);
         
-        // Execute MCP tools
+        // Get working directory for project context
+        const workingDir = await this.getWorkingDirectory(conversation);
+        
+        // Execute MCP tools with project working directory
         const toolResults = await Promise.all(
-          toolCalls.map(toolCall => this.mcpService.executeTool(toolCall))
+          toolCalls.map(toolCall => this.mcpService.executeTool(toolCall, workingDir))
         );
         
         // Format tool results and append to response
@@ -516,8 +522,50 @@ Error: ${error.message}`;
     }
   }
 
-  private async buildSystemPrompt(agent: Agent, conversationId: string, userMessage: string): Promise<string> {
+  /**
+   * Get the working directory for a conversation based on its project
+   */
+  private async getWorkingDirectory(conversation: Conversation): Promise<string> {
+    if (conversation.projectId) {
+      try {
+        const project = await this.projectsRepository.findOne({ where: { id: conversation.projectId } });
+        if (project?.localPath) {
+          return project.localPath;
+        }
+      } catch (error) {
+        console.error('[Conversations] Failed to get project working directory:', error);
+      }
+    }
+    return process.env.VSCODE_WORKSPACE || '/workspace';
+  }
+
+  private async buildSystemPrompt(agent: Agent, conversationId: string, userMessage: string, conversation?: Conversation): Promise<string> {
     let systemPrompt = agent.configuration?.systemPrompt || 'You are a helpful AI assistant.';
+    
+    // Add project context if this is a workspace conversation
+    if (conversation?.projectId) {
+      try {
+        const project = await this.projectsRepository.findOne({ where: { id: conversation.projectId } });
+        if (project) {
+          systemPrompt += `\n\n## Current Project Context\n`;
+          systemPrompt += `You are working in a project workspace with the following details:\n`;
+          systemPrompt += `- **Project Name**: ${project.name}\n`;
+          systemPrompt += `- **Project Directory**: ${project.localPath || '/workspace/projects/' + project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}\n`;
+          systemPrompt += `- **Language**: ${project.language || 'Not specified'}\n`;
+          systemPrompt += `- **Framework**: ${project.framework || 'Not specified'}\n`;
+          systemPrompt += `- **Description**: ${project.description || 'No description'}\n\n`;
+          systemPrompt += `**IMPORTANT WORKING DIRECTORY RULES:**\n`;
+          systemPrompt += `1. ALL file operations (read, write, create, delete) must use paths relative to the project directory\n`;
+          systemPrompt += `2. ALL commands (npm, git, etc.) will execute in the project directory\n`;
+          systemPrompt += `3. When creating new applications/projects, use "${project.name}" as the app name\n`;
+          systemPrompt += `4. Create all source files, folders, and assets in the project root directory\n`;
+          systemPrompt += `5. For example: "src/", "public/", "dist/", "package.json" should be in project root\n`;
+          systemPrompt += `6. The project directory is already created and ready for your files\n\n`;
+        }
+      } catch (error) {
+        console.error('[ReAct] Failed to fetch project context:', error);
+      }
+    }
     
     // Add memory context if enabled
     if (agent.configuration?.memory?.enabled) {
@@ -678,8 +726,8 @@ Error: ${error.message}`;
     console.log(`🤖 ReAct: Starting for message: "${userMessage.substring(0, 100)}..."`);
     
     try {
-      // Get system prompt
-      const systemPrompt = await this.buildSystemPrompt(conversation.agent, conversation.id, userMessage);
+      // Get system prompt with project context
+      const systemPrompt = await this.buildSystemPrompt(conversation.agent, conversation.id, userMessage, conversation);
       console.log(`📝 ReAct: System prompt length: ${systemPrompt.length} chars`);
       
       // Get conversation history
@@ -1163,11 +1211,14 @@ NOTE: You have no workspace tools available. You can only provide suggestions an
                       status: 'in_progress'
                     });
                     
-                    // Execute the tool via MCP service
+                    // Get working directory for project context
+                    const workingDir = await this.getWorkingDirectory(conversation);
+                    
+                    // Execute the tool via MCP service with project working directory
                     const toolResult = await this.mcpService.executeTool({
                       name: toolName,
                       arguments: toolArgs
-                    });
+                    }, workingDir);
                     
                     // Broadcast tool execution result
                     this.websocketGateway.broadcastAgentActivity({
@@ -1868,8 +1919,8 @@ You: TOOL_CALL:
     console.log(`🤖 ReAct (External LLM): Starting for message: "${userMessage.substring(0, 100)}..."`);
     
     try {
-      // Get system prompt
-      const systemPrompt = await this.buildSystemPrompt(conversation.agent, conversation.id, userMessage);
+      // Get system prompt with project context
+      const systemPrompt = await this.buildSystemPrompt(conversation.agent, conversation.id, userMessage, conversation);
       console.log(`📝 ReAct (External LLM): System prompt length: ${systemPrompt.length} chars`);
       
       // Get conversation history
@@ -2100,11 +2151,14 @@ Provide a complete answer based on the data you already have.`;
       });
       toolsUsed.push(toolCall.name);
 
-      // Execute tool
+      // Get working directory for project context
+      const workingDir = await this.getWorkingDirectory(conversation);
+
+      // Execute tool with project working directory
       const toolResult = await this.mcpService.executeTool({
         name: toolCall.name,
         arguments: toolCall.arguments
-      });
+      }, workingDir);
 
       const observation = toolResult.success
         ? JSON.stringify(toolResult.result, null, 2)
@@ -2602,11 +2656,14 @@ TOOL_CALL:
             continue;
           }
           
-          // Execute tool and update message inline (XML legacy path)
+          // Get working directory for project context
+          const workingDir = await this.getWorkingDirectory(conversation);
+          
+          // Execute tool and update message inline (XML legacy path) with project working directory
           const toolResult = await this.mcpService.executeTool({
             name: toolName,
             arguments: args
-          });
+          }, workingDir);
           
           const resultToShow = toolResult.result !== undefined ? toolResult.result : { error: 'No result returned' };
           const toolResultText = `\n\n**Tool Executed: ${toolName}**\n\`\`\`json\n${JSON.stringify(resultToShow, null, 2)}\n\`\`\`\n`;
@@ -2652,11 +2709,14 @@ TOOL_CALL:
           status: 'in_progress'
         });
         
-        // Execute the tool
+        // Get working directory for project context
+        const workingDir = await this.getWorkingDirectory(conversation);
+        
+        // Execute the tool with project working directory
         const toolResult = await this.mcpService.executeTool({
           name: toolName,
           arguments: args
-        });
+        }, workingDir);
         
         // Broadcast tool execution result
         this.websocketGateway.broadcastAgentActivity({

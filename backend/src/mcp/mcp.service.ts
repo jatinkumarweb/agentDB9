@@ -29,10 +29,13 @@ export class MCPService {
 
   /**
    * Execute an MCP tool call for an agent
+   * @param toolCall The tool call to execute
+   * @param workingDir Optional working directory for file operations and commands (defaults to workspaceRoot)
    */
-  async executeTool(toolCall: MCPToolCall): Promise<MCPToolResult> {
+  async executeTool(toolCall: MCPToolCall, workingDir?: string): Promise<MCPToolResult> {
     const startTime = Date.now();
-    this.logger.log(`🔧 Executing MCP tool: ${toolCall.name} with args:`, JSON.stringify(toolCall.arguments));
+    const effectiveWorkingDir = workingDir || this.workspaceRoot;
+    this.logger.log(`🔧 Executing MCP tool: ${toolCall.name} in ${effectiveWorkingDir} with args:`, JSON.stringify(toolCall.arguments));
     
     try {
       // Add timeout to prevent hanging
@@ -42,7 +45,7 @@ export class MCPService {
       
       // Execute tool with timeout
       const result = await Promise.race([
-        this.executeToolDirectly(toolCall),
+        this.executeToolDirectly(toolCall, effectiveWorkingDir),
         timeoutPromise
       ]);
       
@@ -142,65 +145,65 @@ export class MCPService {
   /**
    * Execute tool directly on the file system
    */
-  private async executeToolDirectly(toolCall: MCPToolCall): Promise<any> {
+  private async executeToolDirectly(toolCall: MCPToolCall, workingDir: string): Promise<any> {
     const { name, arguments: args } = toolCall;
     
-    this.logger.log(`📂 Executing tool directly: ${name}`);
+    this.logger.log(`📂 Executing tool directly: ${name} in ${workingDir}`);
     
     try {
       let result;
       switch (name) {
         case 'read_file':
           this.logger.log(`📖 Reading file: ${args.path}`);
-          result = await this.readFile(args.path);
+          result = await this.readFile(args.path, workingDir);
           this.logger.log(`✅ Read file success, size: ${result.size} bytes`);
           return result;
           
         case 'write_file':
           this.logger.log(`✍️ Writing file: ${args.path}`);
-          result = await this.writeFile(args.path, args.content);
+          result = await this.writeFile(args.path, args.content, workingDir);
           this.logger.log(`✅ Write file success`);
           return result;
           
         case 'list_files':
           this.logger.log(`📋 Listing files in: ${args.path || '.'}`);
-          result = await this.listFiles(args.path || '.');
+          result = await this.listFiles(args.path || '.', workingDir);
           this.logger.log(`✅ List files success: ${result.total} items (${result.files.length} files, ${result.directories.length} dirs)`);
           return result;
           
         case 'execute_command':
           this.logger.log(`⚡ Executing command: ${args.command}`);
-          result = await this.executeCommand(args.command);
+          result = await this.executeCommand(args.command, workingDir);
           this.logger.log(`✅ Command executed, exit code: ${result.exitCode}`);
           return result;
           
         case 'git_status':
           this.logger.log(`🔍 Getting git status`);
-          result = await this.getGitStatus();
+          result = await this.getGitStatus(workingDir);
           this.logger.log(`✅ Git status retrieved`);
           return result;
           
         case 'git_commit':
           this.logger.log(`💾 Git commit: ${args.message}`);
-          result = await this.gitCommit(args.message, args.files);
+          result = await this.gitCommit(args.message, args.files, workingDir);
           this.logger.log(`✅ Git commit success`);
           return result;
           
         case 'create_directory':
           this.logger.log(`📁 Creating directory: ${args.path}`);
-          result = await this.createDirectory(args.path);
+          result = await this.createDirectory(args.path, workingDir);
           this.logger.log(`✅ Directory created`);
           return result;
           
         case 'delete_file':
           this.logger.log(`🗑️ Deleting file: ${args.path}`);
-          result = await this.deleteFile(args.path);
+          result = await this.deleteFile(args.path, workingDir);
           this.logger.log(`✅ File deleted`);
           return result;
           
         case 'get_workspace_summary':
           this.logger.log(`📊 Getting workspace summary`);
-          result = await this.getWorkspaceSummary();
+          result = await this.getWorkspaceSummary(workingDir);
           this.logger.log(`✅ Workspace summary retrieved`);
           return result;
           
@@ -213,8 +216,8 @@ export class MCPService {
     }
   }
 
-  private async readFile(filePath: string): Promise<any> {
-    const fullPath = path.resolve(this.workspaceRoot, filePath);
+  private async readFile(filePath: string, workingDir: string = this.workspaceRoot): Promise<any> {
+    const fullPath = path.resolve(workingDir, filePath);
     try {
       const content = await fs.readFile(fullPath, 'utf-8');
       return {
@@ -227,8 +230,8 @@ export class MCPService {
     }
   }
 
-  private async writeFile(filePath: string, content: string): Promise<any> {
-    const fullPath = path.resolve(this.workspaceRoot, filePath);
+  private async writeFile(filePath: string, content: string, workingDir: string = this.workspaceRoot): Promise<any> {
+    const fullPath = path.resolve(workingDir, filePath);
     try {
       // Ensure directory exists
       await fs.mkdir(path.dirname(fullPath), { recursive: true });
@@ -243,8 +246,8 @@ export class MCPService {
     }
   }
 
-  private async listFiles(dirPath: string): Promise<any> {
-    const fullPath = path.resolve(this.workspaceRoot, dirPath);
+  private async listFiles(dirPath: string, workingDir: string = this.workspaceRoot): Promise<any> {
+    const fullPath = path.resolve(workingDir, dirPath);
     try {
       const entries = await fs.readdir(fullPath, { withFileTypes: true });
       const files = entries
@@ -265,7 +268,7 @@ export class MCPService {
     }
   }
 
-  private async executeCommand(command: string): Promise<any> {
+  private async executeCommand(command: string, workingDir: string = this.workspaceRoot): Promise<any> {
     const timestamp = new Date().toISOString();
     const separator = '='.repeat(80);
     
@@ -275,16 +278,17 @@ export class MCPService {
         `\n${separator}\n` +
         `[${timestamp}] Executing Command\n` +
         `${separator}\n` +
-        `$ ${command}\n\n`
+        `$ ${command}\n` +
+        `Working Directory: ${workingDir}\n\n`
       );
       
       // ALL commands execute in VSCode container via MCP Server
       // This ensures consistency, proper environment, and user visibility
-      this.logger.log(`Executing command in VSCode container: ${command}`);
+      this.logger.log(`Executing command in VSCode container: ${command} (cwd: ${workingDir})`);
       
       // Parse command to extract cd directory if present
       let actualCommand = command;
-      let workingDir = '/workspace';
+      let effectiveWorkingDir = workingDir;
       
       // Match patterns like: "cd dir && command" or "cd dir; command"
       const cdMatch = command.match(/^cd\s+([^\s;&|]+)\s*(?:&&|;)\s*(.+)$/);
@@ -294,12 +298,12 @@ export class MCPService {
         
         // Handle relative paths
         if (targetDir.startsWith('/')) {
-          workingDir = targetDir;
+          effectiveWorkingDir = targetDir;
         } else {
-          workingDir = `/workspace/${targetDir}`;
+          effectiveWorkingDir = path.resolve(workingDir, targetDir);
         }
         
-        this.logger.log(`Parsed cd command: dir=${workingDir}, command=${actualCommand}`);
+        this.logger.log(`Parsed cd command: dir=${effectiveWorkingDir}, command=${actualCommand}`);
       }
       
       // Convert "npm run <script>" to direct binary execution
@@ -418,7 +422,7 @@ export class MCPService {
           tool: 'terminal_execute',
           parameters: {
             command: actualCommand,
-            cwd: workingDir,
+            cwd: effectiveWorkingDir,
             // Use longer timeout for potentially long-running commands
             // Dev servers will be handled separately in the future
             timeout: 300000, // 5 minutes
@@ -561,10 +565,10 @@ export class MCPService {
     }
   }
 
-  private async getGitStatus(): Promise<any> {
+  private async getGitStatus(workingDir: string = this.workspaceRoot): Promise<any> {
     try {
       const { stdout } = await this.execAsync('git status --porcelain', {
-        cwd: this.workspaceRoot
+        cwd: workingDir
       });
       
       const lines = stdout.trim().split('\n').filter(line => line.length > 0);
@@ -582,7 +586,7 @@ export class MCPService {
       }
       
       const { stdout: branchOutput } = await this.execAsync('git branch --show-current', {
-        cwd: this.workspaceRoot
+        cwd: workingDir
       });
       
       return {
@@ -596,20 +600,20 @@ export class MCPService {
     }
   }
 
-  private async gitCommit(message: string, files?: string[]): Promise<any> {
+  private async gitCommit(message: string, files?: string[], workingDir: string = this.workspaceRoot): Promise<any> {
     try {
       if (files && files.length > 0) {
         await this.execAsync(`git add ${files.join(' ')}`, {
-          cwd: this.workspaceRoot
+          cwd: workingDir
         });
       }
       
       const { stdout } = await this.execAsync(`git commit -m "${message}"`, {
-        cwd: this.workspaceRoot
+        cwd: workingDir
       });
       
       const { stdout: hashOutput } = await this.execAsync('git rev-parse HEAD', {
-        cwd: this.workspaceRoot
+        cwd: workingDir
       });
       
       return {
@@ -623,8 +627,8 @@ export class MCPService {
     }
   }
 
-  private async createDirectory(dirPath: string): Promise<any> {
-    const fullPath = path.resolve(this.workspaceRoot, dirPath);
+  private async createDirectory(dirPath: string, workingDir: string = this.workspaceRoot): Promise<any> {
+    const fullPath = path.resolve(workingDir, dirPath);
     try {
       await fs.mkdir(fullPath, { recursive: true });
       return {
@@ -636,8 +640,8 @@ export class MCPService {
     }
   }
 
-  private async deleteFile(filePath: string): Promise<any> {
-    const fullPath = path.resolve(this.workspaceRoot, filePath);
+  private async deleteFile(filePath: string, workingDir: string = this.workspaceRoot): Promise<any> {
+    const fullPath = path.resolve(workingDir, filePath);
     try {
       await fs.unlink(fullPath);
       return {
@@ -649,10 +653,10 @@ export class MCPService {
     }
   }
 
-  private async getWorkspaceSummary(): Promise<any> {
+  private async getWorkspaceSummary(workingDir: string = this.workspaceRoot): Promise<any> {
     try {
       // Scan workspace and provide comprehensive summary
-      const rootPath = this.workspaceRoot;
+      const rootPath = workingDir;
       
       // Get directory listing
       const files = await fs.readdir(rootPath, { withFileTypes: true });
