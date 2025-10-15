@@ -38,9 +38,10 @@ export class MCPService {
     this.logger.log(`🔧 Executing MCP tool: ${toolCall.name} in ${effectiveWorkingDir} with args:`, JSON.stringify(toolCall.arguments));
     
     try {
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging (5 minutes for long-running commands like npm install)
+      const timeoutMs = 300000; // 5 minutes
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(`Tool execution timeout after 30s`)), 30000);
+        setTimeout(() => reject(new Error(`Tool execution timeout after ${timeoutMs/1000}s`)), timeoutMs);
       });
       
       // Execute tool with timeout

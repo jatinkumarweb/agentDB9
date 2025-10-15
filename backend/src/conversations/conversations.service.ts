@@ -543,9 +543,11 @@ Error: ${error.message}`;
     let systemPrompt = agent.configuration?.systemPrompt || 'You are a helpful AI assistant.';
     
     // Add project context if this is a workspace conversation
+    console.log(`[buildSystemPrompt] Conversation ID: ${conversationId}, ProjectId: ${conversation?.projectId}`);
     if (conversation?.projectId) {
       try {
         const project = await this.projectsRepository.findOne({ where: { id: conversation.projectId } });
+        console.log(`[buildSystemPrompt] Found project:`, project ? `${project.name} (${project.id})` : 'null');
         if (project) {
           systemPrompt += `\n\n## Current Project Context\n`;
           systemPrompt += `You are working in a project workspace with the following details:\n`;
@@ -568,6 +570,7 @@ Error: ${error.message}`;
       }
     } else {
       // No project selected - add instructions for project creation
+      console.log(`[buildSystemPrompt] No project selected for conversation ${conversationId}`);
       systemPrompt += `\n\n## No Project Selected\n`;
       systemPrompt += `Currently, no project is selected. You are working in the default workspace directory: /workspace\n\n`;
       systemPrompt += `**IMPORTANT:** If the user asks you to create a new application with a specific name:\n`;
