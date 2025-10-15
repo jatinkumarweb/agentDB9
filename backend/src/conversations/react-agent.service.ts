@@ -164,6 +164,9 @@ Provide a complete answer based on the data you already have.`;
       { role: 'user', content: userMessage }
     ];
 
+    console.log(`🤖 [ReAct] Sending to Ollama with system prompt length: ${systemPrompt.length}`);
+    console.log(`🤖 [ReAct] System prompt preview: ${systemPrompt.substring(0, 300)}...`);
+
     const response = await fetch(`${ollamaUrl}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

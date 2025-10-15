@@ -544,6 +544,9 @@ Error: ${error.message}`;
   }
 
   private async buildSystemPrompt(agent: Agent, conversationId: string, userMessage: string, conversation?: Conversation): Promise<string> {
+    console.log('='.repeat(80));
+    console.log('🔨 [buildSystemPrompt] CALLED');
+    console.log('='.repeat(80));
     let systemPrompt = agent.configuration?.systemPrompt || 'You are a helpful AI assistant.';
     
     // Add project context if this is a workspace conversation
@@ -752,6 +755,12 @@ Error: ${error.message}`;
       // Get system prompt with project context
       const systemPrompt = await this.buildSystemPrompt(conversation.agent, conversation.id, userMessage, conversation);
       console.log(`📝 ReAct: System prompt length: ${systemPrompt.length} chars`);
+      console.log(`📝 ReAct: System prompt contains "Current Project Context": ${systemPrompt.includes('Current Project Context')}`);
+      console.log(`📝 ReAct: System prompt contains "No Project Selected": ${systemPrompt.includes('No Project Selected')}`);
+      if (systemPrompt.includes('Current Project Context')) {
+        const projectNameMatch = systemPrompt.match(/Project Name\*\*: (.+)/);
+        console.log(`📝 ReAct: Project name in prompt: ${projectNameMatch ? projectNameMatch[1] : 'NOT FOUND'}`);
+      }
       
       // Get conversation history
       const messages = await this.messagesRepository.find({
