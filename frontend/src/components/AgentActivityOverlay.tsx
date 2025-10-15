@@ -178,42 +178,89 @@ export const AgentActivityOverlay: React.FC<AgentActivityOverlayProps> = ({
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: -20 }}
                           className={cn(
-                            "p-2 rounded border-l-4 transition-colors",
-                            getStatusColor(activity.status)
+                            "rounded transition-colors overflow-hidden",
+                            activity.type === 'terminal_command' 
+                              ? "bg-gray-900 dark:bg-black border border-gray-700" 
+                              : cn("p-2 border-l-4", getStatusColor(activity.status))
                           )}
                         >
-                          <div className="flex items-start space-x-2">
-                            <div className="flex-shrink-0 mt-0.5">
-                              {getActivityIcon(activity.type)}
-                            </div>
-                            
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center space-x-2">
-                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                  {activity.description}
-                                </p>
-                                {getStatusIcon(activity.status)}
+                          {activity.type === 'terminal_command' ? (
+                            <div className="font-mono text-xs">
+                              {/* Terminal header */}
+                              <div className="flex items-center justify-between px-3 py-1.5 bg-gray-800 dark:bg-gray-950 border-b border-gray-700">
+                                <div className="flex items-center space-x-2">
+                                  <Terminal className="w-3 h-3 text-green-400" />
+                                  <span className="text-gray-400 text-[10px]">Terminal</span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  {getStatusIcon(activity.status)}
+                                  <span className="text-gray-500 text-[10px]">
+                                    {formatTime(activity.timestamp)}
+                                  </span>
+                                </div>
                               </div>
                               
-                              {activity.file && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">
-                                  {activity.file}
-                                </p>
-                              )}
-                              
-                              <div className="flex items-center justify-between mt-1">
-                                <span className="text-xs text-gray-400 dark:text-gray-500">
-                                  {formatTime(activity.timestamp)}
-                                </span>
-                                
-                                {activity.details?.error && (
-                                  <span className="text-xs text-red-500 truncate max-w-32" title={activity.details.error}>
-                                    Error
+                              {/* Terminal content */}
+                              <div className="p-3 space-y-1">
+                                {/* Command line */}
+                                <div className="flex items-start space-x-2">
+                                  <span className="text-green-400 flex-shrink-0">$</span>
+                                  <span className="text-gray-100 break-all">
+                                    {activity.details?.parameters?.command || activity.description.replace(/^(Executing|Completed|Failed):\s*/, '')}
                                   </span>
+                                </div>
+                                
+                                {/* Command output */}
+                                {activity.details?.result && (
+                                  <div className="text-gray-300 whitespace-pre-wrap break-words pl-4 max-h-32 overflow-y-auto">
+                                    {typeof activity.details.result === 'string' 
+                                      ? activity.details.result 
+                                      : JSON.stringify(activity.details.result, null, 2)}
+                                  </div>
+                                )}
+                                
+                                {/* Error output */}
+                                {activity.details?.error && (
+                                  <div className="text-red-400 whitespace-pre-wrap break-words pl-4">
+                                    {activity.details.error}
+                                  </div>
                                 )}
                               </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="flex items-start space-x-2">
+                              <div className="flex-shrink-0 mt-0.5">
+                                {getActivityIcon(activity.type)}
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center space-x-2">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                    {activity.description}
+                                  </p>
+                                  {getStatusIcon(activity.status)}
+                                </div>
+                                
+                                {activity.file && (
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">
+                                    {activity.file}
+                                  </p>
+                                )}
+                                
+                                <div className="flex items-center justify-between mt-1">
+                                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                                    {formatTime(activity.timestamp)}
+                                  </span>
+                                  
+                                  {activity.details?.error && (
+                                    <span className="text-xs text-red-500 truncate max-w-32" title={activity.details.error}>
+                                      Error
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </motion.div>
                       ))}
                     </div>
