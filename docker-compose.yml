@@ -121,7 +121,7 @@ services:
     volumes:
       - ./backend:/app
       - ./shared:/shared
-      - ./.volumes/agentdb9/backend-node-modules:/app/node_modules
+      - backend_node_modules:/app/node_modules
       - ./.volumes/agentdb9/workspace:/workspace:cached
       # Mount root node_modules as read-only for hoisted package resolution
       - ./node_modules:/workspace/node_modules:ro
@@ -178,7 +178,7 @@ services:
       - ./llm-service:/app
       - ./shared:/shared
       - ./models:/models
-      - ./.volumes/agentdb9/llm-service-node-modules:/app/node_modules
+      - llm_service_node_modules:/app/node_modules
       # Mount root node_modules as read-only for hoisted package resolution
       - ./node_modules:/workspace/node_modules:ro
     healthcheck:
@@ -445,7 +445,11 @@ services:
         max-size: "5m"
         max-file: "2"
 
-volumes: {}
+volumes:
+  backend_node_modules:
+    name: agentdb9_backend_node_modules
+  llm_service_node_modules:
+    name: agentdb9_llm_service_node_modules
 
 networks:
   default:

@@ -8,8 +8,6 @@ All Docker volumes are now organized under `.volumes/agentdb9/` for better manag
 
 ```
 .volumes/agentdb9/
-├── backend-node-modules/    # Backend Node.js dependencies
-├── llm-service-node-modules/ # LLM service Node.js dependencies
 ├── ollama/                   # Ollama models and data
 ├── postgres/                 # PostgreSQL database files
 ├── qdrant/                   # Qdrant vector database
@@ -18,6 +16,8 @@ All Docker volumes are now organized under `.volumes/agentdb9/` for better manag
 ├── vscode-extensions/        # VSCode extensions
 └── workspace/                # User workspace files
 ```
+
+**Note**: `node_modules` for backend and llm-service use Docker-managed volumes (not bind mounts) to preserve dependencies installed during image build.
 
 ## Benefits
 
@@ -34,9 +34,9 @@ All Docker volumes are now organized under `.volumes/agentdb9/` for better manag
 | VSCode | `/home/coder/workspace` | `.volumes/agentdb9/workspace` |
 | VSCode | `/home/coder/.local/share/code-server` | `.volumes/agentdb9/vscode-data` |
 | VSCode | `/home/coder/.local/share/code-server/extensions` | `.volumes/agentdb9/vscode-extensions` |
-| Backend | `/app/node_modules` | `.volumes/agentdb9/backend-node-modules` |
+| Backend | `/app/node_modules` | Docker volume: `agentdb9_backend_node_modules` |
 | Backend | `/workspace` | `.volumes/agentdb9/workspace` |
-| LLM Service | `/app/node_modules` | `.volumes/agentdb9/llm-service-node-modules` |
+| LLM Service | `/app/node_modules` | Docker volume: `agentdb9_llm_service_node_modules` |
 | MCP Server | `/workspace` | `.volumes/agentdb9/workspace` |
 | PostgreSQL | `/var/lib/postgresql/data` | `.volumes/agentdb9/postgres` |
 | Redis | `/data` | `.volumes/agentdb9/redis` |
@@ -55,7 +55,7 @@ docker-compose down
 rm -rf .volumes/agentdb9/
 
 # Recreate directories
-mkdir -p .volumes/agentdb9/{vscode-data,vscode-extensions,workspace,postgres,redis,qdrant,ollama,backend-node-modules,llm-service-node-modules}
+mkdir -p .volumes/agentdb9/{vscode-data,vscode-extensions,workspace,postgres,redis,qdrant,ollama}
 
 # Start services
 docker-compose up -d
@@ -127,7 +127,7 @@ mkdir -p .volumes/agentdb9
 [ -d workspace ] && cp -r workspace/* .volumes/agentdb9/workspace/
 
 # Create missing directories
-mkdir -p .volumes/agentdb9/{vscode-data,vscode-extensions,backend-node-modules,llm-service-node-modules}
+mkdir -p .volumes/agentdb9/{vscode-data,vscode-extensions}
 
 # Start services
 docker-compose up -d
