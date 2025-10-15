@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
 /**
@@ -78,17 +78,19 @@ Response includes transaction status, amount, and metadata.
     app = moduleFixture.createNestApplication();
     await app.init();
 
-    // Create test user and authenticate
-    const signupResponse = await request(app.getHttpServer())
-      .post('/api/auth/signup')
+    // Use existing admin user for authentication
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/auth/login')
       .send({
-        email: `knowledge-test-${Date.now()}@test.com`,
-        password: 'TestPassword123!',
-        name: 'Knowledge Test User',
+        email: 'admin@agentdb9.com',
+        password: 'admin123',
+      })
+      .expect((res) => {
+        expect([200, 201]).toContain(res.status);
       });
 
-    authToken = signupResponse.body.data.token;
-    userId = signupResponse.body.data.user.id;
+    authToken = loginResponse.body.accessToken;
+    userId = loginResponse.body.user.id;
   });
 
   afterAll(async () => {
