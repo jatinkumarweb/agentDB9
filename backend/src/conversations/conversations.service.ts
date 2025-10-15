@@ -555,16 +555,26 @@ Error: ${error.message}`;
           systemPrompt += `- **Framework**: ${project.framework || 'Not specified'}\n`;
           systemPrompt += `- **Description**: ${project.description || 'No description'}\n\n`;
           systemPrompt += `**IMPORTANT WORKING DIRECTORY RULES:**\n`;
-          systemPrompt += `1. ALL file operations (read, write, create, delete) must use paths relative to the project directory\n`;
+          systemPrompt += `1. ALL file operations (read, write, create, delete) must use paths relative to the project directory: ${project.localPath || '/workspace/projects/' + project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}\n`;
           systemPrompt += `2. ALL commands (npm, git, etc.) will execute in the project directory\n`;
-          systemPrompt += `3. When creating new applications/projects, use "${project.name}" as the app name\n`;
-          systemPrompt += `4. Create all source files, folders, and assets in the project root directory\n`;
-          systemPrompt += `5. For example: "src/", "public/", "dist/", "package.json" should be in project root\n`;
-          systemPrompt += `6. The project directory is already created and ready for your files\n\n`;
+          systemPrompt += `3. When creating new applications/projects, use "${project.name}" as the app name in package.json, metadata, etc.\n`;
+          systemPrompt += `4. Create all source files, folders, and assets directly in the project root directory (${project.localPath || '/workspace/projects/' + project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')})\n`;
+          systemPrompt += `5. For example: "src/", "public/", "dist/", "package.json" should be at ${project.localPath || '/workspace/projects/' + project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/\n`;
+          systemPrompt += `6. The project directory is already created and ready for your files\n`;
+          systemPrompt += `7. DO NOT create subdirectories with the app name - files go directly in project root\n\n`;
         }
       } catch (error) {
         console.error('[ReAct] Failed to fetch project context:', error);
       }
+    } else {
+      // No project selected - add instructions for project creation
+      systemPrompt += `\n\n## No Project Selected\n`;
+      systemPrompt += `Currently, no project is selected. You are working in the default workspace directory: /workspace\n\n`;
+      systemPrompt += `**IMPORTANT:** If the user asks you to create a new application with a specific name:\n`;
+      systemPrompt += `1. You should inform them that you'll create files in /workspace for now\n`;
+      systemPrompt += `2. Suggest they create a project in the UI to organize their work better\n`;
+      systemPrompt += `3. If they provide an app name (e.g., "create a React app called MyApp"), use that name in package.json and metadata\n`;
+      systemPrompt += `4. Create files directly in /workspace (not in subdirectories unless specifically requested)\n\n`;
     }
     
     // Add memory context if enabled

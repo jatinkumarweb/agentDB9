@@ -698,6 +698,7 @@ export default function WorkspacePage() {
                   <CollaborationPanel
                     isOpen={isCollaborationOpen}
                     onToggle={() => setIsCollaborationOpen(!isCollaborationOpen)}
+                    projectId={selectedProject?.id}
                   />
                 </div>
               </div>

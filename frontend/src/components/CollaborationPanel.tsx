@@ -46,12 +46,14 @@ interface CollaborationPanelProps {
   className?: string;
   isOpen: boolean;
   onToggle: () => void;
+  projectId?: string | null;
 }
 
 export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   className = '',
   isOpen,
-  onToggle
+  onToggle,
+  projectId
 }) => {
   const { isAuthenticated, token } = useAuthStore();
   const [activeUsers, setActiveUsers] = useState<User[]>([]);
@@ -568,7 +570,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         body: JSON.stringify({ 
           agentId: selectedAgent.id, 
           title: `Workspace Chat with ${selectedAgent.name}`,
-          projectId: 'default' // Mark this as a workspace conversation
+          projectId: projectId || undefined // Use actual project ID if available
         }),
       });
 
