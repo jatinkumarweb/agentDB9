@@ -5,6 +5,7 @@ import { ConversationsService } from './conversations.service';
 import { ReActAgentService } from './react-agent.service';
 import { Conversation } from '../entities/conversation.entity';
 import { Message } from '../entities/message.entity';
+import { Project } from '../entities/project.entity';
 import { WebSocketModule } from '../websocket/websocket.module';
 import { MCPModule } from '../mcp/mcp.module';
 import { MemoryModule } from '../memory/memory.module';
@@ -12,7 +13,7 @@ import { KnowledgeModule } from '../knowledge/knowledge.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Conversation, Message]),
+    TypeOrmModule.forFeature([Conversation, Message, Project]),
     forwardRef(() => WebSocketModule),
     MCPModule,
     MemoryModule,
