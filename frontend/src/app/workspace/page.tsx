@@ -355,7 +355,10 @@ export default function WorkspacePage() {
                   </button>
                   <div className="h-4 w-px bg-gray-300"></div>
                   <button
-                    onClick={() => setShowProjectSelector(true)}
+                    onClick={() => {
+                      setShowProjectSelector(true);
+                      fetchProjects();
+                    }}
                     className="flex items-center space-x-1 text-xs text-gray-600 hover:text-indigo-600 transition-colors"
                   >
                     <FolderOpen className="w-3 h-3" />

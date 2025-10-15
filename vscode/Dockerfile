@@ -16,8 +16,15 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Copy workspace initialization script
+COPY init-workspace.sh /usr/local/bin/init-workspace.sh
+RUN chmod +x /usr/local/bin/init-workspace.sh
+
 # Switch back to coder user
 USER coder
 
 # Set working directory
 WORKDIR /home/coder/workspace
+
+# Use initialization script as entrypoint
+ENTRYPOINT ["/usr/local/bin/init-workspace.sh"]
