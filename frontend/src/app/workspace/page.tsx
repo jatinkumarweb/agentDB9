@@ -186,11 +186,6 @@ export default function WorkspacePage() {
   // Handle project selection
   const handleProjectSelect = async (projectId: string | null) => {
     const project = projectId ? projects.find(p => p.id === projectId) : null;
-    setSelectedProject(project);
-    setWorkspaceState(prev => ({
-      ...prev,
-      projectId,
-    }));
     setShowProjectSelector(false);
     
     // Initialize project folder in workspace if needed
@@ -217,6 +212,8 @@ export default function WorkspacePage() {
         
         if (response.ok) {
           console.log('Project folder initialized successfully');
+          // Small delay to ensure filesystem sync
+          await new Promise(resolve => setTimeout(resolve, 500));
         } else {
           console.warn('Failed to initialize project folder:', response.status);
         }
@@ -225,8 +222,13 @@ export default function WorkspacePage() {
       }
     }
     
-    // No need to reload - the VSCode iframe will update automatically
-    // because its key prop includes projectId and projectName
+    // Update state after folder is initialized
+    // This ensures VSCode opens the folder only after it exists
+    setSelectedProject(project);
+    setWorkspaceState(prev => ({
+      ...prev,
+      projectId,
+    }));
   };
 
   // Handle create project

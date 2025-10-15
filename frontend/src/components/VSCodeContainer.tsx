@@ -49,9 +49,9 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
       folderPath = `/home/coder/workspace/projects/${safeFolderName}`;
     }
     
-    // Use workspace parameter instead of folder for better workspace switching
-    // The workspace parameter forces code-server to open the specified folder
-    const url = `${baseUrl}?workspace=${encodeURIComponent(folderPath)}`;
+    // Use folder parameter for code-server
+    // Note: code-server caches the workspace, so we rely on iframe key prop to force remount
+    const url = `${baseUrl}?folder=${encodeURIComponent(folderPath)}`;
     
     setVscodeUrl(url);
     setIsLoading(true);
