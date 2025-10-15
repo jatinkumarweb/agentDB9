@@ -328,7 +328,14 @@ app.get('/api/models', async (req, res) => {
       ...availableModels.map(model => {
         if (model.provider === 'ollama') {
           // Check if this specific model is downloaded in Ollama
-          const isDownloaded = ollamaStatus.downloadedModels.includes(model.id);
+          // Match both exact model ID and :latest variant
+          const modelBase = model.id.split(':')[0]; // e.g., "llama3.1" from "llama3.1:8b"
+          const isDownloaded = ollamaStatus.downloadedModels.some((downloaded: string) => {
+            // Exact match or base name match with :latest
+            return downloaded === model.id || 
+                   (downloaded.startsWith(modelBase + ':') && downloaded.includes(':latest'));
+          });
+          
           return {
             id: model.id,
             name: model.name,

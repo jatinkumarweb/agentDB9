@@ -6,6 +6,11 @@ export async function seedDemoData(dataSource: DataSource): Promise<void> {
   const agentRepository = dataSource.getRepository('Agent');
   const projectRepository = dataSource.getRepository('Project');
   
+  // Get admin user
+  const adminUser = await userRepository.findOne({
+    where: { email: 'admin@agentdb9.com' }
+  });
+  
   // Create demo user
   let demoUser = await userRepository.findOne({
     where: { email: 'demo@agentdb9.com' }
@@ -40,17 +45,18 @@ export async function seedDemoData(dataSource: DataSource): Promise<void> {
     console.log('✅ Demo user created: demo@agentdb9.com / demo123');
   }
 
-  // Create demo agents
-  const existingAgent = await agentRepository.findOne({
-    where: { name: 'TypeScript Assistant' }
-  });
+  // Helper function to create agents for a user
+  const createAgentsForUser = async (user: any, userLabel: string) => {
+    const existingAgent = await agentRepository.findOne({
+      where: { name: 'TypeScript Assistant', userId: user.id }
+    });
 
-  if (!existingAgent) {
-    await agentRepository.save([
+    if (!existingAgent) {
+      await agentRepository.save([
       {
         name: 'TypeScript Assistant',
         description: 'Specialized in TypeScript development, React, and Node.js',
-        userId: demoUser.id,
+        userId: user.id,
         configuration: {
           model: 'codellama:7b',
           provider: 'ollama',
@@ -77,7 +83,7 @@ export async function seedDemoData(dataSource: DataSource): Promise<void> {
       {
         name: 'Python Developer',
         description: 'Expert in Python, Django, FastAPI, and data science',
-        userId: demoUser.id,
+        userId: user.id,
         configuration: {
           model: 'deepseek-coder:6.7b',
           provider: 'ollama',
@@ -102,7 +108,7 @@ export async function seedDemoData(dataSource: DataSource): Promise<void> {
       {
         name: 'Full-Stack Assistant',
         description: 'General purpose coding assistant for multiple languages',
-        userId: demoUser.id,
+        userId: user.id,
         configuration: {
           model: 'qwen2.5-coder:7b',
           provider: 'ollama',
@@ -126,12 +132,21 @@ export async function seedDemoData(dataSource: DataSource): Promise<void> {
           { type: 'architecture', enabled: true, confidence: 0.6 }
         ]
       }
-    ]);
+      ]);
 
-    console.log('✅ Demo agents created');
-  } else {
-    console.log('ℹ️  Demo agents already exist');
+      console.log(`✅ ${userLabel} agents created`);
+    } else {
+      console.log(`ℹ️  ${userLabel} agents already exist`);
+    }
+  };
+
+  // Create agents for admin user
+  if (adminUser) {
+    await createAgentsForUser(adminUser, 'Admin');
   }
+
+  // Create agents for demo user
+  await createAgentsForUser(demoUser, 'Demo');
 
   // Create demo projects
   const existingProject = await projectRepository.findOne({
