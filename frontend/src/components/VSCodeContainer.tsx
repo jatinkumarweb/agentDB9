@@ -50,8 +50,12 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
     }
     
     // Use folder parameter for code-server
-    // Note: code-server caches the workspace, so we rely on iframe key prop to force remount
-    const url = `${baseUrl}?folder=${encodeURIComponent(folderPath)}`;
+    // Note: Don't encode the folder path - code-server expects it unencoded
+    const url = `${baseUrl}?folder=${folderPath}`;
+    
+    console.log('[VSCodeContainer] Opening folder:', folderPath);
+    console.log('[VSCodeContainer] URL:', url);
+    console.log('[VSCodeContainer] Project:', { projectId, projectName });
     
     setVscodeUrl(url);
     setIsLoading(true);
