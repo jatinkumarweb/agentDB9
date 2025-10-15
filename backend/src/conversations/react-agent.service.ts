@@ -35,7 +35,8 @@ export class ReActAgentService {
     conversationId?: string,
     progressCallback?: (status: string) => void,
     maxIterations?: number,
-    toolExecutionCallback?: (toolName: string, toolResult: any, observation: string) => Promise<void>
+    toolExecutionCallback?: (toolName: string, toolResult: any, observation: string) => Promise<void>,
+    workingDir?: string
   ): Promise<ReActResult> {
     const MAX_ITERATIONS = maxIterations || this.DEFAULT_MAX_ITERATIONS;
     const steps: ReActStep[] = [];
@@ -110,11 +111,11 @@ Provide a complete answer based on the data you already have.`;
       });
       toolsUsed.push(toolCall.name);
 
-      // Execute tool
+      // Execute tool with working directory
       const toolResult = await this.mcpService.executeTool({
         name: toolCall.name,
         arguments: toolCall.arguments
-      });
+      }, workingDir);
 
       const observation = toolResult.success
         ? JSON.stringify(toolResult.result, null, 2)

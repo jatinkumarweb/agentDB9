@@ -758,7 +758,8 @@ Error: ${error.message}`;
       // Execute ReAct loop with progress updates
       // Workspace (with projectId) gets more iterations for complex tool chains
       const maxIterations = conversation.projectId ? 10 : 2;
-      console.log(`⚙️ ReAct: Calling executeReActLoop with model ${model} (max ${maxIterations} iterations for ${conversation.projectId ? 'workspace' : 'chat'})`);
+      const workingDir = await this.getWorkingDirectory(conversation);
+      console.log(`⚙️ ReAct: Calling executeReActLoop with model ${model} (max ${maxIterations} iterations for ${conversation.projectId ? 'workspace' : 'chat'}, workingDir: ${workingDir})`);
       const result = await this.reactAgentService.executeReActLoop(
         userMessage,
         systemPrompt,
@@ -791,7 +792,7 @@ Error: ${error.message}`;
             ).catch(err => console.error('Failed to save tool memory:', err));
           }
         },
-        conversation
+        workingDir
       );
       
       // Update the temporary message with final response
