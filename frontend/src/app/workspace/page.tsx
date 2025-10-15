@@ -44,7 +44,7 @@ export default function WorkspacePage() {
     }
   }, [isLoading, isAuthenticated, router]);
 
-  // Load workspace state from localStorage on mount
+  // Load workspace state and selected project from localStorage on mount
   useEffect(() => {
     const savedState = localStorage.getItem('workspace-state');
     if (savedState) {
@@ -59,6 +59,23 @@ export default function WorkspacePage() {
       }
     }
   }, []);
+
+  // Fetch projects and restore selected project when workspace state has projectId
+  useEffect(() => {
+    if (workspaceState.projectId && projects.length === 0) {
+      fetchProjects();
+    }
+  }, [workspaceState.projectId]);
+
+  // Set selected project when projects are loaded and projectId exists
+  useEffect(() => {
+    if (workspaceState.projectId && projects.length > 0 && !selectedProject) {
+      const project = projects.find(p => p.id === workspaceState.projectId);
+      if (project) {
+        setSelectedProject(project);
+      }
+    }
+  }, [projects, workspaceState.projectId, selectedProject]);
 
   // Save workspace state to localStorage
   useEffect(() => {
@@ -199,24 +216,17 @@ export default function WorkspacePage() {
         });
         
         if (response.ok) {
-          console.log('Project folder initialized, reloading VSCode...');
-          // Just reload the page to refresh VSCode iframe
-          // VSCode will open the project folder automatically
-          window.location.reload();
+          console.log('Project folder initialized successfully');
         } else {
           console.warn('Failed to initialize project folder:', response.status);
-          // Still reload to show the project
-          window.location.reload();
         }
       } catch (error) {
         console.error('Error initializing project folder:', error);
-        // Still reload to show the project
-        window.location.reload();
       }
-    } else {
-      // No project selected, just reload to show default workspace
-      window.location.reload();
     }
+    
+    // No need to reload - the VSCode iframe will update automatically
+    // because its key prop includes projectId and projectName
   };
 
   // Handle create project

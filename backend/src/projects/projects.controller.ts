@@ -59,6 +59,15 @@ export class ProjectsController {
   async create(@Body() createProjectData: any, @CurrentUser() user: any): Promise<APIResponse> {
     try {
       const project = await this.projectsService.create(createProjectData, user.id);
+      
+      // Automatically initialize workspace folder for new project
+      try {
+        await this.projectsService.initWorkspaceFolder(project.id);
+      } catch (initError) {
+        console.error('Failed to initialize workspace folder:', initError);
+        // Don't fail the project creation if workspace init fails
+      }
+      
       return {
         success: true,
         data: project,
