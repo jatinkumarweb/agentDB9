@@ -741,14 +741,20 @@ Error: ${error.message}`;
       'update the', 'modify the', 'change the', 'edit the', 'add to', 'remove from', 'delete the',
       'fix the', 'improve the', 'refactor the', 'enhance the',
       // Creation tasks (requires file creation)
-      'create a file', 'create a component', 'build a', 'make a file', 'generate a file',
-      'setup the', 'initialize the', 'implement in', 'write to file',
+      'create a file', 'create a component', 'create a', 'create an', 'build a', 'make a file', 'generate a file',
+      'setup the', 'initialize the', 'implement in', 'write to file', 'create react', 'create next',
       // Command execution
       'run the', 'execute the', 'install', 'npm', 'git commit', 'git status'
     ];
     
-    const shouldUse = reactKeywords.some(keyword => lowerMessage.includes(keyword));
+    const matchedKeywords = reactKeywords.filter(keyword => lowerMessage.includes(keyword));
+    const shouldUse = matchedKeywords.length > 0;
     console.log(`🔍 ReACT decision for "${userMessage.substring(0, 50)}...": ${shouldUse}`);
+    if (matchedKeywords.length > 0) {
+      console.log(`🔍 Matched keywords: ${matchedKeywords.join(', ')}`);
+    } else {
+      console.log(`🔍 No keywords matched. Message: "${lowerMessage}"`);
+    }
     
     return shouldUse;
   }
