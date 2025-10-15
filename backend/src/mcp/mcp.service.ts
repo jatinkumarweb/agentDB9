@@ -35,6 +35,10 @@ export class MCPService {
   async executeTool(toolCall: MCPToolCall, workingDir?: string): Promise<MCPToolResult> {
     const startTime = Date.now();
     const effectiveWorkingDir = workingDir || this.workspaceRoot;
+    console.log(`[MCP] Tool: ${toolCall.name}`);
+    console.log(`[MCP] Working dir param: ${workingDir || 'undefined (will use default)'}`);
+    console.log(`[MCP] Effective working dir: ${effectiveWorkingDir}`);
+    console.log(`[MCP] Default workspace root: ${this.workspaceRoot}`);
     this.logger.log(`🔧 Executing MCP tool: ${toolCall.name} in ${effectiveWorkingDir} with args:`, JSON.stringify(toolCall.arguments));
     
     try {

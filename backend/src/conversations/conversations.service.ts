@@ -145,11 +145,15 @@ export class ConversationsService {
   }
 
   async create(createConversationDto: CreateConversationDto, userId: string): Promise<Conversation> {
+    console.log(`[CREATE CONVERSATION] DTO:`, JSON.stringify(createConversationDto));
+    console.log(`[CREATE CONVERSATION] ProjectId from DTO: ${createConversationDto.projectId}`);
     const conversation = this.conversationsRepository.create({
       ...createConversationDto,
       userId: userId,
     });
-    return this.conversationsRepository.save(conversation);
+    const saved = await this.conversationsRepository.save(conversation);
+    console.log(`[CREATE CONVERSATION] Saved conversation ID: ${saved.id}, ProjectId: ${saved.projectId}`);
+    return saved;
   }
 
   async getMessages(conversationId: string): Promise<Message[]> {
@@ -564,6 +568,8 @@ Error: ${error.message}`;
           systemPrompt += `5. For example: "src/", "public/", "dist/", "package.json" should be at ${project.localPath || '/workspace/projects/' + project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/\n`;
           systemPrompt += `6. The project directory is already created and ready for your files\n`;
           systemPrompt += `7. DO NOT create subdirectories with the app name - files go directly in project root\n\n`;
+          console.log(`[buildSystemPrompt] ✅ Added project context for: ${project.name}`);
+          console.log(`[buildSystemPrompt] Project directory: ${project.localPath}`);
         }
       } catch (error) {
         console.error('[ReAct] Failed to fetch project context:', error);
@@ -579,6 +585,10 @@ Error: ${error.message}`;
       systemPrompt += `3. If they provide an app name (e.g., "create a React app called MyApp"), use that name in package.json and metadata\n`;
       systemPrompt += `4. Create files directly in /workspace (not in subdirectories unless specifically requested)\n\n`;
     }
+    
+    // Log system prompt snippet for debugging
+    const promptSnippet = systemPrompt.substring(0, 500);
+    console.log(`[buildSystemPrompt] System prompt preview (first 500 chars):\n${promptSnippet}...`);
     
     // Add memory context if enabled
     if (agent.configuration?.memory?.enabled) {
