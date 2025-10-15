@@ -727,8 +727,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         initial={{ x: 300, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: 300, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
         className={cn(
-          "fixed top-0 right-0 h-full w-80 glass-card-collab border-l border-white border-opacity-20 shadow-[-8px_0_32px_rgba(31,38,135,0.15)] z-40",
+          "fixed top-0 right-0 h-full w-96 glass-card-collab border-l border-white border-opacity-20 shadow-[-8px_0_32px_rgba(31,38,135,0.15)] z-40",
           className
         )}
       >

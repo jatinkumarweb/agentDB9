@@ -663,14 +663,13 @@ export default function WorkspacePage() {
             <div className="relative z-10 h-full">
               {workspaceState.type === 'vscode' && (
                 <div className={cn(
-                  "h-full transition-all duration-300 rounded-2xl overflow-hidden",
+                  "h-full w-full transition-all duration-300 overflow-hidden",
                   "bg-white/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white/20",
-                  "m-4",
-                  isCollaborationOpen ? 'mr-[400px]' : 'mr-4'
+                  isCollaborationOpen ? 'pr-96' : ''
                 )}>
                   <VSCodeContainer 
                     key={`workspace-${workspaceState.id || 'new'}-${workspaceState.projectId || 'no-project'}`}
-                    className="h-full"
+                    className="h-full w-full"
                     showHeader={true}
                     allowPopout={true}
                     workspaceId={workspaceState.id}
