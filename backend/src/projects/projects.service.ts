@@ -55,9 +55,16 @@ export class ProjectsService {
   async initWorkspaceFolder(id: string): Promise<void> {
     const project = await this.findOne(id);
     
+    // Create a safe folder name from project name
+    // Convert to lowercase, replace spaces and special chars with hyphens
+    const safeFolderName = project.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+    
     // Path to the shared workspace volume
     const workspaceBasePath = process.env.WORKSPACE_PATH || '/workspace';
-    const projectFolderPath = path.join(workspaceBasePath, 'projects', project.id);
+    const projectFolderPath = path.join(workspaceBasePath, 'projects', safeFolderName);
     
     try {
       // Create project folder if it doesn't exist

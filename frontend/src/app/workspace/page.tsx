@@ -663,6 +663,7 @@ export default function WorkspacePage() {
                     allowPopout={true}
                     workspaceId={workspaceState.id}
                     projectId={workspaceState.projectId}
+                    projectName={selectedProject?.name || null}
                   />
                 </div>
               )}

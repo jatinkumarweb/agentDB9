@@ -12,6 +12,7 @@ interface VSCodeContainerProps {
   allowPopout?: boolean;
   workspaceId?: string | null;
   projectId?: string | null;
+  projectName?: string | null;
 }
 
 export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({ 
@@ -19,7 +20,8 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
   showHeader = true,
   allowPopout = true,
   workspaceId = null,
-  projectId = null
+  projectId = null,
+  projectName = null
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,19 +37,25 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
     const baseUrl = process.env.NEXT_PUBLIC_VSCODE_URL || 'http://localhost:8080';
     
     // Determine which folder to open
-    // If projectId is provided, open the project folder
+    // If projectName is provided, use it for the folder name
     // Otherwise, open the default workspace
     let folderPath = '/home/coder/workspace';
-    if (projectId) {
-      folderPath = `/home/coder/workspace/projects/${projectId}`;
+    if (projectName) {
+      // Create safe folder name (same logic as backend)
+      const safeFolderName = projectName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      folderPath = `/home/coder/workspace/projects/${safeFolderName}`;
     }
     
-    // Add timestamp to force reload when workspace/project changes
-    const timestamp = Date.now();
-    const url = `${baseUrl}?folder=${encodeURIComponent(folderPath)}&t=${timestamp}`;
+    // Use workspace parameter instead of folder for better workspace switching
+    // The workspace parameter forces code-server to open the specified folder
+    const url = `${baseUrl}?workspace=${encodeURIComponent(folderPath)}`;
     
     setVscodeUrl(url);
-  }, [workspaceId, projectId]);
+    setIsLoading(true);
+  }, [workspaceId, projectId, projectName]);
 
   const handleIframeLoad = () => {
     setIsLoading(false);
@@ -229,6 +237,7 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
 
         {vscodeUrl && (
           <iframe
+            key={`vscode-${projectId || 'default'}-${projectName || 'workspace'}`}
             ref={iframeRef}
             src={vscodeUrl}
             className="w-full h-full border-0"

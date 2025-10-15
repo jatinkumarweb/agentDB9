@@ -710,10 +710,8 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
               <X className="w-5 h-5 text-gray-800" />
             </button>
           </div>
-    </>
-  );
 
-        {/* Tabs */}
+          {/* Tabs */}
         <div className="flex border-b border-white border-opacity-20">
           {[
             { id: 'users', label: 'Users', icon: Users },
@@ -1073,8 +1071,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
             </div>
           )}
         </div>
-      </div>
-    </motion.div>
+        </div>
+      </motion.div>
+    </>
   );
 };
 
