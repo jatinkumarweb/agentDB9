@@ -14,15 +14,11 @@ if [[ "$OSTYPE" != "darwin"* ]]; then
     exit 1
 fi
 
-# Pull VSCode base image if not exists
-if ! docker images agentdb9-vscode:latest | grep -q agentdb9-vscode; then
-    echo "📥 Pulling VSCode base image (ARM64 for Apple Silicon)..."
-    # Pull ARM64 image using digest to ensure correct architecture
-    docker pull codercom/code-server@sha256:3ba1f602193c3ab4902fe0d2a26d9c16cd98c8e472095d4173954002c07dd4ae
-    docker tag codercom/code-server@sha256:3ba1f602193c3ab4902fe0d2a26d9c16cd98c8e472095d4173954002c07dd4ae agentdb9-vscode:latest
-    echo "✅ VSCode image ready (ARM64)"
-    echo ""
-fi
+# Build VSCode image with npm/node installed
+echo "🔨 Building VSCode image with npm/node..."
+DOCKER_BUILDKIT=0 docker-compose -f docker-compose.yml -f docker-compose.arm64.yml -f docker-compose.mac.yml build vscode
+echo "✅ VSCode image built"
+echo ""
 
 # Start services
 echo "🚀 Starting services..."

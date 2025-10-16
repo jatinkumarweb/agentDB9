@@ -4,10 +4,12 @@
 
 services:
   vscode:
-    # Use base image directly without building
-    # This avoids the "mount options is too long" error on Mac
-    image: codercom/code-server:latest
-    build: {}  # Disable build (empty object instead of null)
+    # Build custom image with npm/node installed
+    # Use DOCKER_BUILDKIT=0 to avoid BuildKit bug on Mac
+    image: agentdb9-vscode:latest
+    build:
+      context: ./vscode
+      dockerfile: Dockerfile
     # Use ARM64 for Apple Silicon Macs
     platform: linux/arm64
     # Override command to open workspace directory instead of current directory
