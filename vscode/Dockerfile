@@ -20,8 +20,15 @@ RUN apt-get update && \
 COPY init-workspace.sh /usr/local/bin/init-workspace.sh
 RUN chmod +x /usr/local/bin/init-workspace.sh
 
+# Copy dev environment setup script
+COPY setup-dev-env.sh /usr/local/bin/setup-dev-env.sh
+RUN chmod +x /usr/local/bin/setup-dev-env.sh
+
 # Switch back to coder user
 USER coder
+
+# Run dev environment setup to configure global dev server settings
+RUN /usr/local/bin/setup-dev-env.sh
 
 # Fix PATH for VSCode terminal - ensure npm/node are accessible
 # Add to both .bashrc (non-login shells) and .profile (login shells)

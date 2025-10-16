@@ -107,6 +107,57 @@ EOFNPX
   echo "npm installed to workspace bin!"
 fi
 
+# Configure VSCode to auto-forward common dev server ports
+mkdir -p /home/coder/.local/share/code-server/User
+SETTINGS_FILE="/home/coder/.local/share/code-server/User/settings.json"
+
+# Read existing settings or create empty object
+if [ -f "$SETTINGS_FILE" ]; then
+  EXISTING_SETTINGS=$(cat "$SETTINGS_FILE")
+else
+  EXISTING_SETTINGS='{}'
+fi
+
+# Add port forwarding configuration using jq if available, otherwise use simple merge
+if command -v jq &> /dev/null; then
+  echo "$EXISTING_SETTINGS" | jq '. + {
+    "remote.autoForwardPorts": true,
+    "remote.autoForwardPortsSource": "process",
+    "remote.forwardOnOpen": true,
+    "remote.portsAttributes": {
+      "3000": {"label": "React/CRA", "onAutoForward": "notify"},
+      "3001": {"label": "React Alt", "onAutoForward": "notify"},
+      "5173": {"label": "Vite", "onAutoForward": "notify"},
+      "8080": {"label": "Webpack", "onAutoForward": "notify"},
+      "4200": {"label": "Angular", "onAutoForward": "notify"},
+      "8000": {"label": "Django/Python", "onAutoForward": "notify"}
+    }
+  }' > "$SETTINGS_FILE"
+else
+  # Fallback: simple JSON merge (overwrites existing settings)
+  cat > "$SETTINGS_FILE" << 'EOFSETTINGS'
+{
+  "terminal.integrated.env.linux": {
+    "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${env:PATH}"
+  },
+  "terminal.integrated.inheritEnv": true,
+  "remote.autoForwardPorts": true,
+  "remote.autoForwardPortsSource": "process",
+  "remote.forwardOnOpen": true,
+  "remote.portsAttributes": {
+    "3000": {"label": "React/CRA", "onAutoForward": "notify"},
+    "3001": {"label": "React Alt", "onAutoForward": "notify"},
+    "5173": {"label": "Vite", "onAutoForward": "notify"},
+    "8080": {"label": "Webpack", "onAutoForward": "notify"},
+    "4200": {"label": "Angular", "onAutoForward": "notify"},
+    "8000": {"label": "Django/Python", "onAutoForward": "notify"}
+  }
+}
+EOFSETTINGS
+fi
+
+chown coder:coder "$SETTINGS_FILE"
+
 # Execute the original entrypoint
 # Use /usr/bin/entrypoint.sh from the base image with the command arguments
 exec /usr/bin/entrypoint.sh "$@"

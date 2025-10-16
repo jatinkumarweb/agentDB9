@@ -1,5 +1,8 @@
 # Mac NPM Fix - Complete Guide
 
+## Overview
+This document describes the Mac-specific npm installation fix. For information about the container-level development environment configuration (dev servers, port forwarding, etc.), see [Container-Level Dev Environment](./CONTAINER_DEV_ENV.md).
+
 ## Problem
 On macOS, `npm` was not available in VSCode terminals because the Mac workaround was using the base `codercom/code-server` image instead of our custom `agentdb9-vscode` image with npm installed.
 
@@ -144,6 +147,12 @@ This tests:
 - PATH configuration in different shell contexts
 - npm availability in interactive/non-interactive/login shells
 - VSCode settings configuration
+- Development environment variables (HOST, POLLING, etc.)
+
+## Related Documentation
+
+- [Container-Level Dev Environment](./CONTAINER_DEV_ENV.md) - Container-level configuration for dev servers
+- [Dev Server Guide](./DEV_SERVER_GUIDE.md) - Framework-specific dev server configuration
 
 ## Related Files
 
