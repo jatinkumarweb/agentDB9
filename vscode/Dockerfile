@@ -36,6 +36,22 @@ RUN echo '' >> /home/coder/.bashrc && \
 RUN mkdir -p /home/coder/.local/share/code-server/User && \
     echo '{\n  "terminal.integrated.env.linux": {\n    "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${env:PATH}"\n  },\n  "terminal.integrated.inheritEnv": true\n}' > /home/coder/.local/share/code-server/User/settings.json
 
+# Copy node/npm to workspace bin for persistent access across volume mounts
+USER root
+RUN mkdir -p /home/coder/workspace/bin && \
+    cp /usr/bin/node /home/coder/workspace/bin/ && \
+    cp -r /usr/lib/node_modules /home/coder/workspace/ && \
+    echo '#!/bin/bash\nNODE_PATH=/home/coder/workspace/node_modules /home/coder/workspace/bin/node /home/coder/workspace/node_modules/npm/bin/npm-cli.js "$@"' > /home/coder/workspace/bin/npm && \
+    echo '#!/bin/bash\nNODE_PATH=/home/coder/workspace/node_modules /home/coder/workspace/bin/node /home/coder/workspace/node_modules/npm/bin/npx-cli.js "$@"' > /home/coder/workspace/bin/npx && \
+    chmod +x /home/coder/workspace/bin/npm /home/coder/workspace/bin/npx && \
+    chown -R coder:coder /home/coder/workspace/bin /home/coder/workspace/node_modules
+
+USER coder
+
+# Add workspace bin to PATH at the beginning
+RUN sed -i '1i export PATH="/home/coder/workspace/bin:$PATH"' /home/coder/.bashrc && \
+    sed -i '1i export PATH="/home/coder/workspace/bin:$PATH"' /home/coder/.profile
+
 # Set working directory
 WORKDIR /home/coder/workspace
 
