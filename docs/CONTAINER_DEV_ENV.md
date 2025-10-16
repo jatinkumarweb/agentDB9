@@ -11,7 +11,7 @@ Development servers (React, Vite, Next.js, etc.) running in Docker containers fa
 1. **Host Binding**: Dev servers default to `localhost`, which isn't accessible from outside the container
 2. **File Watching**: Docker volume mounts require polling for file change detection
 3. **Browser Auto-Open**: Doesn't work in containerized environments
-4. **Proxy Path Issues**: VSCode's code-server proxy can have issues with asset paths
+4. **Proxy Path Issues**: VSCode's code-server proxies requests through `/proxy/<port>/`, requiring assets to be served with that base path
 
 ## Solution Architecture
 
@@ -40,6 +40,15 @@ export NEXT_PUBLIC_HOST=0.0.0.0
 
 # Disable browser auto-open (doesn't work in containers)
 export BROWSER=none
+
+# VSCode code-server proxy configuration
+# Automatically set PUBLIC_URL for correct asset paths
+export PUBLIC_URL="/proxy/3000"
+
+# Convenience aliases for common frameworks
+alias react-start='PUBLIC_URL=/proxy/3000 npm start'
+alias vite-dev='PUBLIC_URL=/proxy/5173 npm run dev'
+alias next-dev='PUBLIC_URL=/proxy/3000 npm run dev'
 ```
 
 #### 2. Shell Integration
@@ -105,20 +114,41 @@ Configured in `vscode/init-workspace.sh` to automatically detect and forward por
 
 ### For Users
 
-No action required! Just start your dev server normally:
+The environment variables are automatically applied. You can start your dev server in two ways:
+
+#### Option 1: Use Convenience Aliases (Recommended)
 
 ```bash
-# React/CRA
-npm start
+# React/CRA - automatically sets PUBLIC_URL=/proxy/3000
+react-start
 
-# Vite
-npm run dev
+# Vite - automatically sets PUBLIC_URL=/proxy/5173
+vite-dev
 
-# Next.js
-npm run dev
+# Next.js - automatically sets PUBLIC_URL=/proxy/3000
+next-dev
 ```
 
-The environment variables are automatically applied.
+#### Option 2: Standard Commands
+
+The default `PUBLIC_URL=/proxy/3000` is set automatically, which works for most React apps:
+
+```bash
+# React/CRA (uses default PUBLIC_URL=/proxy/3000)
+npm start
+
+# For other ports, set PUBLIC_URL explicitly
+PUBLIC_URL=/proxy/5173 npm run dev  # Vite
+PUBLIC_URL=/proxy/8080 npm start    # Custom port
+```
+
+#### Accessing Your App
+
+When using VSCode in the browser, access your app at:
+- Direct: `http://localhost:3001` (if port forwarding is configured)
+- Through VSCode proxy: `http://your-vscode-url/proxy/3000`
+
+All assets (JS, CSS, images) will load correctly with the `/proxy/<port>` prefix.
 
 ### For Developers
 
@@ -177,14 +207,22 @@ BROWSER=none
    npm start
    ```
 
-2. Verify it binds to `0.0.0.0`:
+2. Verify it binds to `0.0.0.0` and uses the proxy path:
    ```
    Attempting to bind to HOST environment variable: 0.0.0.0
+   Local:            http://localhost:3000/proxy/3000
+   On Your Network:  http://172.18.0.2:3000/proxy/3000
    ```
 
-3. Access from host:
+3. Verify assets load correctly:
    ```bash
-   curl http://localhost:3001
+   # Check HTML references proxy path
+   curl http://localhost:3001 | grep bundle.js
+   # Should show: <script defer src="/proxy/3000/static/js/bundle.js"></script>
+   
+   # Verify bundle loads
+   curl http://localhost:3001/proxy/3000/static/js/bundle.js | head -5
+   # Should show JavaScript code
    ```
 
 ## Benefits
@@ -206,6 +244,33 @@ BROWSER=none
 
 ## Troubleshooting
 
+### Assets Return 404 Errors
+
+If you see 404 errors for bundle.js or other assets:
+
+1. **Check PUBLIC_URL is set**:
+   ```bash
+   env | grep PUBLIC_URL
+   # Should show: PUBLIC_URL=/proxy/3000
+   ```
+
+2. **Use the convenience aliases**:
+   ```bash
+   react-start  # Instead of npm start
+   ```
+
+3. **Or set PUBLIC_URL explicitly**:
+   ```bash
+   PUBLIC_URL=/proxy/3000 npm start
+   ```
+
+4. **Verify the HTML output**:
+   ```bash
+   curl http://localhost:3001 | grep bundle.js
+   # Should show: /proxy/3000/static/js/bundle.js
+   # NOT: /static/js/bundle.js
+   ```
+
 ### Environment Variables Not Set
 
 If environment variables aren't available:
@@ -224,6 +289,7 @@ If environment variables aren't available:
    ```bash
    bash -i
    env | grep HOST
+   env | grep PUBLIC_URL
    ```
 
 ### Dev Server Not Accessible

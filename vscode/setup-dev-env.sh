@@ -26,8 +26,47 @@ export NEXT_PUBLIC_HOST=0.0.0.0
 # Disable browser auto-open (doesn't work in containers)
 export BROWSER=none
 
-# Set default ports (can be overridden per project)
-# export PORT=3000
+# VSCode code-server proxy configuration
+# Detect the port from the current directory or use default
+detect_port() {
+  # Check if package.json exists and has a start script with a port
+  if [ -f "package.json" ]; then
+    # Try to extract port from package.json scripts
+    local port=$(grep -oP '"start".*?--port[= ]\K\d+' package.json 2>/dev/null || echo "")
+    if [ -n "$port" ]; then
+      echo "$port"
+      return
+    fi
+  fi
+  
+  # Check common environment variables
+  if [ -n "$PORT" ]; then
+    echo "$PORT"
+    return
+  fi
+  
+  # Default to 3000 for React/CRA
+  echo "3000"
+}
+
+# Set PUBLIC_URL for VSCode code-server proxy
+# This function will be called when starting a dev server
+setup_public_url() {
+  local port="${1:-$(detect_port)}"
+  export PUBLIC_URL="/proxy/${port}"
+  echo "📦 PUBLIC_URL set to: $PUBLIC_URL"
+}
+
+# Auto-detect and set PUBLIC_URL based on common dev server ports
+# Users can override by calling: setup_public_url <custom_port>
+if [ -z "$PUBLIC_URL" ]; then
+  export PUBLIC_URL="/proxy/3000"
+fi
+
+# Convenience aliases for common frameworks
+alias react-start='PUBLIC_URL=/proxy/3000 npm start'
+alias vite-dev='PUBLIC_URL=/proxy/5173 npm run dev'
+alias next-dev='PUBLIC_URL=/proxy/3000 npm run dev'
 
 EOF
 
