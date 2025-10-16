@@ -23,6 +23,11 @@ RUN chmod +x /usr/local/bin/init-workspace.sh
 # Switch back to coder user
 USER coder
 
+# Fix PATH for VSCode terminal - ensure npm/node are accessible
+RUN echo '' >> /home/coder/.bashrc && \
+    echo '# Ensure standard paths are in PATH for npm/node' >> /home/coder/.bashrc && \
+    echo 'export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"' >> /home/coder/.bashrc
+
 # Set working directory
 WORKDIR /home/coder/workspace
 
