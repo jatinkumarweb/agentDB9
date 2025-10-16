@@ -50,7 +50,11 @@ USER coder
 
 # Add workspace bin to PATH at the beginning
 RUN sed -i '1i export PATH="/home/coder/workspace/bin:$PATH"' /home/coder/.bashrc && \
-    sed -i '1i export PATH="/home/coder/workspace/bin:$PATH"' /home/coder/.profile
+    sed -i '1i export PATH="/home/coder/workspace/bin:$PATH"' /home/coder/.profile && \
+    echo '# Load .bashrc for login shells' > /home/coder/.bash_profile && \
+    echo 'if [ -f ~/.bashrc ]; then' >> /home/coder/.bash_profile && \
+    echo '    . ~/.bashrc' >> /home/coder/.bash_profile && \
+    echo 'fi' >> /home/coder/.bash_profile
 
 # Set working directory
 WORKDIR /home/coder/workspace
