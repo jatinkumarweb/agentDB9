@@ -12,6 +12,15 @@ services:
       dockerfile: Dockerfile
     # Use ARM64 for Apple Silicon Macs
     platform: linux/arm64
+    # Forward common dev server ports
+    ports:
+      - "8080:8080"
+      - "9001:9001"
+      - "9002:9002"
+      - "3001:3000"  # React/Next.js dev server
+      - "3002:3001"  # Additional dev server
+      - "5173:5173"  # Vite dev server
+      - "4200:4200"  # Angular dev server
     # Override command to open workspace directory instead of current directory
     # Base image defaults to "." which causes "Workspace does not exist" error
     command: >

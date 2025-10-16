@@ -290,6 +290,10 @@ services:
       - "8080:8080"
       - "9001:9001"  # MCP server HTTP port (shared network namespace)
       - "9002:9002"  # MCP server WebSocket port (shared network namespace)
+      - "3001:3000"  # React dev server port forwarding
+      - "3002:3001"  # Additional dev server port
+      - "5173:5173"  # Vite dev server port
+      - "4200:4200"  # Angular dev server port
     environment:
       - SHELL=/bin/bash
       - DISABLE_WORKSPACE_TRUST=true
