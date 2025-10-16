@@ -32,6 +32,10 @@ RUN echo '' >> /home/coder/.bashrc && \
     echo '# Ensure standard paths are in PATH for npm/node' >> /home/coder/.profile && \
     echo 'export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"' >> /home/coder/.profile
 
+# Configure VSCode terminal to use correct PATH
+RUN mkdir -p /home/coder/.local/share/code-server/User && \
+    echo '{\n  "terminal.integrated.env.linux": {\n    "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${env:PATH}"\n  },\n  "terminal.integrated.inheritEnv": true\n}' > /home/coder/.local/share/code-server/User/settings.json
+
 # Set working directory
 WORKDIR /home/coder/workspace
 
