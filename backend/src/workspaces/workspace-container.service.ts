@@ -385,7 +385,7 @@ export class WorkspaceContainerService {
 
     const containerConfig: Docker.ContainerCreateOptions = {
       name: containerName,
-      Image: config.containerImage || 'codercom/code-server:latest',
+      Image: config.containerImage || 'agentdb9-vscode:latest',
       Env: [
         `WORKSPACE_TYPE=${workspace.type}`,
         `WORKSPACE_ID=${workspace.id}`,
