@@ -49,6 +49,27 @@ export class ProjectsService {
 
   async remove(id: string): Promise<void> {
     const project = await this.findOne(id);
+    
+    // Clean up workspace folder if it exists
+    if (project.localPath) {
+      try {
+        const fs = require('fs').promises;
+        const path = require('path');
+        
+        // Only delete if it's within the workspace directory (safety check)
+        const workspaceRoot = process.env.WORKSPACE_PATH || '/workspace';
+        if (project.localPath.startsWith(workspaceRoot)) {
+          await fs.rm(project.localPath, { recursive: true, force: true });
+          console.log(`[ProjectsService] Deleted workspace folder: ${project.localPath}`);
+        } else {
+          console.warn(`[ProjectsService] Skipped deleting folder outside workspace: ${project.localPath}`);
+        }
+      } catch (error) {
+        console.error(`[ProjectsService] Failed to delete workspace folder: ${error.message}`);
+        // Continue with database deletion even if folder cleanup fails
+      }
+    }
+    
     await this.projectsRepository.remove(project);
   }
 

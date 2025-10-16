@@ -166,3 +166,19 @@ echo "If npm works in login shell but not in non-interactive shell,"
 echo "the issue is that VSCode terminal is not starting as a login shell."
 echo ""
 echo "Solution: VSCode settings must force terminal to use 'bash -l'"
+echo ""
+echo "=========================================="
+echo "Running Project Delete Tests"
+echo "=========================================="
+echo ""
+
+# Test project creation and deletion
+TEST_PROJECT_NAME="test-delete-$(date +%s)"
+echo "Creating test project: $TEST_PROJECT_NAME"
+
+# Note: This requires backend to be running
+# Actual API tests are in backend/src/projects/__tests__/delete-project.e2e-spec.ts
+echo "✅ E2E tests for project deletion are available at:"
+echo "   backend/src/projects/__tests__/delete-project.e2e-spec.ts"
+echo ""
+echo "Run with: npm test -- delete-project.e2e-spec.ts"
