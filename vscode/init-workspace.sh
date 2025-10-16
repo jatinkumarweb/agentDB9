@@ -72,6 +72,41 @@ EOF
   echo "Default workspace initialized!"
 fi
 
+# Install npm/node to workspace bin (after volume mount)
+# This ensures npm is accessible even when workspace is mounted as a volume
+if [ ! -f "$WORKSPACE_DIR/bin/npm" ]; then
+  echo "Installing npm to workspace bin..."
+  mkdir -p "$WORKSPACE_DIR/bin"
+  
+  # Copy node binary
+  cp /usr/bin/node "$WORKSPACE_DIR/bin/"
+  
+  # Copy node_modules if not already there
+  if [ ! -d "$WORKSPACE_DIR/node_modules/npm" ]; then
+    cp -r /usr/lib/node_modules "$WORKSPACE_DIR/"
+  fi
+  
+  # Create npm wrapper script
+  cat > "$WORKSPACE_DIR/bin/npm" << 'EOFNPM'
+#!/bin/bash
+NODE_PATH=/home/coder/workspace/node_modules /home/coder/workspace/bin/node /home/coder/workspace/node_modules/npm/bin/npm-cli.js "$@"
+EOFNPM
+  
+  # Create npx wrapper script
+  cat > "$WORKSPACE_DIR/bin/npx" << 'EOFNPX'
+#!/bin/bash
+NODE_PATH=/home/coder/workspace/node_modules /home/coder/workspace/bin/node /home/coder/workspace/node_modules/npm/bin/npx-cli.js "$@"
+EOFNPX
+  
+  # Make scripts executable
+  chmod +x "$WORKSPACE_DIR/bin/npm" "$WORKSPACE_DIR/bin/npx"
+  
+  # Set ownership
+  chown -R coder:coder "$WORKSPACE_DIR/bin" "$WORKSPACE_DIR/node_modules"
+  
+  echo "npm installed to workspace bin!"
+fi
+
 # Execute the original entrypoint
 # Use /usr/bin/entrypoint.sh from the base image with the command arguments
 exec /usr/bin/entrypoint.sh "$@"
