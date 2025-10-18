@@ -14,7 +14,7 @@
     "ghcr.io/devcontainers/features/node:1": {
       "version": "22",
       "nodeGypDependencies": true,
-      "installYarnUsingApt": false
+      "installYarnUsingApt": true
     }
   },
   "customizations": {
@@ -28,8 +28,17 @@
     }
   },
   "postCreateCommand": "npm install",
-  "postStartCommand": "bash -c 'source /usr/local/share/nvm/nvm.sh && nvm install 22 && nvm alias default 22 && nvm use 22 && docker-compose up -d postgres'",
   "forwardPorts": [3000, 8000, 9000, 6333],
+  "portsAttributes": {
+    "3000": {
+      "label": "React Dev Server",
+      "onAutoForward": "notify"
+    },
+    "8000": {
+      "label": "Backend API",
+      "onAutoForward": "notify"
+    }
+  },
   "mounts": [
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
