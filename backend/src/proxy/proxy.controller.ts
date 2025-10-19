@@ -99,6 +99,7 @@ export class ProxyController {
       // This allows dev server to be configured with PUBLIC_URL=/proxy/{port}/
       const path = req.url;
       console.log('Full request path:', path);
+      console.log('Query string:', req.url.includes('?') ? req.url.split('?')[1] : 'none');
       
       // Map ports to Docker service names (for inter-container communication)
       // Can be overridden via PROXY_SERVICE_MAP env var: "3000:vscode,5173:devserver"
@@ -173,6 +174,17 @@ export class ProxyController {
       
       console.log('Response status:', response.status);
       console.log('Response content-type:', response.headers['content-type']);
+      
+      // Check if we got HTML when expecting JavaScript
+      const contentType = response.headers['content-type'] || '';
+      const isHtml = contentType.includes('text/html');
+      const requestedJs = path.includes('.js') || path.includes('.jsx') || path.includes('.ts') || path.includes('.tsx');
+      
+      if (isHtml && requestedJs) {
+        console.warn('⚠️  WARNING: Received HTML for JavaScript file!');
+        console.warn('   This usually means the dev server returned a 404 page');
+        console.warn('   Check that dev server is configured with PUBLIC_URL=/proxy/' + port);
+      }
       
       // Copy response headers
       Object.keys(response.headers).forEach(key => {
