@@ -22,6 +22,7 @@ import { MCPModule } from './mcp/mcp.module';
 import { EvaluationModule } from './evaluation/evaluation.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
+import { ProxyModule } from './proxy/proxy.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     EvaluationModule,
     KnowledgeModule,
     WorkspacesModule,
+    ProxyModule,
   ],
   controllers: [AppController],
   providers: [
