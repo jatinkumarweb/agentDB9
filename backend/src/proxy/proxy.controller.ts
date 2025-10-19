@@ -5,6 +5,17 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import axios from 'axios';
 
+/**
+ * Proxy Controller - Forwards requests to local dev servers
+ * 
+ * ⚠️  WARNING: JWT authentication is currently DISABLED for development
+ * TODO: Re-enable authentication before deploying to production
+ * 
+ * Security considerations:
+ * - CORS headers are permissive (allows any origin)
+ * - No authentication required (commented out)
+ * - Should only be used in trusted development environments
+ */
 @Controller('proxy')
 export class ProxyController {
   
@@ -24,6 +35,9 @@ export class ProxyController {
 
   /**
    * Handle OPTIONS preflight requests (no authentication required)
+   * 
+   * TODO: Re-enable JWT authentication for production
+   * Currently disabled for development/testing
    */
   @All(':port/*')
   @Public()
@@ -45,17 +59,18 @@ export class ProxyController {
       return;
     }
     
+    // TODO: TEMPORARILY DISABLED - Re-enable for production
     // For non-OPTIONS requests, require authentication
-    if (!user) {
-      console.log('=== PROXY REQUEST - UNAUTHORIZED ===');
-      res.status(401).json({
-        statusCode: 401,
-        message: 'Unauthorized - JWT token required',
-      });
-      return;
-    }
+    // if (!user) {
+    //   console.log('=== PROXY REQUEST - UNAUTHORIZED ===');
+    //   res.status(401).json({
+    //     statusCode: 401,
+    //     message: 'Unauthorized - JWT token required',
+    //   });
+    //   return;
+    // }
     
-    // Proceed with authenticated proxy request
+    // Proceed with proxy request (auth check disabled for now)
     return this.proxyRequest(port, user, req, res);
   }
 
@@ -71,7 +86,7 @@ export class ProxyController {
     res: Response,
   ) {
     console.log('=== PROXY REQUEST START ===');
-    console.log('Authenticated User:', user?.id, user?.email);
+    console.log('User:', user ? `${user.id} ${user.email}` : 'No authentication (disabled)');
     console.log('Method:', req.method);
     console.log('Original URL:', req.url);
     console.log('Port param:', port);

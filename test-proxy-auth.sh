@@ -1,12 +1,14 @@
 #!/bin/bash
 
-echo "=== Testing Proxy Authentication & CORS ==="
+echo "=== Testing Proxy (Authentication DISABLED) ==="
 echo ""
 
 BACKEND_URL="http://localhost:8000"
 
 echo "✅ Correct proxy URL: $BACKEND_URL/proxy/3000/"
 echo "❌ Wrong URL (vscode): http://localhost:8080/proxy/3000/"
+echo ""
+echo "⚠️  Note: JWT authentication is currently DISABLED for development"
 echo ""
 echo "---"
 echo ""
@@ -24,7 +26,7 @@ echo ""
 echo "---"
 echo ""
 
-echo "2. Testing proxy WITHOUT authentication (should fail with 401):"
+echo "2. Testing proxy WITHOUT authentication (should work now - auth disabled):"
 echo "   Command: curl -i $BACKEND_URL/proxy/3000/"
 echo ""
 curl -i "$BACKEND_URL/proxy/3000/" 2>&1 | head -20
