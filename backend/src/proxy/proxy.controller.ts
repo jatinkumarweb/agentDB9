@@ -100,7 +100,10 @@ export class ProxyController {
       console.log('Extracted path:', path);
       
       // Try multiple hosts for different environments (Gitpod, Docker, local)
-      const hosts = ['localhost', '0.0.0.0', '127.0.0.1'];
+      // host.docker.internal: Docker container accessing host machine
+      // localhost: Local development
+      // 0.0.0.0: Gitpod/containerized environments
+      const hosts = ['host.docker.internal', 'localhost', '0.0.0.0', '127.0.0.1'];
       let response = null;
       let lastError = null;
       
