@@ -99,23 +99,43 @@ export class ProxyController {
       const path = req.url.split(`/proxy/${port}/`)[1] || '';
       console.log('Extracted path:', path);
       
-      // Build target URL
-      const targetUrl = `http://localhost:${port}/${path}`;
-      console.log('Target URL:', targetUrl);
+      // Try multiple hosts for different environments (Gitpod, Docker, local)
+      const hosts = ['localhost', '0.0.0.0', '127.0.0.1'];
+      let response = null;
+      let lastError = null;
       
-      // Forward the request
-      console.log('Forwarding request to target...');
-      const response = await axios({
-        method: req.method,
-        url: targetUrl,
-        headers: {
-          ...req.headers,
-          host: `localhost:${port}`, // Override host header
-        },
-        data: req.body,
-        responseType: 'stream',
-        validateStatus: () => true, // Accept any status code
-      });
+      for (const host of hosts) {
+        const targetUrl = `http://${host}:${port}/${path}`;
+        console.log(`Trying: ${targetUrl}`);
+        
+        try {
+          // Forward the request
+          response = await axios({
+            method: req.method,
+            url: targetUrl,
+            headers: {
+              ...req.headers,
+              host: `${host}:${port}`, // Override host header
+            },
+            data: req.body,
+            responseType: 'stream',
+            validateStatus: () => true, // Accept any status code
+            timeout: 2000, // 2 second timeout per attempt
+          });
+          
+          console.log(`✅ Success with ${host}:${port}`);
+          break; // Success, exit loop
+        } catch (error) {
+          console.log(`❌ Failed with ${host}:${port} - ${error.message}`);
+          lastError = error;
+          continue; // Try next host
+        }
+      }
+      
+      // If all hosts failed, throw the last error
+      if (!response) {
+        throw lastError || new Error('All connection attempts failed');
+      }
       
       console.log('Response status:', response.status);
       console.log('Response content-type:', response.headers['content-type']);
