@@ -1,34 +1,74 @@
-import { Controller, All, Req, Res, Param, UseGuards } from '@nestjs/common';
+import { Controller, All, Req, Res, Param, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import axios from 'axios';
 
 @Controller('proxy')
-@UseGuards(JwtAuthGuard) // Require authentication for proxy access
 export class ProxyController {
   
   /**
    * Add CORS headers for proxy routes only
    * This allows browser access to proxied dev servers without compromising app security
    */
-  private setCorsHeaders(res: Response) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+  private setCorsHeaders(req: Request, res: Response) {
+    // Allow requests from any origin for proxy routes
+    const origin = req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
   }
+
+  /**
+   * Handle OPTIONS preflight requests (no authentication required)
+   */
+  @All(':port/*')
+  @Public()
+  async handleOptionsOrProxy(
+    @Param('port') port: string,
+    @CurrentUser() user: any,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    // Set CORS headers for all proxy requests
+    this.setCorsHeaders(req, res);
+    
+    // Handle OPTIONS preflight (no auth required)
+    if (req.method === 'OPTIONS') {
+      console.log('=== OPTIONS PREFLIGHT ===');
+      console.log('Port:', port);
+      console.log('Origin:', req.headers.origin);
+      res.status(204).send();
+      return;
+    }
+    
+    // For non-OPTIONS requests, require authentication
+    if (!user) {
+      console.log('=== PROXY REQUEST - UNAUTHORIZED ===');
+      res.status(401).json({
+        statusCode: 401,
+        message: 'Unauthorized - JWT token required',
+      });
+      return;
+    }
+    
+    // Proceed with authenticated proxy request
+    return this.proxyRequest(port, user, req, res);
+  }
+
   /**
    * Universal proxy route: /proxy/{port}/*
    * Forwards requests to localhost:{port}
    * Works for any dev server (React, Vite, Angular, etc.)
    */
-  @All(':port/*')
-  async proxyRequest(
-    @Param('port') port: string,
-    @CurrentUser() user: any,
-    @Req() req: Request,
-    @Res() res: Response,
+  private async proxyRequest(
+    port: string,
+    user: any,
+    req: Request,
+    res: Response,
   ) {
     console.log('=== PROXY REQUEST START ===');
     console.log('Authenticated User:', user?.id, user?.email);
@@ -39,16 +79,6 @@ export class ProxyController {
     console.log('Referer:', req.headers.referer);
     
     try {
-      // Set CORS headers for proxy routes only
-      console.log('Setting CORS headers...');
-      this.setCorsHeaders(res);
-      
-      // Handle OPTIONS preflight request
-      if (req.method === 'OPTIONS') {
-        console.log('Handling OPTIONS preflight - returning 204');
-        res.status(204).send();
-        return;
-      }
       
       // Extract the path after /proxy/{port}/
       const path = req.url.split(`/proxy/${port}/`)[1] || '';
