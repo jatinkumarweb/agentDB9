@@ -6,6 +6,17 @@ import axios from 'axios';
 @Controller('proxy')
 @Public() // No authentication required for proxy
 export class ProxyController {
+  
+  /**
+   * Add CORS headers for proxy routes only
+   * This allows browser access to proxied dev servers without compromising app security
+   */
+  private setCorsHeaders(res: Response) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
   /**
    * Universal proxy route: /proxy/{port}/*
    * Forwards requests to localhost:{port}
@@ -18,6 +29,15 @@ export class ProxyController {
     @Res() res: Response,
   ) {
     try {
+      // Set CORS headers for proxy routes only
+      this.setCorsHeaders(res);
+      
+      // Handle OPTIONS preflight request
+      if (req.method === 'OPTIONS') {
+        res.status(204).send();
+        return;
+      }
+      
       // Extract the path after /proxy/{port}/
       const path = req.url.split(`/proxy/${port}/`)[1] || '';
       
