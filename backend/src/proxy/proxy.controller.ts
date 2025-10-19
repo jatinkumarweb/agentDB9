@@ -28,23 +28,35 @@ export class ProxyController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
+    console.log('=== PROXY REQUEST START ===');
+    console.log('Method:', req.method);
+    console.log('Original URL:', req.url);
+    console.log('Port param:', port);
+    console.log('Origin:', req.headers.origin);
+    console.log('Referer:', req.headers.referer);
+    
     try {
       // Set CORS headers for proxy routes only
+      console.log('Setting CORS headers...');
       this.setCorsHeaders(res);
       
       // Handle OPTIONS preflight request
       if (req.method === 'OPTIONS') {
+        console.log('Handling OPTIONS preflight - returning 204');
         res.status(204).send();
         return;
       }
       
       // Extract the path after /proxy/{port}/
       const path = req.url.split(`/proxy/${port}/`)[1] || '';
+      console.log('Extracted path:', path);
       
       // Build target URL
       const targetUrl = `http://localhost:${port}/${path}`;
+      console.log('Target URL:', targetUrl);
       
       // Forward the request
+      console.log('Forwarding request to target...');
       const response = await axios({
         method: req.method,
         url: targetUrl,
@@ -57,6 +69,9 @@ export class ProxyController {
         validateStatus: () => true, // Accept any status code
       });
       
+      console.log('Response status:', response.status);
+      console.log('Response content-type:', response.headers['content-type']);
+      
       // Copy response headers
       Object.keys(response.headers).forEach(key => {
         res.setHeader(key, response.headers[key]);
@@ -67,9 +82,12 @@ export class ProxyController {
       
       // Pipe response data
       response.data.pipe(res);
+      console.log('=== PROXY REQUEST END ===');
       
     } catch (error) {
+      console.error('=== PROXY ERROR ===');
       console.error(`Proxy error for port ${port}:`, error.message);
+      console.error('Error stack:', error.stack);
       res.status(502).json({
         error: 'Bad Gateway',
         message: `Could not reach service on port ${port}`,
