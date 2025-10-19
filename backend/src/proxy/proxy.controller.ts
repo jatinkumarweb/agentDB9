@@ -1,10 +1,11 @@
-import { Controller, All, Req, Res, Param } from '@nestjs/common';
+import { Controller, All, Req, Res, Param, UseGuards } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { Public } from '../auth/decorators/public.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import axios from 'axios';
 
 @Controller('proxy')
-@Public() // No authentication required for proxy
+@UseGuards(JwtAuthGuard) // Require authentication for proxy access
 export class ProxyController {
   
   /**
@@ -25,10 +26,12 @@ export class ProxyController {
   @All(':port/*')
   async proxyRequest(
     @Param('port') port: string,
+    @CurrentUser() user: any,
     @Req() req: Request,
     @Res() res: Response,
   ) {
     console.log('=== PROXY REQUEST START ===');
+    console.log('Authenticated User:', user?.id, user?.email);
     console.log('Method:', req.method);
     console.log('Original URL:', req.url);
     console.log('Port param:', port);
