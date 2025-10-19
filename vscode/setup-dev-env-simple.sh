@@ -61,7 +61,8 @@ dev() {
   
   echo "🚀 Starting dev server on port $port"
   echo "📦 PUBLIC_URL: $PUBLIC_URL"
-  echo "🌐 Access at: http://localhost:8080/proxy/$port/"
+  echo "🌐 Access at: http://localhost:8000/proxy/$port/"
+  echo "🔐 Note: Requires authentication (JWT token)"
   echo ""
   
   # Start the dev server
