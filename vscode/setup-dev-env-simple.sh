@@ -11,8 +11,8 @@ export REACT_APP_HOST=0.0.0.0
 export VITE_HOST=0.0.0.0
 export NEXT_PUBLIC_HOST=0.0.0.0
 export BROWSER=none
-# PUBLIC_URL should be "/" for proxy mode (backend proxy handles the /proxy/{port}/ prefix)
-export PUBLIC_URL="${PUBLIC_URL:-/}"
+# PUBLIC_URL must match proxy path (proxy forwards full path to dev server)
+export PUBLIC_URL="${PUBLIC_URL:-/proxy/3000}"
 
 # ============================================================================
 # AUTO-CONFIGURATION ON FIRST DEV START
@@ -57,12 +57,12 @@ dev() {
   fi
   
   # Set environment and start dev server
-  # PUBLIC_URL should be "/" for proxy mode (proxy handles the /proxy/{port}/ prefix)
-  export PUBLIC_URL="/"
+  # PUBLIC_URL must match the proxy path so browser requests correct URLs
+  export PUBLIC_URL="/proxy/${port}"
   export PORT="$port"
   
   echo "🚀 Starting dev server on port $port"
-  echo "📦 PUBLIC_URL: $PUBLIC_URL (proxy handles /proxy/$port/ prefix)"
+  echo "📦 PUBLIC_URL: $PUBLIC_URL"
   echo "🌐 Access at: http://localhost:8000/proxy/$port/"
   echo "🔐 Note: Authentication disabled for development"
   echo ""

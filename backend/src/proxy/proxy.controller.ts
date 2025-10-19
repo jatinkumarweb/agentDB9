@@ -95,9 +95,10 @@ export class ProxyController {
     
     try {
       
-      // Extract the path after /proxy/{port}/
-      const path = req.url.split(`/proxy/${port}/`)[1] || '';
-      console.log('Extracted path:', path);
+      // Keep the full path including /proxy/{port}/ prefix
+      // This allows dev server to be configured with PUBLIC_URL=/proxy/{port}/
+      const path = req.url;
+      console.log('Full request path:', path);
       
       // Map ports to Docker service names (for inter-container communication)
       // Can be overridden via PROXY_SERVICE_MAP env var: "3000:vscode,5173:devserver"
@@ -138,7 +139,7 @@ export class ProxyController {
       let lastError = null;
       
       for (const host of hosts) {
-        const targetUrl = `http://${host}:${port}/${path}`;
+        const targetUrl = `http://${host}:${port}${path}`;
         console.log(`Trying: ${targetUrl}`);
         
         try {

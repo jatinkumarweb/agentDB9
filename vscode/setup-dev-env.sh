@@ -50,25 +50,23 @@ detect_port() {
 }
 
 # Set PUBLIC_URL for proxy mode
-# PUBLIC_URL should be "/" because the backend proxy handles the /proxy/{port}/ prefix
-# The dev server serves files from root, proxy translates the paths
+# PUBLIC_URL must match the proxy path (proxy forwards full path to dev server)
 setup_public_url() {
   local port="${1:-$(detect_port)}"
-  export PUBLIC_URL="/"
-  echo "📦 PUBLIC_URL set to: $PUBLIC_URL (proxy handles /proxy/${port}/ prefix)"
+  export PUBLIC_URL="/proxy/${port}"
+  echo "📦 PUBLIC_URL set to: $PUBLIC_URL"
 }
 
 # Auto-detect and set PUBLIC_URL for proxy mode
-# PUBLIC_URL="/" because backend proxy strips the /proxy/{port}/ prefix
+# PUBLIC_URL must include /proxy/{port}/ prefix
 if [ -z "$PUBLIC_URL" ]; then
-  export PUBLIC_URL="/"
+  export PUBLIC_URL="/proxy/3000"
 fi
 
 # Convenience aliases for common frameworks
-# PUBLIC_URL="/" because proxy handles the path prefix
-alias react-start='PUBLIC_URL=/ npm start'
-alias vite-dev='PUBLIC_URL=/ npm run dev'
-alias next-dev='PUBLIC_URL=/ npm run dev'
+alias react-start='PUBLIC_URL=/proxy/3000 npm start'
+alias vite-dev='PUBLIC_URL=/proxy/5173 npm run dev'
+alias next-dev='PUBLIC_URL=/proxy/3000 npm run dev'
 
 EOF
 

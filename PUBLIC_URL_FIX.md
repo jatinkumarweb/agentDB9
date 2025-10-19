@@ -1,43 +1,34 @@
 # PUBLIC_URL Fix for Proxy
 
-## The Problem
+## The Solution (Updated)
+
+The proxy now forwards the FULL path including `/proxy/{port}/` prefix to the dev server.
+
+### ✅ Correct Configuration
+
+```bash
+export PUBLIC_URL="/proxy/3000"
+npm start
+```
+
+### Why This Works
 
 Browser requests:
 ```
 http://localhost:8000/proxy/3000/static/js/bundle.js
 ```
 
-Proxy extracts path and requests:
+Proxy forwards FULL path to dev server:
 ```
-http://vscode:3000/static/js/bundle.js
-```
-
-Dev server returns 404 (HTML error page) because:
-- Dev server serves files at root: `/static/js/bundle.js`
-- But it's configured with `PUBLIC_URL=/proxy/3000/`
-- This makes it expect requests at `/proxy/3000/static/js/bundle.js`
-
-## The Solution
-
-**When running dev server in vscode container for proxy access:**
-
-### ❌ Wrong Configuration
-```bash
-export PUBLIC_URL="/proxy/3000"
-npm start
+http://vscode:3000/proxy/3000/static/js/bundle.js
 ```
 
-This makes the dev server expect the `/proxy/3000/` prefix in requests.
-
-### ✅ Correct Configuration
-```bash
-export PUBLIC_URL="/"
-# or
-unset PUBLIC_URL
-npm start
+Dev server (configured with `PUBLIC_URL=/proxy/3000/`):
 ```
-
-The dev server serves files at root, and the proxy handles the `/proxy/3000/` prefix.
+✅ Recognizes /proxy/3000/ prefix
+✅ Serves /static/js/bundle.js
+✅ Returns JavaScript file
+```
 
 ## How It Works
 
@@ -50,11 +41,13 @@ Requests: http://localhost:8000/proxy/3000/static/js/bundle.js
   ↓
 Backend Proxy
   ↓
-Extracts path: static/js/bundle.js
+Forwards FULL path: /proxy/3000/static/js/bundle.js
   ↓
-Requests: http://vscode:3000/static/js/bundle.js
+Requests: http://vscode:3000/proxy/3000/static/js/bundle.js
   ↓
-VSCode Dev Server (PUBLIC_URL="/")
+VSCode Dev Server (PUBLIC_URL="/proxy/3000")
+  ↓
+Recognizes /proxy/3000/ prefix
   ↓
 Serves: /static/js/bundle.js ✅
   ↓
