@@ -24,19 +24,19 @@ import { ProjectsController } from '../projects.controller';
 import { ConversationsService } from '../../conversations/conversations.service';
 import { ConversationsController } from '../../conversations/conversations.controller';
 import { AuthService } from '../../auth/auth.service';
-import { UsersService } from '../../users/users.service';
+// import { UsersService } from '../../users/users.service'; // Service doesn't exist
 import { MCPService } from '../../mcp/mcp.service';
 import { ReActAgentService } from '../../conversations/react-agent.service';
 import { MemoryService } from '../../memory/memory.service';
 import { KnowledgeService } from '../../knowledge/knowledge.service';
-import { WebsocketGateway } from '../../websocket/websocket.gateway';
+import { WebSocketGateway } from '../../websocket/websocket.gateway';
 
 describe('Project Context Flow Integration Tests', () => {
   let app: INestApplication;
   let projectsService: ProjectsService;
   let conversationsService: ConversationsService;
   let authService: AuthService;
-  let usersService: UsersService;
+  // let usersService: UsersService; // Service doesn't exist
   
   let authToken: string;
   let testUser: User;

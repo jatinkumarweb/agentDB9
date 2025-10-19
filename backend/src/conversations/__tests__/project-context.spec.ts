@@ -6,7 +6,7 @@ import { Conversation } from '../../entities/conversation.entity';
 import { Message } from '../../entities/message.entity';
 import { Project } from '../../entities/project.entity';
 import { Agent } from '../../entities/agent.entity';
-import { WebsocketGateway } from '../../websocket/websocket.gateway';
+import { WebSocketGateway } from '../../websocket/websocket.gateway';
 import { MCPService } from '../../mcp/mcp.service';
 import { ReActAgentService } from '../react-agent.service';
 import { MemoryService } from '../../memory/memory.service';
@@ -109,7 +109,7 @@ describe('ConversationsService - Project Context Flow', () => {
           },
         },
         {
-          provide: WebsocketGateway,
+          provide: WebSocketGateway,
           useValue: {
             broadcastNewMessage: jest.fn(),
             broadcastMessageUpdate: jest.fn(),
@@ -252,8 +252,8 @@ describe('ConversationsService - Project Context Flow', () => {
       expect(systemPrompt).toContain('/workspace/projects/testproject');
       expect(systemPrompt).toContain('typescript');
       expect(systemPrompt).toContain('react');
-      expect(systemPrompt).toContain('IMPORTANT WORKING DIRECTORY RULES');
-      expect(systemPrompt).toContain('DO NOT create subdirectories with the app name');
+      expect(systemPrompt).toContain('CRITICAL RULES');
+      expect(systemPrompt).toContain('NEVER create subdirectories');
     });
 
     it('should not include project context when conversation has no projectId', async () => {
@@ -266,7 +266,7 @@ describe('ConversationsService - Project Context Flow', () => {
 
       expect(projectsRepository.findOne).not.toHaveBeenCalled();
       expect(systemPrompt).toContain('No Project Selected');
-      expect(systemPrompt).toContain('default workspace directory: /workspace');
+      expect(systemPrompt).toContain('Working Directory: /workspace (default)');
       expect(systemPrompt).not.toContain('Current Project Context');
     });
 

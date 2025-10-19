@@ -1,3 +1,13 @@
+// Set environment variables before any imports
+process.env.JWT_SECRET = 'test-jwt-secret-key-for-e2e-tests-minimum-32-chars';
+process.env.SESSION_SECRET = 'test-session-secret-key-for-e2e-tests-minimum-32-chars';
+process.env.JWT_EXPIRES_IN = '1h';
+process.env.DATABASE_HOST = 'localhost';
+process.env.DATABASE_PORT = '5432';
+process.env.DATABASE_USER = 'postgres';
+process.env.DATABASE_PASSWORD = 'postgres';
+process.env.DATABASE_NAME = 'agentdb9_test';
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';

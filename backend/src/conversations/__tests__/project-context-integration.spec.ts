@@ -7,7 +7,7 @@ import { Conversation } from '../../entities/conversation.entity';
 import { Message } from '../../entities/message.entity';
 import { Project } from '../../entities/project.entity';
 import { Agent } from '../../entities/agent.entity';
-import { WebsocketGateway } from '../../websocket/websocket.gateway';
+import { WebSocketGateway } from '../../websocket/websocket.gateway';
 import { MemoryService } from '../../memory/memory.service';
 import { KnowledgeService } from '../../knowledge/knowledge.service';
 
@@ -63,8 +63,18 @@ describe('Project Context Integration Tests', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ConversationsService,
-        ReActAgentService,
-        MCPService,
+        {
+          provide: ReActAgentService,
+          useValue: {
+            executeReActLoop: jest.fn(),
+          },
+        },
+        {
+          provide: MCPService,
+          useValue: {
+            executeTool: jest.fn(),
+          },
+        },
         {
           provide: getRepositoryToken(Conversation),
           useValue: {
@@ -97,7 +107,7 @@ describe('Project Context Integration Tests', () => {
           },
         },
         {
-          provide: WebsocketGateway,
+          provide: WebSocketGateway,
           useValue: {
             broadcastNewMessage: jest.fn(),
             broadcastMessageUpdate: jest.fn(),
@@ -229,7 +239,7 @@ describe('Project Context Integration Tests', () => {
       const conversation = await conversationsService.create(createDto, 'test-user');
 
       // Verify conversation has no projectId
-      expect(conversation.projectId).toBeUndefined();
+      expect(conversation.projectId).toBeNull();
 
       // Step 2: Verify system prompt does NOT include project context
       const systemPrompt = await (conversationsService as any).buildSystemPrompt(
