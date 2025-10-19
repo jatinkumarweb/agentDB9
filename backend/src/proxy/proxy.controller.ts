@@ -99,11 +99,41 @@ export class ProxyController {
       const path = req.url.split(`/proxy/${port}/`)[1] || '';
       console.log('Extracted path:', path);
       
-      // Try multiple hosts for different environments (Gitpod, Docker, local)
-      // host.docker.internal: Docker container accessing host machine
-      // localhost: Local development
-      // 0.0.0.0: Gitpod/containerized environments
-      const hosts = ['host.docker.internal', 'localhost', '0.0.0.0', '127.0.0.1'];
+      // Map ports to Docker service names (for inter-container communication)
+      // Can be overridden via PROXY_SERVICE_MAP env var: "3000:vscode,5173:devserver"
+      const defaultServiceMap: Record<string, string> = {
+        '3000': 'vscode',  // VSCode container dev server
+        '3001': 'vscode',  // VSCode container additional port
+        '5173': 'vscode',  // Vite dev server in vscode
+        '4200': 'vscode',  // Angular dev server in vscode
+        '8080': 'vscode',  // VSCode itself
+      };
+      
+      // Parse custom mappings from environment
+      const serviceMap = { ...defaultServiceMap };
+      if (process.env.PROXY_SERVICE_MAP) {
+        const customMappings = process.env.PROXY_SERVICE_MAP.split(',');
+        customMappings.forEach(mapping => {
+          const [mapPort, service] = mapping.split(':');
+          if (mapPort && service) {
+            serviceMap[mapPort.trim()] = service.trim();
+          }
+        });
+      }
+      
+      // Build list of hosts to try
+      // Priority: Docker service name > host.docker.internal > localhost > others
+      const hosts: string[] = [];
+      
+      // If port has a known service mapping, try that first
+      if (serviceMap[port]) {
+        hosts.push(serviceMap[port]);
+        console.log(`Port ${port} mapped to service: ${serviceMap[port]}`);
+      }
+      
+      // Then try other hosts
+      hosts.push('host.docker.internal', 'localhost', '0.0.0.0', '127.0.0.1');
+      
       let response = null;
       let lastError = null;
       
