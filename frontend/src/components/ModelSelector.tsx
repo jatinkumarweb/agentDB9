@@ -198,20 +198,26 @@ export default function ModelSelector({
   }
 
   // Available models: Actually ready to use
+  // For Ollama: only show downloaded models (status === 'available')
+  // For API providers: show if API key is configured
   const availableModels = (filteredModels || []).filter(m => 
     m && (
-      m.status === 'available' || 
-      (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
-      (m.requiresApiKey && m.apiKeyConfigured) // API-based models with configured keys are ready
+      (m.provider === 'ollama' && m.status === 'available') || // Only downloaded Ollama models
+      (m.provider !== 'ollama' && (
+        m.status === 'available' || 
+        (m.status === 'unknown' && (!m.requiresApiKey || m.apiKeyConfigured)) ||
+        (m.requiresApiKey && m.apiKeyConfigured)
+      ))
     )
   );
   
-  // Unavailable but selectable: Ollama models that can be downloaded
+  // Unavailable but selectable: Empty now (Ollama models must be downloaded first)
   const unavailableSelectableModels: ModelOption[] = [];
   
-  // Disabled models: Cannot be used without configuration
+  // Disabled models: Ollama models not downloaded + API models without keys
   const disabledModels = (filteredModels || []).filter(m => 
     m && (
+      (m.provider === 'ollama' && m.status !== 'available') || // Ollama models not downloaded
       m.status === 'disabled' || 
       (m.status === 'unknown' && m.requiresApiKey && !m.apiKeyConfigured) ||
       m.status === 'error'
@@ -307,7 +313,9 @@ export default function ModelSelector({
             {disabledModels.map((model) => (
               <option key={model.id} value={model.id} disabled>
                 {model.id} - {
-                  model.requiresApiKey && !model.apiKeyConfigured 
+                  model.provider === 'ollama' && model.status !== 'available'
+                    ? 'Not Downloaded (visit /models to download)'
+                    : model.requiresApiKey && !model.apiKeyConfigured 
                     ? 'API Key Required' 
                     : 'Disabled'
                 }
@@ -319,7 +327,13 @@ export default function ModelSelector({
         
         {/* Show configuration hints */}
         {disabledModels.length > 0 && (
-          <div className="mt-2 text-xs text-gray-600">
+          <div className="mt-2 text-xs text-gray-600 space-y-1">
+            {disabledModels.some(m => m.provider === 'ollama' && m.status !== 'available') && (
+              <div className="flex items-center space-x-1">
+                <span>⚠️</span>
+                <span>Some Ollama models need to be downloaded first - visit <a href="/models" className="text-blue-600 hover:underline">/models</a> page</span>
+              </div>
+            )}
             {disabledModels.some(m => m.requiresApiKey && !m.apiKeyConfigured) && (
               <div className="flex items-center space-x-1">
                 <span>⚠️</span>

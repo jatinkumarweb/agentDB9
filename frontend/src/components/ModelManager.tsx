@@ -2,7 +2,7 @@
 import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
 import React, { useState, useEffect } from 'react';
-import { Download, Trash2, Key, Settings, RefreshCw, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Download, Trash2, Key, Settings, RefreshCw, CheckCircle, XCircle, AlertCircle, Search, ExternalLink } from 'lucide-react';
 
 interface ModelInfo {
   id: string;
@@ -32,6 +32,8 @@ export default function ModelManager() {
   const [activeTab, setActiveTab] = useState<'models' | 'providers'>('models');
   const [downloadingModels, setDownloadingModels] = useState<Set<string>>(new Set());
   const [removingModels, setRemovingModels] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'available' | 'unavailable'>('all');
 
   useEffect(() => {
     fetchModels();
@@ -307,6 +309,27 @@ export default function ModelManager() {
            !removingModels.has(model.id);
   };
 
+  const getModelDetailUrl = (modelId: string) => {
+    // Extract base model name (e.g., "llama3.1:8b" -> "llama3.1")
+    const baseName = modelId.split(':')[0];
+    return `https://ollama.com/library/${baseName}`;
+  };
+
+  const filteredModels = models.filter(model => {
+    // Search filter
+    const matchesSearch = searchQuery === '' || 
+      model.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (model.description && model.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    // Status filter
+    const matchesStatus = filterStatus === 'all' ||
+      (filterStatus === 'available' && model.status === 'available') ||
+      (filterStatus === 'unavailable' && model.status === 'unavailable');
+    
+    return matchesSearch && matchesStatus;
+  });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -351,11 +374,70 @@ export default function ModelManager() {
 
       {activeTab === 'models' && (
         <div className="space-y-6">
+          {/* Search and Filter Controls */}
+          <div className="bg-white shadow rounded-lg p-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              {/* Search */}
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search models by name or description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              
+              {/* Status Filter */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFilterStatus('all')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    filterStatus === 'all'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  All ({models.filter(m => m.provider === 'ollama').length})
+                </button>
+                <button
+                  onClick={() => setFilterStatus('available')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    filterStatus === 'available'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Downloaded ({models.filter(m => m.provider === 'ollama' && m.status === 'available').length})
+                </button>
+                <button
+                  onClick={() => setFilterStatus('unavailable')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    filterStatus === 'unavailable'
+                      ? 'bg-gray-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Available ({models.filter(m => m.provider === 'ollama' && m.status === 'unavailable').length})
+                </button>
+                <button
+                  onClick={() => fetchModels(true)}
+                  className="px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-2"
+                  title="Refresh models list"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Ollama Models */}
           <div>
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               <Settings className="w-5 h-5 mr-2" />
-              Ollama Models (Local)
+              Ollama Models ({filteredModels.filter(m => m.provider === 'ollama').length} models)
             </h2>
             <div className="bg-white shadow rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
@@ -374,14 +456,37 @@ export default function ModelManager() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {models.filter(m => m.provider === 'ollama').map((model) => (
+                    {filteredModels.filter(m => m.provider === 'ollama').length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
+                          {searchQuery ? 'No models match your search' : 'No models available'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredModels.filter(m => m.provider === 'ollama').map((model) => (
                       <tr key={model.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{model.id}</div>
-                            {model.description && (
-                              <div className="text-sm text-gray-500">{model.description}</div>
-                            )}
+                        <td className="px-6 py-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <div className="text-sm font-medium text-gray-900">{model.id}</div>
+                                <a
+                                  href={getModelDetailUrl(model.id)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-800 transition-colors"
+                                  title="View on Ollama"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
+                              </div>
+                              {model.description && (
+                                <div className="text-sm text-gray-500 mt-1 max-w-2xl">{model.description}</div>
+                              )}
+                              {model.size && (
+                                <div className="text-xs text-gray-400 mt-1">Size: {model.size}</div>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -416,7 +521,8 @@ export default function ModelManager() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    ))
+                    )}
                   </tbody>
                 </table>
               </div>
