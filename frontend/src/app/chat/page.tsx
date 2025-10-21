@@ -9,8 +9,11 @@ import AgentCreator from '@/components/AgentCreator';
 import { useAuthStore } from '@/stores/authStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useConversationCache } from '@/hooks/useConversationCache';
+import { useApprovalWorkflow } from '@/hooks/useApprovalWorkflow';
 import { fetchWithAuth } from '@/utils/fetch-with-auth';
 import GradientColorPicker from '@/components/dev/GradientColorPicker';
+import ApprovalDialog from '@/components/ApprovalDialogSimple';
+import TaskProgressBar from '@/components/TaskProgressBarSimple';
 
 interface ChatPageProps {}
 
@@ -41,6 +44,16 @@ export default function ChatPage({}: ChatPageProps) {
   // WebSocket and caching hooks
   const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff, error: wsError } = useWebSocket();
   const cache = useConversationCache();
+  
+  // Approval workflow hook
+  const {
+    pendingApproval,
+    taskProgress,
+    currentTaskPlan,
+    approveRequest,
+    rejectRequest,
+    isConnected: approvalConnected,
+  } = useApprovalWorkflow(currentConversation?.id);
 
   // Memoize stable functions to prevent useEffect dependency issues
   const formatTimestamp = useCallback((ts?: string | Date | number) => {
@@ -1150,7 +1163,7 @@ if (cachedMessages) {
 
                 {/* Connection Status */}
                 <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-4">
                     {wsConnected ? (
                       <span className="flex items-center text-green-600">
                         <div className="w-2 h-2 bg-green-500 rounded-full mr-1" />
@@ -1160,6 +1173,17 @@ if (cachedMessages) {
                       <span className="flex items-center text-orange-500">
                         <div className="w-2 h-2 bg-orange-500 rounded-full mr-1" />
                         Using polling fallback
+                      </span>
+                    )}
+                    {approvalConnected ? (
+                      <span className="flex items-center text-green-600" title="Approval system active">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-1" />
+                        Approvals active
+                      </span>
+                    ) : (
+                      <span className="flex items-center text-gray-400" title="Approval system disconnected">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full mr-1" />
+                        Approvals inactive
                       </span>
                     )}
                   </div>
@@ -1201,6 +1225,23 @@ if (cachedMessages) {
 
       {showGradientPicker && (
         <GradientColorPicker onClose={() => setShowGradientPicker(false)} />
+      )}
+
+      {/* Approval Dialog */}
+      {pendingApproval && (
+        <ApprovalDialog
+          request={pendingApproval}
+          onApprove={approveRequest}
+          onReject={rejectRequest}
+        />
+      )}
+
+      {/* Task Progress Bar */}
+      {taskProgress && currentTaskPlan && (
+        <TaskProgressBar
+          taskPlan={currentTaskPlan}
+          currentProgress={taskProgress}
+        />
       )}
     </div>
   );

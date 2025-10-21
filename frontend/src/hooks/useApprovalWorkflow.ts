@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { ApprovalRequest } from '../components/ApprovalDialog';
+import { ApprovalRequest } from '../components/ApprovalDialogSimple';
 
 interface TaskProgressUpdate {
   type: 'plan' | 'milestone_start' | 'milestone_progress' | 'milestone_complete' | 'tool_execution' | 'approval_required' | 'final_answer';
