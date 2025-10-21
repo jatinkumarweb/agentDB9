@@ -4,8 +4,14 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Conversation } from '../entities/conversation.entity';
 import { Message } from '../entities/message.entity';
+import { Project } from '../entities/project.entity';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
 import { NotFoundException } from '@nestjs/common';
+import { WebSocketGateway } from '../websocket/websocket.gateway';
+import { MCPService } from '../mcp/mcp.service';
+import { ReActAgentService } from './react-agent.service';
+import { MemoryService } from '../memory/memory.service';
+import { KnowledgeService } from '../knowledge/knowledge.service';
 
 describe('ConversationsService', () => {
   let service: ConversationsService;
@@ -55,6 +61,34 @@ describe('ConversationsService', () => {
     metadata: {},
   };
 
+  const mockWebSocketGateway = {
+    emitToConversation: jest.fn(),
+    emitToAgent: jest.fn(),
+    broadcastNewMessage: jest.fn(),
+    broadcastMessageUpdate: jest.fn(),
+  };
+
+  const mockMCPService = {
+    executeTool: jest.fn(),
+  };
+
+  const mockReActAgentService = {
+    executeReActLoop: jest.fn(),
+  };
+
+  const mockMemoryService = {
+    createMemory: jest.fn(),
+    getMemoryContext: jest.fn(),
+  };
+
+  const mockKnowledgeService = {
+    query: jest.fn(),
+  };
+
+  const mockProjectRepository = {
+    findOne: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,6 +100,30 @@ describe('ConversationsService', () => {
         {
           provide: getRepositoryToken(Message),
           useValue: mockMessageRepository,
+        },
+        {
+          provide: getRepositoryToken(Project),
+          useValue: mockProjectRepository,
+        },
+        {
+          provide: WebSocketGateway,
+          useValue: mockWebSocketGateway,
+        },
+        {
+          provide: MCPService,
+          useValue: mockMCPService,
+        },
+        {
+          provide: ReActAgentService,
+          useValue: mockReActAgentService,
+        },
+        {
+          provide: MemoryService,
+          useValue: mockMemoryService,
+        },
+        {
+          provide: KnowledgeService,
+          useValue: mockKnowledgeService,
         },
       ],
     }).compile();
@@ -171,11 +229,11 @@ describe('ConversationsService', () => {
       mockConversationRepository.create.mockReturnValue(mockConversation);
       mockConversationRepository.save.mockResolvedValue(mockConversation);
 
-      const result = await service.create(createConversationDto);
+      const result = await service.create(createConversationDto, 'user1');
 
       expect(conversationRepository.create).toHaveBeenCalledWith({
         ...createConversationDto,
-        userId: 'default-user',
+        userId: 'user1',
       });
       expect(conversationRepository.save).toHaveBeenCalledWith(mockConversation);
       expect(result).toEqual(mockConversation);
@@ -208,12 +266,12 @@ describe('ConversationsService', () => {
         new Error('Database error')
       );
 
-      await expect(service.create(createConversationDto)).rejects.toThrow(
+      await expect(service.create(createConversationDto, 'user1')).rejects.toThrow(
         'Database error'
       );
     });
 
-    it('should set default userId when not provided', async () => {
+    it('should set userId from parameter', async () => {
       const createConversationDto: CreateConversationDto = {
         title: 'New Conversation',
         agentId: 'agent1',
@@ -222,11 +280,11 @@ describe('ConversationsService', () => {
       mockConversationRepository.create.mockReturnValue(mockConversation);
       mockConversationRepository.save.mockResolvedValue(mockConversation);
 
-      await service.create(createConversationDto);
+      await service.create(createConversationDto, 'test-user');
 
       expect(conversationRepository.create).toHaveBeenCalledWith({
         ...createConversationDto,
-        userId: 'default-user',
+        userId: 'test-user',
       });
     });
   });
@@ -300,7 +358,7 @@ describe('ConversationsService', () => {
 
       expect(conversationRepository.findOne).toHaveBeenCalledWith({
         where: { id: messageData.conversationId },
-        relations: ['messages', 'agent'],
+        relations: ['agent'],
       });
       expect(messageRepository.create).toHaveBeenCalledWith(messageData);
       expect(messageRepository.save).toHaveBeenCalledWith(mockMessage);

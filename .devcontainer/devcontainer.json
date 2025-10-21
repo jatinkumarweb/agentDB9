@@ -7,10 +7,6 @@
   "workspaceFolder": "/workspaces/agentDB9",
   "shutdownAction": "none",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "version": "latest",
-      "enableNonRootDocker": "true"
-    },
     "ghcr.io/devcontainers/features/node:1": {
       "version": "22",
       "nodeGypDependencies": true,
@@ -22,7 +18,6 @@
       "extensions": [
         "ms-vscode.vscode-typescript-next",
         "bradlc.vscode-tailwindcss",
-        "ms-vscode.vscode-docker",
         "esbenp.prettier-vscode"
       ]
     }
@@ -39,9 +34,6 @@
       "onAutoForward": "notify"
     }
   },
-  "mounts": [
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-  ],
   "remoteEnv": {
     "NODE_PATH": "${containerWorkspaceFolder}/node_modules"
   }

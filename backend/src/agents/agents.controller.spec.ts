@@ -81,9 +81,9 @@ describe('AgentsController', () => {
       const agents = [mockAgent];
       mockAgentsService.findAll.mockResolvedValue(agents);
 
-      const result = await controller.findAll();
+      const result = await controller.findAll(mockUser);
 
-      expect(agentsService.findAll).toHaveBeenCalled();
+      expect(agentsService.findAll).toHaveBeenCalledWith('user1');
       expect(result).toEqual({
         success: true,
         data: agents,
@@ -93,7 +93,7 @@ describe('AgentsController', () => {
     it('should handle empty agent list', async () => {
       mockAgentsService.findAll.mockResolvedValue([]);
 
-      const result = await controller.findAll();
+      const result = await controller.findAll(mockUser);
 
       expect(result).toEqual({
         success: true,
@@ -150,10 +150,10 @@ describe('AgentsController', () => {
 
       const result = await controller.create(createAgentDto, mockUser);
 
-      expect(agentsService.create).toHaveBeenCalledWith({
-        ...createAgentDto,
-        userId: mockUser.id,
-      });
+      expect(agentsService.create).toHaveBeenCalledWith(
+        createAgentDto,
+        mockUser.id,
+      );
       expect(result).toEqual({
         success: true,
         data: mockAgent,

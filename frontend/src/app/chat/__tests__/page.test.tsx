@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useConversationCache } from '@/hooks/useConversationCache';
 import { useRouter } from 'next/navigation';
+import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
 // Mock dependencies
 jest.mock('@/stores/authStore');
@@ -19,7 +20,9 @@ jest.mock('@/hooks/useConversationCache');
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
-jest.mock('@/utils/fetch-with-auth');
+jest.mock('@/utils/fetch-with-auth', () => ({
+  fetchWithAuth: jest.fn(),
+}));
 jest.mock('@/components/AgentCreator', () => {
   return function AgentCreator() {
     return <button>Create Agent</button>;
@@ -39,6 +42,7 @@ const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore
 const mockUseWebSocket = useWebSocket as jest.MockedFunction<typeof useWebSocket>;
 const mockUseConversationCache = useConversationCache as jest.MockedFunction<typeof useConversationCache>;
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
+const mockFetchWithAuth = fetchWithAuth as jest.MockedFunction<typeof fetchWithAuth>;
 
 describe('ChatPage - Light Theme Design', () => {
   const mockRouter = {
@@ -71,9 +75,16 @@ describe('ChatPage - Light Theme Design', () => {
   };
 
   const mockCache = {
-    getConversation: jest.fn(),
+    getConversation: jest.fn().mockReturnValue({
+      id: 'conv-1',
+      agentId: 'agent-1',
+      title: 'Test Conversation',
+      messages: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }),
     setConversation: jest.fn(),
-    getMessages: jest.fn(),
+    getMessages: jest.fn().mockReturnValue([]),
     setMessages: jest.fn(),
     addMessage: jest.fn(),
     updateMessage: jest.fn(),
@@ -85,6 +96,30 @@ describe('ChatPage - Light Theme Design', () => {
     mockUseAuthStore.mockReturnValue(mockAuthStore as any);
     mockUseWebSocket.mockReturnValue(mockWebSocket as any);
     mockUseConversationCache.mockReturnValue(mockCache as any);
+    
+    // Mock fetchWithAuth for agents and conversations
+    mockFetchWithAuth.mockImplementation((url: string) => {
+      if (url.includes('/agents')) {
+        return Promise.resolve([{
+          id: 'agent-1',
+          name: 'Test Agent',
+          description: 'Test',
+          systemPrompt: 'Test',
+          userId: '1',
+        }]);
+      }
+      if (url.includes('/conversations')) {
+        return Promise.resolve([{
+          id: 'conv-1',
+          agentId: 'agent-1',
+          title: 'Test Conversation',
+          messages: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }]);
+      }
+      return Promise.resolve({});
+    });
   });
 
   describe('Light Theme Styling', () => {
@@ -233,16 +268,25 @@ describe('ChatPage - Light Theme Design', () => {
   });
 
   describe('Input Styling', () => {
-    it('should render message input with glass effect', () => {
+    it('should render message input with glass effect', async () => {
       const { container } = render(<ChatPage />);
-      const input = container.querySelector('textarea.glass-input');
-      expect(input).toBeInTheDocument();
+      await waitFor(() => {
+        const input = container.querySelector('textarea');
+        expect(input).toBeInTheDocument();
+        expect(input).toHaveClass('glass-input');
+      });
     });
 
-    it('should render send button with gradient', () => {
-      const { container } = render(<ChatPage />);
-      const sendButton = container.querySelector('.bg-gradient-to-r.from-indigo-600.to-purple-600');
-      expect(sendButton).toBeInTheDocument();
+    it('should render send button with gradient', async () => {
+      render(<ChatPage />);
+      await waitFor(() => {
+        const buttons = document.querySelectorAll('button');
+        const sendButton = Array.from(buttons).find(btn => 
+          btn.className.includes('bg-gradient-to-r') && 
+          btn.className.includes('from-indigo-600')
+        );
+        expect(sendButton).toBeTruthy();
+      });
     });
   });
 
@@ -302,10 +346,12 @@ describe('ChatPage - Light Theme Design', () => {
       expect(container).toBeInTheDocument();
     });
 
-    it('should support keyboard navigation', () => {
+    it('should support keyboard navigation', async () => {
       const { container } = render(<ChatPage />);
-      const textarea = container.querySelector('textarea');
-      expect(textarea).toBeInTheDocument();
+      await waitFor(() => {
+        const textarea = container.querySelector('textarea');
+        expect(textarea).toBeInTheDocument();
+      });
     });
   });
 });

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { APP_GUARD } from '@nestjs/core';
 import configuration from './config/configuration';
 import { validationSchema } from './config/validation.schema';
@@ -35,6 +36,7 @@ import { ProxyModule } from './proxy/proxy.module';
         abortEarly: true,
       },
     }),
+    EventEmitterModule.forRoot(),
     TypeOrmModule.forRoot(
       process.env.DATABASE_URL?.startsWith('sqlite:')
         ? {

@@ -37,6 +37,12 @@ describe('ConversationsController', () => {
     metadata: {},
   };
 
+  const mockUser = {
+    id: 'user1',
+    email: 'test@example.com',
+    username: 'testuser',
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ConversationsController],
@@ -62,9 +68,9 @@ describe('ConversationsController', () => {
       const conversations = [mockConversation];
       mockConversationsService.findByAgent.mockResolvedValue(conversations);
 
-      const result = await controller.findByAgent(agentId);
+      const result = await controller.findByAgent(agentId, mockUser);
 
-      expect(conversationsService.findByAgent).toHaveBeenCalledWith(agentId);
+      expect(conversationsService.findByAgent).toHaveBeenCalledWith(agentId, mockUser.id);
       expect(result).toEqual({
         success: true,
         data: conversations,
@@ -72,8 +78,8 @@ describe('ConversationsController', () => {
     });
 
     it('should throw BadRequestException when agentId is missing', async () => {
-      await expect(controller.findByAgent('')).rejects.toThrow(HttpException);
-      await expect(controller.findByAgent(undefined)).rejects.toThrow(HttpException);
+      await expect(controller.findByAgent('', mockUser)).rejects.toThrow(HttpException);
+      await expect(controller.findByAgent(undefined, mockUser)).rejects.toThrow(HttpException);
     });
 
     it('should handle service errors', async () => {
@@ -82,14 +88,14 @@ describe('ConversationsController', () => {
         new Error('Database error')
       );
 
-      await expect(controller.findByAgent(agentId)).rejects.toThrow(HttpException);
+      await expect(controller.findByAgent(agentId, mockUser)).rejects.toThrow(HttpException);
     });
 
     it('should return empty array when no conversations exist', async () => {
       const agentId = 'agent1';
       mockConversationsService.findByAgent.mockResolvedValue([]);
 
-      const result = await controller.findByAgent(agentId);
+      const result = await controller.findByAgent(agentId, mockUser);
 
       expect(result).toEqual({
         success: true,
@@ -104,9 +110,9 @@ describe('ConversationsController', () => {
       const conversations = [mockConversation];
       mockConversationsService.findByAgent.mockResolvedValue(conversations);
 
-      const result = await controller.findConversationsByAgent(agentId);
+      const result = await controller.findConversationsByAgent(agentId, mockUser);
 
-      expect(conversationsService.findByAgent).toHaveBeenCalledWith(agentId);
+      expect(conversationsService.findByAgent).toHaveBeenCalledWith(agentId, mockUser.id);
       expect(result).toEqual({
         success: true,
         data: conversations,
@@ -119,7 +125,7 @@ describe('ConversationsController', () => {
         new Error('Database error')
       );
 
-      await expect(controller.findConversationsByAgent(agentId)).rejects.toThrow(
+      await expect(controller.findConversationsByAgent(agentId, mockUser)).rejects.toThrow(
         HttpException
       );
     });
@@ -171,10 +177,11 @@ describe('ConversationsController', () => {
 
       mockConversationsService.create.mockResolvedValue(mockConversation);
 
-      const result = await controller.create(createConversationDto);
+      const result = await controller.create(createConversationDto, mockUser);
 
       expect(conversationsService.create).toHaveBeenCalledWith(
-        createConversationDto
+        createConversationDto,
+        mockUser.id
       );
       expect(result).toEqual({
         success: true,
@@ -192,7 +199,7 @@ describe('ConversationsController', () => {
         new Error('Validation failed')
       );
 
-      await expect(controller.create(invalidDto)).rejects.toThrow(HttpException);
+      await expect(controller.create(invalidDto, mockUser)).rejects.toThrow(HttpException);
     });
 
     it('should handle missing required fields', async () => {
@@ -205,7 +212,7 @@ describe('ConversationsController', () => {
         new Error('Agent ID is required')
       );
 
-      await expect(controller.create(incompleteDto)).rejects.toThrow(
+      await expect(controller.create(incompleteDto, mockUser)).rejects.toThrow(
         HttpException
       );
     });
@@ -220,7 +227,7 @@ describe('ConversationsController', () => {
         new Error('Database error')
       );
 
-      await expect(controller.create(createConversationDto)).rejects.toThrow(
+      await expect(controller.create(createConversationDto, mockUser)).rejects.toThrow(
         HttpException
       );
     });

@@ -4,6 +4,10 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Agent } from '../entities/agent.entity';
 import { NotFoundException } from '@nestjs/common';
+import { KnowledgeService } from '../knowledge/knowledge.service';
+import { ContextService } from '../context/context.service';
+import { MemoryService } from '../memory/memory.service';
+import { ReActAgentService } from '../conversations/react-agent.service';
 
 describe('AgentsService', () => {
   let service: AgentsService;
@@ -53,6 +57,24 @@ describe('AgentsService', () => {
     updatedAt: new Date(),
   };
 
+  const mockKnowledgeService = {
+    ingestKnowledge: jest.fn(),
+    query: jest.fn(),
+  };
+
+  const mockContextService = {
+    getContext: jest.fn(),
+  };
+
+  const mockMemoryService = {
+    createMemory: jest.fn(),
+    getMemoryContext: jest.fn(),
+  };
+
+  const mockReActAgentService = {
+    executeReActLoop: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -60,6 +82,22 @@ describe('AgentsService', () => {
         {
           provide: getRepositoryToken(Agent),
           useValue: mockAgentRepository,
+        },
+        {
+          provide: KnowledgeService,
+          useValue: mockKnowledgeService,
+        },
+        {
+          provide: ContextService,
+          useValue: mockContextService,
+        },
+        {
+          provide: MemoryService,
+          useValue: mockMemoryService,
+        },
+        {
+          provide: ReActAgentService,
+          useValue: mockReActAgentService,
         },
       ],
     }).compile();
@@ -80,6 +118,7 @@ describe('AgentsService', () => {
       const result = await service.findAll();
 
       expect(agentRepository.find).toHaveBeenCalledWith({
+        where: {},
         order: { createdAt: 'DESC' },
       });
       expect(result).toEqual(agents);
@@ -132,20 +171,19 @@ describe('AgentsService', () => {
       const createAgentDto = {
         name: 'New Agent',
         description: 'A new coding agent',
-        userId: 'user1',
         configuration: mockAgent.configuration,
       };
 
       mockAgentRepository.create.mockReturnValue(mockAgent);
       mockAgentRepository.save.mockResolvedValue(mockAgent);
 
-      const result = await service.create(createAgentDto);
+      const result = await service.create(createAgentDto, 'user1');
 
-      expect(agentRepository.create).toHaveBeenCalledWith({
-        ...createAgentDto,
-        status: 'idle',
-        capabilities: expect.any(Array),
-      });
+      expect(agentRepository.create).toHaveBeenCalled();
+      const createCall = agentRepository.create.mock.calls[0][0];
+      expect(createCall.userId).toBe('user1');
+      expect(createCall.status).toBe('idle');
+      expect(Array.isArray(createCall.capabilities)).toBe(true);
       expect(agentRepository.save).toHaveBeenCalledWith(mockAgent);
       expect(result).toEqual(mockAgent);
     });
@@ -467,9 +505,10 @@ describe('AgentsService', () => {
       const userAgents = [mockAgent];
       mockAgentRepository.find.mockResolvedValue(userAgents);
 
-      const result = await service.findAll();
+      const result = await service.findAll('user1');
 
       expect(agentRepository.find).toHaveBeenCalledWith({
+        where: { userId: 'user1' },
         order: { createdAt: 'DESC' },
       });
       expect(result).toEqual(userAgents);

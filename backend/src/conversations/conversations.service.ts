@@ -818,7 +818,19 @@ Error: ${error.message}`;
         conversationHistory,
         conversation.id,
         (status: string) => {
-          // Broadcast progress via WebSocket
+          // Check if status is a JSON string (task progress update)
+          try {
+            const parsed = JSON.parse(status);
+            if (parsed.type) {
+              // This is a task progress update
+              this.websocketGateway.broadcastTaskProgress(conversation.id, parsed);
+              return;
+            }
+          } catch (e) {
+            // Not JSON, treat as regular status string
+          }
+          
+          // Broadcast regular progress via WebSocket
           this.websocketGateway.broadcastMessageUpdate(
             conversation.id,
             savedTempMessage.id,
@@ -842,7 +854,9 @@ Error: ${error.message}`;
             ).catch(err => console.error('Failed to save tool memory:', err));
           }
         },
-        workingDir
+        workingDir,
+        conversation.agentId,
+        true // Enable task planning
       );
       
       // Update the temporary message with final response

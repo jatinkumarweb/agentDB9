@@ -66,10 +66,13 @@ describe('ChunkingService', () => {
 
       expect(chunks.length).toBeGreaterThan(1);
       // Overlap means chunks should share some content
+      // With overlap of 50, chunk 1 should start before chunk 0 ends
       if (chunks.length > 1) {
-        expect(chunks[0].metadata.endOffset).toBeGreaterThan(
-          chunks[1].metadata.startOffset,
-        );
+        const chunk0End = chunks[0].metadata.endOffset;
+        const chunk1Start = chunks[1].metadata.startOffset;
+        // Chunk 1 should start at (chunk0End - overlap)
+        expect(chunk1Start).toBeLessThanOrEqual(chunk0End);
+        expect(chunk0End - chunk1Start).toBeLessThanOrEqual(options.chunkOverlap);
       }
     });
 

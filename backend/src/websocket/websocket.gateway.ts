@@ -107,6 +107,27 @@ export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnec
     });
   }
 
+  @SubscribeMessage('approval_response')
+  handleApprovalResponse(
+    @MessageBody() data: {
+      requestId: string;
+      status: 'approved' | 'rejected' | 'timeout';
+      modifiedCommand?: string;
+      selectedPackages?: string[];
+      comment?: string;
+      rememberChoice?: boolean;
+    },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.logger.log(`Approval response received for request ${data.requestId}: ${data.status}`);
+    
+    // Emit event for approval service to handle
+    this.server.emit('approval_response_received', {
+      ...data,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   // Method to broadcast environment health updates
   broadcastEnvironmentHealth(health: any) {
     this.monitoringClients.forEach(clientId => {
@@ -136,6 +157,28 @@ export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnec
       content,
       streaming,
       metadata,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Method to broadcast approval requests
+  broadcastApprovalRequest(conversationId: string, approvalRequest: any) {
+    const room = `conversation_${conversationId}`;
+    this.logger.log(`Broadcasting approval request to room ${room}: requestId=${approvalRequest.id}, type=${approvalRequest.type}`);
+    this.server.to(room).emit('approval_request', {
+      conversationId,
+      request: approvalRequest,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Method to broadcast task progress updates
+  broadcastTaskProgress(conversationId: string, progressUpdate: any) {
+    const room = `conversation_${conversationId}`;
+    this.logger.log(`Broadcasting task progress to room ${room}: type=${progressUpdate.type}`);
+    this.server.to(room).emit('task_progress', {
+      conversationId,
+      progress: progressUpdate,
       timestamp: new Date().toISOString(),
     });
   }

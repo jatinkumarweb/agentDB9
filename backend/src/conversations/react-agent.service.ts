@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MCPService } from '../mcp/mcp.service';
 import { parseJSON } from '../common/utils/json-parser.util';
+import { TaskPlan, TaskMilestone, TaskProgressUpdate } from '../common/interfaces/approval.interface';
+import { generateId } from '@agentdb9/shared';
 
 interface ReActStep {
   thought?: string;
@@ -8,12 +10,15 @@ interface ReActStep {
   actionInput?: any;
   observation?: string;
   answer?: string;
+  milestoneId?: string;
 }
 
 interface ReActResult {
   finalAnswer: string;
   steps: ReActStep[];
   toolsUsed: string[];
+  taskPlan?: TaskPlan;
+  milestonesCompleted?: number;
 }
 
 @Injectable()
@@ -24,7 +29,7 @@ export class ReActAgentService {
   constructor(private readonly mcpService: MCPService) {}
 
   /**
-   * Execute ReAct loop: Reason -> Act -> Observe -> Repeat
+   * Execute ReAct loop with task planning: Reason -> Act -> Observe -> Repeat
    */
   async executeReActLoop(
     userMessage: string,
@@ -36,7 +41,9 @@ export class ReActAgentService {
     progressCallback?: (status: string) => void,
     maxIterations?: number,
     toolExecutionCallback?: (toolName: string, toolResult: any, observation: string) => Promise<void>,
-    workingDir?: string
+    workingDir?: string,
+    agentId?: string,
+    enableTaskPlanning: boolean = true
   ): Promise<ReActResult> {
     const MAX_ITERATIONS = maxIterations || this.DEFAULT_MAX_ITERATIONS;
     const steps: ReActStep[] = [];
@@ -44,15 +51,54 @@ export class ReActAgentService {
     const toolCallHistory = new Set<string>();
     let iteration = 0;
     let currentMessage = userMessage;
+    let taskPlan: TaskPlan | undefined;
+    let currentMilestoneIndex = 0;
 
     this.logger.log(`🔄 Starting ReAct loop for: "${userMessage.substring(0, 50)}..."`);
+
+    // Step 1: Generate task plan if enabled
+    if (enableTaskPlanning && this.shouldGenerateTaskPlan(userMessage)) {
+      this.logger.log(`📋 Generating task plan...`);
+      if (progressCallback) {
+        progressCallback(`📋 Planning task...`);
+      }
+      
+      taskPlan = await this.generateTaskPlan(
+        userMessage,
+        systemPrompt,
+        model,
+        ollamaUrl
+      );
+      
+      if (taskPlan && progressCallback) {
+        // Send task plan to user
+        const planUpdate: TaskProgressUpdate = {
+          type: 'plan',
+          taskPlanId: taskPlan.id,
+          objective: taskPlan.objective,
+          totalSteps: taskPlan.estimatedSteps,
+          message: `📋 Task Plan:\n${taskPlan.objective}\n\nMilestones:\n${taskPlan.milestones.map((m, i) => `${i + 1}. ${m.title}`).join('\n')}`,
+          timestamp: new Date(),
+          metadata: { taskPlan }
+        };
+        progressCallback(JSON.stringify(planUpdate));
+      }
+    }
 
     while (iteration < MAX_ITERATIONS) {
       iteration++;
       this.logger.log(`\n🔁 ReAct Iteration ${iteration}/${MAX_ITERATIONS}`);
       
+      // Update milestone if we have a task plan
+      if (taskPlan && currentMilestoneIndex < taskPlan.milestones.length) {
+        const currentMilestone = taskPlan.milestones[currentMilestoneIndex];
+        if (currentMilestone.status === 'pending') {
+          this.updateMilestoneStatus(taskPlan, currentMilestoneIndex, 'in_progress', progressCallback);
+        }
+      }
+      
       // Send progress update
-      if (progressCallback) {
+      if (progressCallback && !taskPlan) {
         progressCallback(`🔄 Analyzing... (step ${iteration}/${MAX_ITERATIONS})`);
       }
 
@@ -73,11 +119,19 @@ export class ReActAgentService {
       if (!toolCall) {
         // No tool call found - this is the final answer
         this.logger.log(`✅ Final answer received (no tool call)`);
+        
+        // Mark current milestone as completed if we have a task plan
+        if (taskPlan && currentMilestoneIndex < taskPlan.milestones.length) {
+          this.updateMilestoneStatus(taskPlan, currentMilestoneIndex, 'completed', progressCallback);
+        }
+        
         steps.push({ answer: llmResponse });
         return {
           finalAnswer: llmResponse,
           steps,
-          toolsUsed
+          toolsUsed,
+          taskPlan,
+          milestonesCompleted: taskPlan ? taskPlan.milestones.filter(m => m.status === 'completed').length : 0
         };
       }
 
@@ -104,25 +158,64 @@ Provide a complete answer based on the data you already have.`;
         progressCallback(`🔧 Executing: ${toolCall.name}...`);
       }
       
-      steps.push({
+      const stepData: ReActStep = {
         thought: `Using ${toolCall.name}...`,
         action: toolCall.name,
-        actionInput: toolCall.arguments
-      });
+        actionInput: toolCall.arguments,
+        milestoneId: taskPlan && currentMilestoneIndex < taskPlan.milestones.length 
+          ? taskPlan.milestones[currentMilestoneIndex].id 
+          : undefined
+      };
+      steps.push(stepData);
       toolsUsed.push(toolCall.name);
 
-      // Execute tool with working directory
-      const toolResult = await this.mcpService.executeTool({
-        name: toolCall.name,
-        arguments: toolCall.arguments
-      }, workingDir);
+      // Send progress update for tool execution
+      if (progressCallback) {
+        if (taskPlan && currentMilestoneIndex < taskPlan.milestones.length) {
+          const milestone = taskPlan.milestones[currentMilestoneIndex];
+          progressCallback(JSON.stringify({
+            type: 'tool_execution',
+            taskPlanId: taskPlan.id,
+            currentMilestone: milestone,
+            message: `🔧 Executing: ${toolCall.name}...`,
+            timestamp: new Date(),
+            metadata: { tool: toolCall.name, arguments: toolCall.arguments }
+          }));
+        } else {
+          progressCallback(`🔧 Executing: ${toolCall.name}...`);
+        }
+      }
+
+      // Execute tool with working directory and context for approval
+      const toolResult = await this.mcpService.executeTool(
+        {
+          name: toolCall.name,
+          arguments: toolCall.arguments
+        }, 
+        workingDir,
+        {
+          conversationId,
+          agentId,
+          requireApproval: true
+        }
+      );
 
       const observation = toolResult.success
         ? JSON.stringify(toolResult.result, null, 2)
         : `Error: ${toolResult.error}`;
 
       this.logger.log(`👁️ Observation: ${observation.substring(0, 200)}...`);
-      steps.push({ observation });
+      steps.push({ observation, milestoneId: stepData.milestoneId });
+      
+      // If tool execution completed successfully and we have milestones, check if we should advance
+      if (toolResult.success && taskPlan && currentMilestoneIndex < taskPlan.milestones.length) {
+        const currentMilestone = taskPlan.milestones[currentMilestoneIndex];
+        // If this tool was the last one for this milestone, mark it complete and move to next
+        if (currentMilestone.tools.includes(toolCall.name)) {
+          this.updateMilestoneStatus(taskPlan, currentMilestoneIndex, 'completed', progressCallback, toolResult.result);
+          currentMilestoneIndex++;
+        }
+      }
       
       // Call tool execution callback if provided (for memory saving)
       if (toolExecutionCallback) {
@@ -144,8 +237,159 @@ Provide a complete answer based on the data you already have.`;
     return {
       finalAnswer: 'I apologize, but I reached the maximum number of steps while processing your request. Please try rephrasing your question.',
       steps,
-      toolsUsed
+      toolsUsed,
+      taskPlan,
+      milestonesCompleted: taskPlan ? taskPlan.milestones.filter(m => m.status === 'completed').length : 0
     };
+  }
+
+  /**
+   * Check if task plan should be generated
+   */
+  private shouldGenerateTaskPlan(userMessage: string): boolean {
+    const lowerMessage = userMessage.toLowerCase();
+    
+    // Generate plan for complex tasks
+    const complexTaskKeywords = [
+      'create app', 'create application', 'build app', 'setup project',
+      'initialize project', 'create react', 'create next', 'create vue',
+      'implement', 'develop', 'build a', 'create a complete'
+    ];
+    
+    return complexTaskKeywords.some(keyword => lowerMessage.includes(keyword));
+  }
+
+  /**
+   * Generate task plan by asking LLM to break down the task
+   */
+  private async generateTaskPlan(
+    userMessage: string,
+    systemPrompt: string,
+    model: string,
+    ollamaUrl: string
+  ): Promise<TaskPlan | undefined> {
+    try {
+      const planningPrompt = `You are a task planning assistant. Break down the following user request into clear, actionable milestones.
+
+User Request: ${userMessage}
+
+Provide a JSON response with this structure:
+{
+  "objective": "Brief description of the overall goal",
+  "description": "Detailed description of what will be accomplished",
+  "milestones": [
+    {
+      "title": "Milestone title",
+      "description": "What this milestone accomplishes",
+      "type": "analysis|file_operation|command_execution|validation|git_operation",
+      "requiresApproval": true/false,
+      "tools": ["tool1", "tool2"]
+    }
+  ],
+  "estimatedSteps": 5
+}
+
+Focus on:
+1. Breaking complex tasks into 3-7 clear milestones
+2. Marking milestones that need user approval (commands, installations, deletions)
+3. Logical ordering of steps
+4. Realistic tool usage
+
+Respond with ONLY the JSON, no other text.`;
+
+      const response = await this.callLLM(
+        planningPrompt,
+        '',
+        [],
+        model,
+        ollamaUrl
+      );
+
+      // Parse the JSON response
+      const planData = parseJSON(response);
+      
+      if (!planData || !planData.objective || !planData.milestones) {
+        this.logger.warn('Failed to parse task plan from LLM response');
+        return undefined;
+      }
+
+      // Create task plan with proper structure
+      const taskPlan: TaskPlan = {
+        id: generateId(),
+        objective: planData.objective,
+        description: planData.description || planData.objective,
+        estimatedSteps: planData.estimatedSteps || planData.milestones.length,
+        requiresApproval: planData.milestones.some((m: any) => m.requiresApproval),
+        createdAt: new Date(),
+        milestones: planData.milestones.map((m: any, index: number) => ({
+          id: generateId(),
+          order: index + 1,
+          title: m.title,
+          description: m.description,
+          type: m.type || 'file_operation',
+          status: 'pending',
+          requiresApproval: m.requiresApproval || false,
+          tools: m.tools || []
+        }))
+      };
+
+      this.logger.log(`✅ Generated task plan with ${taskPlan.milestones.length} milestones`);
+      return taskPlan;
+    } catch (error) {
+      this.logger.error('Failed to generate task plan:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Update milestone status and send progress update
+   */
+  private updateMilestoneStatus(
+    taskPlan: TaskPlan | undefined,
+    milestoneIndex: number,
+    status: 'in_progress' | 'completed' | 'failed',
+    progressCallback?: (status: string) => void,
+    result?: any,
+    error?: string
+  ): void {
+    if (!taskPlan || milestoneIndex >= taskPlan.milestones.length) {
+      return;
+    }
+
+    const milestone = taskPlan.milestones[milestoneIndex];
+    milestone.status = status;
+    
+    if (status === 'in_progress') {
+      milestone.startedAt = new Date();
+    } else if (status === 'completed' || status === 'failed') {
+      milestone.completedAt = new Date();
+      if (result) milestone.result = result;
+      if (error) milestone.error = error;
+    }
+
+    if (progressCallback) {
+      const completedCount = taskPlan.milestones.filter(m => m.status === 'completed').length;
+      const percentage = Math.round((completedCount / taskPlan.milestones.length) * 100);
+      
+      const update: TaskProgressUpdate = {
+        type: status === 'completed' ? 'milestone_complete' : 'milestone_progress',
+        taskPlanId: taskPlan.id,
+        objective: taskPlan.objective,
+        currentMilestone: milestone,
+        currentStep: milestoneIndex + 1,
+        totalSteps: taskPlan.milestones.length,
+        percentage,
+        message: status === 'in_progress' 
+          ? `🔄 ${milestone.title}...`
+          : status === 'completed'
+          ? `✅ ${milestone.title}`
+          : `❌ ${milestone.title} failed`,
+        timestamp: new Date(),
+        metadata: { milestone, completedCount }
+      };
+      
+      progressCallback(JSON.stringify(update));
+    }
   }
 
   /**

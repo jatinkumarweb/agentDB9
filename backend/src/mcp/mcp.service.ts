@@ -1,9 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { parseJSON } from '../common/utils/json-parser.util';
+import { ApprovalService } from '../common/services/approval.service';
+import { ApprovalStatus } from '../common/interfaces/approval.interface';
 
 export interface MCPToolCall {
   name: string;
@@ -14,6 +16,14 @@ export interface MCPToolResult {
   success: boolean;
   result?: any;
   error?: string;
+  approvalRequired?: boolean;
+  approvalRejected?: boolean;
+}
+
+export interface MCPExecutionContext {
+  conversationId?: string;
+  agentId?: string;
+  requireApproval?: boolean;
 }
 
 @Injectable()
@@ -25,14 +35,22 @@ export class MCPService {
   private readonly COMMAND_LOG = '/workspace/.agent-commands.log';
   private readonly TERMINAL_LOG = '/workspace/.agent-terminal.log';
 
-  constructor() {}
+  constructor(
+    @Inject(forwardRef(() => ApprovalService))
+    private approvalService: ApprovalService,
+  ) {}
 
   /**
-   * Execute an MCP tool call for an agent
+   * Execute an MCP tool call for an agent with approval workflow
    * @param toolCall The tool call to execute
    * @param workingDir Optional working directory for file operations and commands (defaults to workspaceRoot)
+   * @param context Execution context including conversationId and agentId for approval workflow
    */
-  async executeTool(toolCall: MCPToolCall, workingDir?: string): Promise<MCPToolResult> {
+  async executeTool(
+    toolCall: MCPToolCall, 
+    workingDir?: string,
+    context?: MCPExecutionContext
+  ): Promise<MCPToolResult> {
     const startTime = Date.now();
     const effectiveWorkingDir = workingDir || this.workspaceRoot;
     console.log(`[MCP] Tool: ${toolCall.name}`);
@@ -42,6 +60,31 @@ export class MCPService {
     this.logger.log(`🔧 Executing MCP tool: ${toolCall.name} in ${effectiveWorkingDir} with args:`, JSON.stringify(toolCall.arguments));
     
     try {
+      // Check if approval is required for this tool
+      const requireApproval = context?.requireApproval !== false; // Default to true
+      
+      if (requireApproval && context?.conversationId && context?.agentId) {
+        const approvalResult = await this.checkAndRequestApproval(
+          toolCall,
+          effectiveWorkingDir,
+          context.conversationId,
+          context.agentId
+        );
+        
+        if (!approvalResult.approved) {
+          return {
+            success: false,
+            error: approvalResult.reason || 'Operation rejected by user',
+            approvalRejected: true
+          };
+        }
+        
+        // Use modified command if provided
+        if (approvalResult.modifiedCommand && toolCall.name === 'execute_command') {
+          toolCall.arguments.command = approvalResult.modifiedCommand;
+        }
+      }
+      
       // Add timeout to prevent hanging (5 minutes for long-running commands like npm install)
       const timeoutMs = 300000; // 5 minutes
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -72,6 +115,178 @@ export class MCPService {
         error: error.message
       };
     }
+  }
+
+  /**
+   * Check if tool requires approval and request it
+   */
+  private async checkAndRequestApproval(
+    toolCall: MCPToolCall,
+    workingDir: string,
+    conversationId: string,
+    agentId: string
+  ): Promise<{ approved: boolean; reason?: string; modifiedCommand?: string }> {
+    try {
+      // Check tool type and request appropriate approval
+      switch (toolCall.name) {
+        case 'execute_command': {
+          const command = toolCall.arguments.command as string;
+          
+          // Special handling for dependency installation commands
+          if (this.isDependencyInstallCommand(command)) {
+            const packages = this.extractPackagesFromCommand(command);
+            const packageManager = this.detectPackageManager(command);
+            const isDevDependency = command.includes('--save-dev') || command.includes('-D');
+            
+            if (packages.length > 0) {
+              this.logger.log(`⏸️ Requesting approval for dependency installation: ${packages.join(', ')}`);
+              const response = await this.approvalService.requestDependencyApproval(
+                packages,
+                packageManager,
+                workingDir,
+                conversationId,
+                agentId,
+                isDevDependency
+              );
+              
+              if (response.status === ApprovalStatus.APPROVED) {
+                // If user selected specific packages, modify command
+                if (response.selectedPackages && response.selectedPackages.length > 0) {
+                  const baseCommand = command.split(/\s+/)[0]; // npm, yarn, pnpm
+                  const action = packageManager === 'npm' ? 'install' : 'add';
+                  const devFlag = isDevDependency ? (packageManager === 'npm' ? '--save-dev' : '-D') : '';
+                  const modifiedCommand = `${baseCommand} ${action} ${response.selectedPackages.join(' ')} ${devFlag}`.trim();
+                  return { approved: true, modifiedCommand };
+                }
+                return { approved: true };
+              } else if (response.status === ApprovalStatus.TIMEOUT) {
+                return { approved: false, reason: 'Approval timeout - dependency installation cancelled' };
+              } else {
+                return { approved: false, reason: 'User rejected dependency installation' };
+              }
+            }
+          }
+          
+          // Check if command requires approval (for non-dependency commands)
+          if (!this.approvalService.shouldRequireApproval(command)) {
+            return { approved: true };
+          }
+          
+          this.logger.log(`⏸️ Requesting approval for command: ${command}`);
+          const response = await this.approvalService.requestCommandApproval(
+            command,
+            workingDir,
+            conversationId,
+            agentId,
+            `Execute command: ${command}`
+          );
+          
+          if (response.status === ApprovalStatus.APPROVED) {
+            return { 
+              approved: true, 
+              modifiedCommand: response.modifiedCommand 
+            };
+          } else if (response.status === ApprovalStatus.TIMEOUT) {
+            return { approved: false, reason: 'Approval timeout - operation cancelled' };
+          } else {
+            return { approved: false, reason: 'User rejected the operation' };
+          }
+        }
+        
+        case 'delete_file': {
+          this.logger.log(`⏸️ Requesting approval for file deletion: ${toolCall.arguments.path}`);
+          const response = await this.approvalService.requestFileOperationApproval(
+            'delete',
+            toolCall.arguments.path as string,
+            conversationId,
+            agentId
+          );
+          
+          return { 
+            approved: response.status === ApprovalStatus.APPROVED,
+            reason: response.status === ApprovalStatus.REJECTED ? 'User rejected file deletion' : undefined
+          };
+        }
+        
+        case 'git_commit':
+        case 'git_push': {
+          const operation = toolCall.name === 'git_commit' ? 'commit' : 'push';
+          this.logger.log(`⏸️ Requesting approval for git ${operation}`);
+          const response = await this.approvalService.requestGitOperationApproval(
+            operation,
+            conversationId,
+            agentId,
+            toolCall.arguments.message as string,
+            toolCall.arguments.files as string[]
+          );
+          
+          return { 
+            approved: response.status === ApprovalStatus.APPROVED,
+            reason: response.status === ApprovalStatus.REJECTED ? `User rejected git ${operation}` : undefined
+          };
+        }
+        
+        default:
+          // No approval required for other tools
+          return { approved: true };
+      }
+    } catch (error) {
+      this.logger.error('Error in approval workflow:', error);
+      // On error, reject to be safe
+      return { approved: false, reason: 'Approval workflow error' };
+    }
+  }
+
+  /**
+   * Check if command is a dependency installation command
+   */
+  private isDependencyInstallCommand(command: string): boolean {
+    const patterns = [
+      /npm\s+install\s+[^-]/,
+      /npm\s+i\s+[^-]/,
+      /yarn\s+add\s+/,
+      /pnpm\s+add\s+/,
+      /bun\s+add\s+/,
+    ];
+    return patterns.some(pattern => pattern.test(command));
+  }
+
+  /**
+   * Extract package names from install command
+   */
+  private extractPackagesFromCommand(command: string): string[] {
+    const packages: string[] = [];
+    
+    // Match npm install, yarn add, pnpm add, bun add patterns
+    const patterns = [
+      /npm\s+(?:install|i)\s+(.+?)(?:\s+--|$)/,
+      /yarn\s+add\s+(.+?)(?:\s+--|$)/,
+      /pnpm\s+add\s+(.+?)(?:\s+--|$)/,
+      /bun\s+add\s+(.+?)(?:\s+--|$)/,
+    ];
+    
+    for (const pattern of patterns) {
+      const match = command.match(pattern);
+      if (match) {
+        const packageString = match[1].trim();
+        // Split by space and filter out flags
+        const pkgs = packageString.split(/\s+/).filter(pkg => !pkg.startsWith('-') && pkg.length > 0);
+        packages.push(...pkgs);
+        break;
+      }
+    }
+    
+    return packages;
+  }
+
+  /**
+   * Detect package manager from command
+   */
+  private detectPackageManager(command: string): 'npm' | 'yarn' | 'pnpm' | 'bun' {
+    if (command.includes('yarn')) return 'yarn';
+    if (command.includes('pnpm')) return 'pnpm';
+    if (command.includes('bun')) return 'bun';
+    return 'npm';
   }
 
   /**
@@ -277,6 +492,10 @@ export class MCPService {
     const timestamp = new Date().toISOString();
     const separator = '='.repeat(80);
     
+    // Parse command to extract cd directory if present - declare outside try block
+    let actualCommand = command;
+    let effectiveWorkingDir = workingDir;
+    
     try {
       // Log command execution start
       await this.logToFile(
@@ -290,10 +509,6 @@ export class MCPService {
       // ALL commands execute in VSCode container via MCP Server
       // This ensures consistency, proper environment, and user visibility
       this.logger.log(`Executing command in VSCode container: ${command} (cwd: ${workingDir})`);
-      
-      // Parse command to extract cd directory if present
-      let actualCommand = command;
-      let effectiveWorkingDir = workingDir;
       
       // Match patterns like: "cd dir && command" or "cd dir; command"
       const cdMatch = command.match(/^cd\s+([^\s;&|]+)\s*(?:&&|;)\s*(.+)$/);
@@ -479,10 +694,10 @@ export class MCPService {
       );
       
       // Fallback to local execution only if MCP Server is unavailable
-      this.logger.warn('MCP Server unavailable, falling back to local execution');
+      this.logger.warn(`MCP Server unavailable, falling back to local execution in ${workingDir}`);
       try {
-        const { stdout, stderr } = await this.execAsync(command, {
-          cwd: this.workspaceRoot,
+        const { stdout, stderr } = await this.execAsync(actualCommand, {
+          cwd: effectiveWorkingDir,
           timeout: 30000,
           env: {
             ...process.env,
