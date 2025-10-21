@@ -23,6 +23,10 @@ import wsManager from '@/lib/websocket';
 import { useAuthStore } from '@/stores/authStore';
 import { CodingAgent, AgentConversation, ConversationMessage } from '@agentdb9/shared';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useApprovalWorkflow } from '@/hooks/useApprovalWorkflow';
+import MessageFeedback, { FeedbackType } from './MessageFeedback';
+import ApprovalDialog from './ApprovalDialogSimple';
+import TaskProgressBar from './TaskProgressBarSimple';
 
 interface User {
   id: string;
@@ -79,6 +83,16 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   
   // WebSocket integration
   const { isConnected: wsConnected, emit: wsEmit, on: wsOn, off: wsOff } = useWebSocket();
+  
+  // Approval workflow hook
+  const {
+    pendingApproval,
+    taskProgress,
+    currentTaskPlan,
+    approveRequest,
+    rejectRequest,
+    isConnected: approvalConnected,
+  } = useApprovalWorkflow(currentConversation?.id);
   
   // Ref for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -555,6 +569,47 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     }
   };
 
+  // Handle feedback changes
+  const handleFeedbackChange = useCallback(async (messageId: string, feedback: FeedbackType) => {
+    if (!currentConversation?.id) return;
+
+    try {
+      const response = await fetchWithAuth(
+        `/api/conversations/${currentConversation.id}/messages/${messageId}/feedback`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ feedback }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to update feedback');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        // Update local message with feedback
+        setCurrentConversation(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            messages: prev.messages.map(msg =>
+              msg.id === messageId
+                ? { ...msg, metadata: { ...msg.metadata, feedback } }
+                : msg
+            ),
+          };
+        });
+      }
+    } catch (error) {
+      console.error('Failed to update feedback:', error);
+      throw error;
+    }
+  }, [currentConversation?.id]);
+
   // Create or get conversation for workspace chat
   const getOrCreateConversation = async () => {
     if (!selectedAgent) return null;
@@ -835,6 +890,16 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                             )}
                           </div>
                         )}
+
+                        {/* Feedback component for agent messages */}
+                        {isAgent && !msg.metadata?.streaming && (
+                          <MessageFeedback
+                            messageId={msg.id}
+                            initialFeedback={msg.metadata?.feedback as FeedbackType}
+                            onFeedbackChange={handleFeedbackChange}
+                            disabled={isLoading || isGenerating}
+                          />
+                        )}
                       </div>
                     </div>
                   );
@@ -957,6 +1022,23 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         </div>
         </div>
       </motion.div>
+
+      {/* Approval Dialog */}
+      {pendingApproval && (
+        <ApprovalDialog
+          request={pendingApproval}
+          onApprove={approveRequest}
+          onReject={rejectRequest}
+        />
+      )}
+
+      {/* Task Progress Bar */}
+      {taskProgress && currentTaskPlan && (
+        <TaskProgressBar
+          taskPlan={currentTaskPlan}
+          currentProgress={taskProgress}
+        />
+      )}
     </>
   );
 };
