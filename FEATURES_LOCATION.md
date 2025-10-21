@@ -6,6 +6,12 @@
 **Location:** `frontend/src/app/chat/page.tsx`
 
 **Features Available:**
+- ✅ **Chain of Thought Display** - See agent's reasoning process
+  - Shows ReAct (Reasoning + Acting) steps
+  - Displays: Thought → Action → Observation → Answer
+  - Collapsible to avoid clutter
+  - Shows tools used and action inputs
+
 - ✅ **Message Feedback System** - Rate agent responses (negative/neutral/positive)
   - Shows on agent messages after they complete
   - Located below each agent message
@@ -38,6 +44,11 @@
 **Location:** `frontend/src/app/workspace/page.tsx` + `frontend/src/components/CollaborationPanel.tsx`
 
 **Features Available:**
+- ✅ **Chain of Thought Display** - Same as /chat
+  - See agent's reasoning in workspace context
+  - Shows file operations and code changes reasoning
+  - Particularly useful for understanding workspace modifications
+
 - ✅ **Message Feedback System** - Same as /chat
   - Rate agent responses in workspace context
   - Feedback stored with workspace project context
@@ -150,11 +161,32 @@
 4. Progress bar should appear at bottom showing steps
 5. Updates in real-time as agent works
 
+### Test Chain of Thought
+1. Go to `/workspace` (better for ReAct)
+2. Open collaboration panel
+3. Select an agent
+4. Send message: "Create a new file called test.js with a hello world function"
+5. Wait for agent response
+6. Click "Show Chain of Thought" below the message
+7. See the reasoning steps:
+   - Thought: "I need to create a file..."
+   - Action: "write_file"
+   - Observation: "File created successfully"
+   - Answer: "I've created the file..."
+
 ## Recent Changes
+
+### Chain of Thought Display (Added: 2025-01-21)
+- Shows agent's ReAct reasoning process
+- Component: `frontend/src/components/ChainOfThoughtDisplay.tsx`
+- Displays: Thought → Action → Observation → Answer
+- Available on both /chat and /workspace
+- Collapsible UI with step count indicator
+- Shows tools used and action inputs
 
 ### Workspace Features Integration (Added: 2025-01-21)
 - Added all chat features to CollaborationPanel (workspace agentic chat)
-- Both /chat and /workspace now have feedback, approval, and progress
+- Both /chat and /workspace now have feedback, approval, progress, and chain of thought
 - Component: `frontend/src/components/CollaborationPanel.tsx`
 - Uses same backend APIs as /chat page
 
