@@ -83,7 +83,7 @@ describe('MCPService - Approval Flow', () => {
     });
 
     it('should reject command when user rejects approval', async () => {
-      const command = 'npm install dangerous-package';
+      const command = 'rm -rf dangerous';
       
       // Mock approval service to reject
       jest.spyOn(approvalService, 'requestCommandApproval').mockResolvedValue({
@@ -109,12 +109,12 @@ describe('MCPService - Approval Flow', () => {
       // Verify command was rejected
       expect(result.success).toBe(false);
       expect(result.approvalRejected).toBe(true);
-      expect(result.error).toContain('rejected');
+      expect(result.error).toBe('User rejected the operation');
     });
 
     it('should use modified command when user modifies it', async () => {
-      const originalCommand = 'npm install package1 package2';
-      const modifiedCommand = 'npm install package1';
+      const originalCommand = 'rm -rf test1 test2';
+      const modifiedCommand = 'rm -rf test1';
       
       // Mock approval service to approve with modification
       jest.spyOn(approvalService, 'requestCommandApproval').mockResolvedValue({
@@ -126,7 +126,7 @@ describe('MCPService - Approval Flow', () => {
 
       // Mock executeCommand to verify the modified command is used
       const executeCommandSpy = jest.spyOn(service as any, 'executeCommand').mockResolvedValue({
-        stdout: 'installed',
+        stdout: '',
         stderr: '',
         exitCode: 0,
       });
@@ -145,11 +145,15 @@ describe('MCPService - Approval Flow', () => {
       });
 
       // Verify the modified command was used
-      expect(executeCommandSpy).toHaveBeenCalledWith(modifiedCommand, testProjectDir);
+      // Note: actualCommand is used in fallback, which is the modified command
+      expect(executeCommandSpy).toHaveBeenCalled();
+      const callArgs = executeCommandSpy.mock.calls[0];
+      expect(callArgs[0]).toBe(modifiedCommand);
+      expect(callArgs[1]).toBe(testProjectDir);
     });
 
     it('should timeout approval request after configured time', async () => {
-      const command = 'npm install';
+      const command = 'rm -rf test';
       
       // Mock approval service to timeout
       jest.spyOn(approvalService, 'requestCommandApproval').mockResolvedValue({
@@ -173,7 +177,7 @@ describe('MCPService - Approval Flow', () => {
 
       // Verify command was rejected due to timeout
       expect(result.success).toBe(false);
-      expect(result.error).toContain('rejected');
+      expect(result.error).toBe('Approval timeout - operation cancelled');
     });
   });
 
@@ -213,12 +217,19 @@ describe('MCPService - Approval Flow', () => {
     });
 
     it('should detect dev dependencies', async () => {
-      const command = 'npm install --save-dev typescript @types/node';
+      const command = 'npm install typescript @types/node --save-dev';
       
       jest.spyOn(approvalService, 'requestDependencyApproval').mockResolvedValue({
         requestId: 'test-request-id',
         status: ApprovalStatus.APPROVED,
         timestamp: new Date(),
+      });
+
+      // Mock executeCommand to avoid actual execution
+      jest.spyOn(service as any, 'executeCommand').mockResolvedValue({
+        stdout: 'installed',
+        stderr: '',
+        exitCode: 0,
       });
 
       const toolCall = {
@@ -293,6 +304,11 @@ describe('MCPService - Approval Flow', () => {
         timestamp: new Date(),
       });
 
+      // Mock deleteFile to avoid actual deletion
+      jest.spyOn(service as any, 'deleteFile').mockResolvedValue({
+        success: true,
+      });
+
       const toolCall = {
         name: 'delete_file',
         arguments: {
@@ -306,32 +322,36 @@ describe('MCPService - Approval Flow', () => {
         requireApproval: true,
       });
 
-      // Verify file operation approval was requested
+      // Verify file operation approval was requested (only required params)
       expect(approvalService.requestFileOperationApproval).toHaveBeenCalledWith(
         'delete',
         filePath,
         'test-conv-id',
-        'test-agent-id',
-        undefined,
-        undefined,
+        'test-agent-id'
       );
     });
   });
 
   describe('Git Operation Approval', () => {
     it('should request approval for git push', async () => {
-      const command = 'git push origin main';
-      
       jest.spyOn(approvalService, 'requestGitOperationApproval').mockResolvedValue({
         requestId: 'test-request-id',
         status: ApprovalStatus.APPROVED,
         timestamp: new Date(),
       });
 
+      // Mock executeCommand to avoid actual execution
+      jest.spyOn(service as any, 'executeCommand').mockResolvedValue({
+        stdout: 'pushed',
+        stderr: '',
+        exitCode: 0,
+      });
+
       const toolCall = {
-        name: 'execute_command',
+        name: 'git_push',
         arguments: {
-          command,
+          message: 'test commit',
+          files: ['file1.txt', 'file2.txt'],
         },
       };
 
@@ -342,7 +362,13 @@ describe('MCPService - Approval Flow', () => {
       });
 
       // Verify git operation approval was requested
-      expect(approvalService.requestGitOperationApproval).toHaveBeenCalled();
+      expect(approvalService.requestGitOperationApproval).toHaveBeenCalledWith(
+        'push',
+        'test-conv-id',
+        'test-agent-id',
+        'test commit',
+        ['file1.txt', 'file2.txt']
+      );
     });
   });
 
