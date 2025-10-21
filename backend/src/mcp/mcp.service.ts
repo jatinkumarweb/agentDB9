@@ -64,14 +64,17 @@ export class MCPService {
       const requireApproval = context?.requireApproval !== false; // Default to true
       
       if (requireApproval && context?.conversationId && context?.agentId) {
+        this.logger.log(`🔔 [APPROVAL] Checking approval for tool: ${toolCall.name}, conversation: ${context.conversationId}`);
         const approvalResult = await this.checkAndRequestApproval(
           toolCall,
           effectiveWorkingDir,
           context.conversationId,
           context.agentId
         );
+        this.logger.log(`🔔 [APPROVAL] Result: ${approvalResult.approved ? 'APPROVED' : 'REJECTED'} for ${toolCall.name}`);
         
         if (!approvalResult.approved) {
+          this.logger.warn(`❌ [APPROVAL] Operation rejected: ${toolCall.name} - ${approvalResult.reason}`);
           return {
             success: false,
             error: approvalResult.reason || 'Operation rejected by user',

@@ -174,7 +174,9 @@ export class ApprovalService {
       });
 
       // Emit event for WebSocket gateway to broadcast
+      this.logger.log(`📢 [APPROVAL] Emitting approval.request event for ${request.id} (${request.type})`);
       this.eventEmitter.emit('approval.request', request);
+      this.logger.log(`📢 [APPROVAL] Event emitted, waiting for response...`);
     });
   }
 
