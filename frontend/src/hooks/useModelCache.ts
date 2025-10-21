@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { fetchWithAuth } from '@/utils/fetch-with-auth';
 
 interface ModelOption {
@@ -17,12 +17,35 @@ interface ModelCacheEntry {
   models: ModelOption[];
   timestamp: number;
   ttl: number;
+  userId: string | null; // Track which user's data this is
 }
 
 interface ModelCacheOptions {
   ttl?: number; // Time to live in milliseconds
   maxRetries?: number;
   retryDelay?: number;
+}
+
+// Get current user ID from auth token cookie
+function getCurrentUserId(): string | null {
+  if (typeof document === 'undefined') return null;
+  
+  const token = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('auth-token='))
+    ?.split('=')[1];
+  
+  if (!token) return null;
+  
+  try {
+    // Decode JWT to get user ID (JWT format: header.payload.signature)
+    const payload = token.split('.')[1];
+    const decoded = JSON.parse(atob(payload));
+    return decoded.id || decoded.sub || null;
+  } catch (e) {
+    console.warn('Failed to decode auth token:', e);
+    return null;
+  }
 }
 
 export function useModelCache(options: ModelCacheOptions = {}) {
@@ -36,15 +59,39 @@ export function useModelCache(options: ModelCacheOptions = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const retryCount = useRef(0);
+  const currentUserId = useRef<string | null>(null);
+
+  // Update current user ID on mount and when auth changes
+  useEffect(() => {
+    currentUserId.current = getCurrentUserId();
+  }, []);
 
   const isExpired = useCallback((entry: ModelCacheEntry): boolean => {
     return Date.now() - entry.timestamp > entry.ttl;
   }, []);
 
+  const isCacheValidForCurrentUser = useCallback((entry: ModelCacheEntry): boolean => {
+    const userId = getCurrentUserId();
+    // Cache is invalid if user has changed
+    if (entry.userId !== userId) {
+      console.log('Cache invalid: user changed from', entry.userId, 'to', userId);
+      return false;
+    }
+    // Cache is invalid if expired
+    if (isExpired(entry)) {
+      console.log('Cache invalid: expired');
+      return false;
+    }
+    return true;
+  }, [isExpired]);
+
   const fetchModels = useCallback(async (forceRefresh = false): Promise<ModelOption[]> => {
-    // Return cached data if valid and not forcing refresh
-    if (!forceRefresh && cache.current && !isExpired(cache.current)) {
-      console.log('Using cached models');
+    // Update current user ID before checking cache
+    currentUserId.current = getCurrentUserId();
+    
+    // Return cached data if valid for current user and not forcing refresh
+    if (!forceRefresh && cache.current && isCacheValidForCurrentUser(cache.current)) {
+      console.log('Using cached models for user:', cache.current.userId);
       return cache.current.models;
     }
 
@@ -71,16 +118,18 @@ export function useModelCache(options: ModelCacheOptions = {}) {
       
       if (data.success && modelsData) {
         const models = modelsData;
+        const userId = getCurrentUserId();
         
-        // Cache the result
+        // Cache the result with user context
         cache.current = {
           models,
           timestamp: Date.now(),
-          ttl
+          ttl,
+          userId
         };
 
         retryCount.current = 0; // Reset retry count on success
-        console.log(`Cached ${models.length} models for ${ttl}ms`);
+        console.log(`Cached ${models.length} models for user ${userId} (TTL: ${ttl}ms)`);
         return models;
       } else {
         throw new Error(data.error || 'Failed to fetch models');
@@ -112,7 +161,7 @@ export function useModelCache(options: ModelCacheOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [ttl, maxRetries, retryDelay, isExpired]);
+  }, [ttl, maxRetries, retryDelay, isCacheValidForCurrentUser]);
 
   const getModels = useCallback(async (): Promise<ModelOption[]> => {
     return fetchModels(false);
@@ -123,11 +172,11 @@ export function useModelCache(options: ModelCacheOptions = {}) {
   }, [fetchModels]);
 
   const getCachedModels = useCallback((): ModelOption[] | null => {
-    if (cache.current && !isExpired(cache.current)) {
+    if (cache.current && isCacheValidForCurrentUser(cache.current)) {
       return cache.current.models;
     }
     return null;
-  }, [isExpired]);
+  }, [isCacheValidForCurrentUser]);
 
   const invalidateCache = useCallback(() => {
     cache.current = null;

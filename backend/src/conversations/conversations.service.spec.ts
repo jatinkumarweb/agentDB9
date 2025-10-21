@@ -568,4 +568,66 @@ describe('ConversationsService', () => {
       }
     });
   });
+
+  describe('updateMessageFeedback', () => {
+    it('should update message feedback successfully', async () => {
+      const conversationId = '1';
+      const messageId = 'msg1';
+      const feedback = 'positive';
+      const userId = 'user1';
+
+      const mockMessage = {
+        id: messageId,
+        role: 'agent',
+        content: 'Test response',
+        timestamp: new Date(),
+        metadata: {},
+        conversation: {
+          id: conversationId,
+          agentId: 'agent1'
+        }
+      };
+
+      mockMessageRepository.findOne = jest.fn().mockResolvedValue(mockMessage);
+      mockMessageRepository.update = jest.fn().mockResolvedValue({ affected: 1 });
+
+      const result = await service.updateMessageFeedback(conversationId, messageId, feedback, userId);
+
+      expect(mockMessageRepository.findOne).toHaveBeenCalledWith({
+        where: { id: messageId },
+        relations: ['conversation']
+      });
+      expect(mockMessageRepository.update).toHaveBeenCalledWith(
+        messageId,
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            feedback,
+            feedbackUpdatedAt: expect.any(String),
+            feedbackBy: userId
+          })
+        })
+      );
+    });
+
+    it('should throw NotFoundException if message not found', async () => {
+      mockMessageRepository.findOne = jest.fn().mockResolvedValue(null);
+
+      await expect(
+        service.updateMessageFeedback('conv1', 'msg1', 'positive', 'user1')
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if message does not belong to conversation', async () => {
+      const mockMessage = {
+        id: 'msg1',
+        conversation: { id: 'different-conv' }
+      };
+
+      mockMessageRepository.findOne = jest.fn().mockResolvedValue(mockMessage);
+
+      await expect(
+        service.updateMessageFeedback('conv1', 'msg1', 'positive', 'user1')
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
 });

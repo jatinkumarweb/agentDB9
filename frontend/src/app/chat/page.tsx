@@ -14,6 +14,7 @@ import { fetchWithAuth } from '@/utils/fetch-with-auth';
 import GradientColorPicker from '@/components/dev/GradientColorPicker';
 import ApprovalDialog from '@/components/ApprovalDialogSimple';
 import TaskProgressBar from '@/components/TaskProgressBarSimple';
+import MessageFeedback, { FeedbackType } from '@/components/MessageFeedback';
 
 interface ChatPageProps {}
 
@@ -605,6 +606,46 @@ if (cachedMessages) {
     }
   }, [logout, router]);
 
+  const handleFeedbackChange = useCallback(async (messageId: string, feedback: FeedbackType) => {
+    if (!currentConversation?.id) return;
+
+    try {
+      const response = await fetchWithAuth(
+        `/api/conversations/${currentConversation.id}/messages/${messageId}/feedback`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ feedback }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to update feedback');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        // Update local message with feedback
+        setCurrentConversation(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            messages: prev.messages.map(msg =>
+              msg.id === messageId
+                ? { ...msg, metadata: { ...msg.metadata, feedback } }
+                : msg
+            ),
+          };
+        });
+      }
+    } catch (error) {
+      console.error('Failed to update feedback:', error);
+      throw error;
+    }
+  }, [currentConversation?.id]);
+
   // Auto-refresh fallback when WebSocket is disconnected and generation is happening
   useEffect(() => {
     if (!wsConnected && currentConversation && (isLoading || isGenerating)) {
@@ -1046,6 +1087,16 @@ if (cachedMessages) {
                             {msg.metadata.responseTime && `⏱️ ${msg.metadata.responseTime}ms`}
                             {msg.metadata.executionTime && ` • 🔧 ${msg.metadata.executionTime}ms`}
                           </div>
+                        )}
+
+                        {/* Feedback component for agent messages */}
+                        {!isUserRole(msg.role) && !msg.metadata?.streaming && (
+                          <MessageFeedback
+                            messageId={msg.id}
+                            initialFeedback={msg.metadata?.feedback as FeedbackType}
+                            onFeedbackChange={handleFeedbackChange}
+                            disabled={isLoading || isGenerating}
+                          />
                         )}
                       </div>
                     </div>

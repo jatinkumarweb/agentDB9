@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, HttpStatus, HttpException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, HttpStatus, HttpException, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ConversationsService } from './conversations.service';
 import { CreateConversationDto } from '../dto/create-conversation.dto';
@@ -175,6 +175,37 @@ export class ConversationsController {
       return {
         success: true,
         data: { message: 'Generation stopped successfully' },
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          success: false,
+          error: error.message,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Patch(':id/messages/:messageId/feedback')
+  @ApiOperation({ summary: 'Add or update feedback for a message' })
+  @ApiResponse({ status: 200, description: 'Feedback updated successfully' })
+  async updateMessageFeedback(
+    @Param('id') conversationId: string,
+    @Param('messageId') messageId: string,
+    @Body() body: { feedback: 'negative' | 'neutral' | 'positive' | null },
+    @CurrentUser() user: any
+  ): Promise<APIResponse> {
+    try {
+      const message = await this.conversationsService.updateMessageFeedback(
+        conversationId,
+        messageId,
+        body.feedback,
+        user.id
+      );
+      return {
+        success: true,
+        data: message,
       };
     } catch (error) {
       throw new HttpException(

@@ -240,6 +240,82 @@ export class ConversationsService {
     }
   }
 
+  async updateMessageFeedback(
+    conversationId: string,
+    messageId: string,
+    feedback: 'negative' | 'neutral' | 'positive' | null,
+    userId: string
+  ): Promise<Message> {
+    console.log(`Updating feedback for message ${messageId}: ${feedback}`);
+
+    // Find the message
+    const message = await this.messagesRepository.findOne({
+      where: { id: messageId },
+      relations: ['conversation']
+    });
+
+    if (!message) {
+      throw new NotFoundException(`Message ${messageId} not found`);
+    }
+
+    // Verify the message belongs to the specified conversation
+    if (message.conversation.id !== conversationId) {
+      throw new NotFoundException(`Message ${messageId} does not belong to conversation ${conversationId}`);
+    }
+
+    // Update message metadata with feedback
+    const updatedMetadata = {
+      ...(message.metadata || {}),
+      feedback,
+      feedbackUpdatedAt: new Date().toISOString(),
+      feedbackBy: userId
+    };
+
+    await this.messagesRepository.update(messageId, {
+      metadata: updatedMetadata as Record<string, any>
+    });
+
+    // If this is an agent message, also update the memory with feedback
+    if (message.role === 'agent' && message.content && feedback) {
+      try {
+        // Create a memory entry with feedback as a tag
+        const feedbackTag = `feedback:${feedback}`;
+        await this.memoryService.createMemory({
+          agentId: message.conversation.agentId,
+          sessionId: conversationId,
+          content: message.content,
+          type: 'short-term',
+          category: 'feedback',
+          metadata: {
+            tags: [feedbackTag, 'agent_response'],
+            keywords: [feedback],
+            confidence: feedback === 'positive' ? 1.0 : feedback === 'neutral' ? 0.5 : 0.0,
+            relevance: 1.0,
+            source: 'user_feedback' as any,
+            sourceId: messageId
+          }
+        });
+        console.log(`Added memory with feedback for message ${messageId}`);
+      } catch (error) {
+        console.error('Failed to add memory with feedback:', error);
+      }
+    }
+
+    // Emit WebSocket event for feedback update
+    this.websocketGateway.broadcastMessageUpdate(
+      conversationId,
+      messageId,
+      message.content,
+      false,
+      updatedMetadata
+    );
+
+    // Return updated message
+    return this.messagesRepository.findOne({
+      where: { id: messageId }
+    });
+  }
+
   private isUserRole(role: string): boolean {
     const userRoles = ['user', 'human', 'person'];
     return userRoles.includes(role.toLowerCase());
