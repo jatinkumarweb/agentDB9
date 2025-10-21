@@ -51,7 +51,7 @@ export class LongTermMemoryEntity {
   @Column({ type: 'integer', default: 0 })
   accessCount: number;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   lastAccessedAt?: Date;
 
   @Column({ 
