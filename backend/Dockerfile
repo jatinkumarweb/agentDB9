@@ -12,6 +12,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Configure npm for faster installs
+RUN npm config set fetch-retries 3 && \
+    npm config set fetch-retry-mintimeout 10000 && \
+    npm config set fetch-retry-maxtimeout 60000
+
 # Install global npm packages
 RUN npm install -g @nestjs/cli typescript
 
@@ -30,7 +35,11 @@ WORKDIR /app
 COPY backend/package*.json ./
 
 # Install all dependencies (including dev dependencies for development mode)
-RUN npm install
+# Use --legacy-peer-deps to avoid peer dependency conflicts
+# Use --prefer-offline to speed up builds with cache
+# Increase timeout for slow networks
+RUN npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund --fetch-timeout=300000 || \
+    (echo "First install attempt failed, retrying..." && npm install --legacy-peer-deps --no-audit --no-fund)
 
 # Rebuild native modules for the container architecture
 RUN npm rebuild sqlite3
