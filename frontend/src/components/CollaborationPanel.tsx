@@ -27,6 +27,7 @@ import { useApprovalWorkflow } from '@/hooks/useApprovalWorkflow';
 import MessageFeedback, { FeedbackType } from './MessageFeedback';
 import ApprovalDialog from './ApprovalDialogSimple';
 import TaskProgressBar from './TaskProgressBarSimple';
+import ChainOfThoughtDisplay from './ChainOfThoughtDisplay';
 
 interface User {
   id: string;
@@ -889,6 +890,14 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                               </button>
                             )}
                           </div>
+                        )}
+
+                        {/* Chain of Thought Display for ReAct steps */}
+                        {isAgent && !msg.metadata?.streaming && msg.metadata?.steps && (
+                          <ChainOfThoughtDisplay
+                            steps={msg.metadata.steps}
+                            toolsUsed={msg.metadata.toolsUsed}
+                          />
                         )}
 
                         {/* Feedback component for agent messages */}

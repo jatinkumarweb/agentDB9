@@ -15,6 +15,7 @@ import GradientColorPicker from '@/components/dev/GradientColorPicker';
 import ApprovalDialog from '@/components/ApprovalDialogSimple';
 import TaskProgressBar from '@/components/TaskProgressBarSimple';
 import MessageFeedback, { FeedbackType } from '@/components/MessageFeedback';
+import ChainOfThoughtDisplay from '@/components/ChainOfThoughtDisplay';
 
 interface ChatPageProps {}
 
@@ -1087,6 +1088,14 @@ if (cachedMessages) {
                             {msg.metadata.responseTime && `⏱️ ${msg.metadata.responseTime}ms`}
                             {msg.metadata.executionTime && ` • 🔧 ${msg.metadata.executionTime}ms`}
                           </div>
+                        )}
+
+                        {/* Chain of Thought Display for ReAct steps */}
+                        {!isUserRole(msg.role) && !msg.metadata?.streaming && msg.metadata?.steps && (
+                          <ChainOfThoughtDisplay
+                            steps={msg.metadata.steps}
+                            toolsUsed={msg.metadata.toolsUsed}
+                          />
                         )}
 
                         {/* Feedback component for agent messages */}
