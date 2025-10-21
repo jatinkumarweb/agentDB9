@@ -1,8 +1,8 @@
 # Feature Locations in AgentDB9
 
-## Important: Different Pages Have Different Features
+## Important: Both Pages Now Have All Features!
 
-### `/chat` Page - Agent Chat Interface
+### `/chat` Page - Conversation Service (1-on-1 Chat)
 **Location:** `frontend/src/app/chat/page.tsx`
 
 **Features Available:**
@@ -21,6 +21,11 @@
   - Shows current step and overall progress
   - Updates in real-time via WebSocket
 
+**Use Case:**
+- Traditional 1-on-1 chat with agents
+- Conversation history management
+- General purpose agent interactions
+
 **How to Access:**
 1. Navigate to: `http://localhost:3000/chat`
 2. Select or create an agent
@@ -29,19 +34,39 @@
 
 ---
 
-### `/workspace` Page - VSCode Integration
-**Location:** `frontend/src/app/workspace/page.tsx`
+### `/workspace` Page - Agentic Service (Workspace Collaboration)
+**Location:** `frontend/src/app/workspace/page.tsx` + `frontend/src/components/CollaborationPanel.tsx`
 
 **Features Available:**
+- ✅ **Message Feedback System** - Same as /chat
+  - Rate agent responses in workspace context
+  - Feedback stored with workspace project context
+
+- ✅ **Approval System** - Same as /chat
+  - Approve/reject agent actions in workspace
+  - Context-aware for project operations
+
+- ✅ **Task Progress Bar** - Same as /chat
+  - Shows progress of workspace tasks
+  - Real-time updates via WebSocket
+
 - ✅ VSCode container integration
 - ✅ Project management
-- ✅ Collaboration panel
-- ❌ NO chat features (feedback, approval, progress)
+- ✅ Collaboration panel with agentic chat
 
-**Purpose:**
-- This page is for working with code in VSCode
-- Not for chatting with agents
-- Different use case from `/chat`
+**Use Case:**
+- Working with code in VSCode
+- Chatting with agents in workspace context
+- Project-specific agent interactions
+- Collaborative development
+
+**How to Access:**
+1. Navigate to: `http://localhost:3000/workspace`
+2. Select workspace type (VSCode)
+3. Select or create a project
+4. Open collaboration panel (chat icon)
+5. Select an agent and start chatting
+6. Features will appear as you interact
 
 ---
 
@@ -58,12 +83,28 @@
 
 ## Quick Navigation
 
-| Feature | Page | URL |
-|---------|------|-----|
-| Chat with agents + Feedback + Approval | Chat | `/chat` |
-| VSCode + Projects | Workspace | `/workspace` |
-| Model management | Models | `/models` |
-| Agent creation/management | Dashboard | `/dashboard` |
+| Feature | Page | URL | Service |
+|---------|------|-----|---------|
+| 1-on-1 Chat + Feedback + Approval | Chat | `/chat` | Conversation Service |
+| Workspace Chat + Feedback + Approval | Workspace | `/workspace` | Agentic Service |
+| VSCode + Projects | Workspace | `/workspace` | - |
+| Model management | Models | `/models` | - |
+| Agent creation/management | Dashboard | `/dashboard` | - |
+
+## Key Differences
+
+### Conversation Service (/chat)
+- Traditional chat interface
+- Conversation history
+- General purpose interactions
+- No project context
+
+### Agentic Service (/workspace)
+- Workspace-integrated chat
+- Project-specific context
+- VSCode integration
+- Collaborative development
+- Same features as /chat but with workspace context
 
 ## Troubleshooting
 
@@ -111,15 +152,23 @@
 
 ## Recent Changes
 
+### Workspace Features Integration (Added: 2025-01-21)
+- Added all chat features to CollaborationPanel (workspace agentic chat)
+- Both /chat and /workspace now have feedback, approval, and progress
+- Component: `frontend/src/components/CollaborationPanel.tsx`
+- Uses same backend APIs as /chat page
+
 ### Feedback System (Added: 2025-01-21)
 - Component: `frontend/src/components/MessageFeedback.tsx`
 - Backend: `backend/src/conversations/conversations.controller.ts`
 - Stores feedback in message metadata and creates memories
+- Available on both /chat and /workspace
 
 ### Approval System (Added: 2025-01-20)
 - Component: `frontend/src/components/ApprovalDialogSimple.tsx`
 - Backend: `backend/src/common/services/approval.service.ts`
 - Real-time via WebSocket events
+- Available on both /chat and /workspace
 
 ### Model Search/Filter (Added: 2025-01-21)
 - Component: `frontend/src/components/ModelManager.tsx`
