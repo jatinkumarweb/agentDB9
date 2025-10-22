@@ -355,8 +355,8 @@ app.get('/api/models', async (req, res) => {
             id: model.id,
             name: model.name,
             provider: model.provider,
-            status: requiresApiKey && !apiKeyConfigured ? 'disabled' : 'unknown',
-            reason: requiresApiKey && !apiKeyConfigured ? 'API key not configured' : undefined,
+            status: requiresApiKey && !apiKeyConfigured ? 'disabled' : 'available',
+            reason: requiresApiKey && !apiKeyConfigured ? 'API key not configured' : 'API key configured',
             requiresApiKey: requiresApiKey,
             apiKeyConfigured: apiKeyConfigured
           };
