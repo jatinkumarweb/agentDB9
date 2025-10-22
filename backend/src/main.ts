@@ -26,7 +26,11 @@ async function bootstrap() {
   }
 
   // Security middleware
-  app.use(helmet());
+  // Configure helmet to allow iframe embedding for VS Code proxy
+  app.use(helmet({
+    contentSecurityPolicy: false, // Disable CSP to allow VS Code iframe
+    frameguard: false, // Disable X-Frame-Options to allow iframe embedding
+  }));
   app.use(compression());
 
   // Enable CORS

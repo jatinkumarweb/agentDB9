@@ -203,9 +203,14 @@ export class ProxyController {
         console.warn('   Check that dev server is configured with PUBLIC_URL=/proxy/' + port);
       }
       
-      // Copy response headers
+      // Copy response headers, but exclude X-Frame-Options to allow iframe embedding
+      const headersToExclude = ['x-frame-options', 'content-security-policy'];
       Object.keys(response.headers).forEach(key => {
-        res.setHeader(key, response.headers[key]);
+        if (!headersToExclude.includes(key.toLowerCase())) {
+          res.setHeader(key, response.headers[key]);
+        } else {
+          console.log(`Excluding header for iframe compatibility: ${key}`);
+        }
       });
       
       // Set status code
