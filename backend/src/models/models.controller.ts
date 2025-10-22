@@ -11,7 +11,8 @@ import { Public } from '../auth/decorators/public.decorator';
 export class ModelsController {
   constructor(private readonly modelsService: ModelsService) {}
 
-  @Public() // Allow unauthenticated access - will show models based on userId if available
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get()
   @ApiOperation({ summary: 'Get all available models' })
   @ApiResponse({ status: 200, description: 'List of all models' })
@@ -20,12 +21,18 @@ export class ModelsController {
     console.log('[ModelsController] Headers:', JSON.stringify(req.headers));
     console.log('[ModelsController] req.user:', req.user);
     try {
-      // Get userId from authenticated user (if available)
+      // Get userId from authenticated user
       const userId = (req.user as any)?.id;
       console.log('[ModelsController] getModels called, userId:', userId, 'type:', typeof userId);
       
       if (!userId) {
-        console.warn('[ModelsController] No userId found - user may not be authenticated');
+        throw new HttpException(
+          {
+            success: false,
+            error: 'User not authenticated',
+          },
+          HttpStatus.UNAUTHORIZED,
+        );
       }
       
       const result = await this.modelsService.getModels(userId);

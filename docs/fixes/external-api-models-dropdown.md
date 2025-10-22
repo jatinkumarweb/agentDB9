@@ -3,10 +3,16 @@
 ## Issue
 External API models (OpenAI, Anthropic, etc.) were configured with API keys and showing in the `/models` page, but were not appearing in the create agent dropdown.
 
-## Root Cause
+## Root Causes
+There were TWO issues that needed to be fixed:
+
+### Issue 1: LLM Service Status Logic
 The LLM service (`llm-service/src/index.ts`) was returning `status: 'unknown'` for external API models when their API keys were configured, instead of `status: 'available'`.
 
-### Code Location
+### Issue 2: Missing Authentication on /api/models Endpoint
+The `/api/models` endpoint in the backend was marked as `@Public()`, which bypassed authentication. This meant `req.user` was undefined, so the userId was never passed to the LLM service. Without the userId, the LLM service couldn't check which providers had configured API keys for the current user, and always fell back to showing all providers as unconfigured.
+
+### Fix 1: LLM Service Status Logic
 File: `llm-service/src/index.ts`, line 358
 
 **Before (incorrect):**
@@ -17,6 +23,33 @@ status: requiresApiKey && !apiKeyConfigured ? 'disabled' : 'unknown',
 **After (fixed):**
 ```typescript
 status: requiresApiKey && !apiKeyConfigured ? 'disabled' : 'available',
+```
+
+### Fix 2: Backend Models Controller Authentication
+File: `backend/src/models/models.controller.ts`, lines 14-45
+
+**Before (incorrect):**
+```typescript
+@Public() // This bypassed authentication!
+@Get()
+async getModels(@Req() req: Request): Promise<APIResponse> {
+  const userId = (req.user as any)?.id; // Always undefined because @Public()
+  // ...
+}
+```
+
+**After (fixed):**
+```typescript
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+@Get()
+async getModels(@Req() req: Request): Promise<APIResponse> {
+  const userId = (req.user as any)?.id; // Now properly populated
+  if (!userId) {
+    throw new HttpException({ success: false, error: 'User not authenticated' }, HttpStatus.UNAUTHORIZED);
+  }
+  // ...
+}
 ```
 
 ## Impact
@@ -74,6 +107,7 @@ All tests pass.
 1. `llm-service/src/index.ts` - Fixed status logic (line 358)
 2. `llm-service/src/__tests__/models-api.test.ts` - Added test suite
 3. `llm-service/tsconfig.json` - Excluded test files from build
+4. `backend/src/models/models.controller.ts` - Added authentication to /api/models endpoint
 
 ## Verification Steps
 1. Configure an external API key (OpenAI, Anthropic, etc.) in `/models` page
