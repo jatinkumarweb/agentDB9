@@ -1,5 +1,5 @@
-# Explicitly specify platform to avoid architecture confusion
-FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:22-slim
+# Use native platform for better performance
+FROM public.ecr.aws/docker/library/node:22-slim
 
 WORKDIR /app
 
@@ -32,9 +32,8 @@ COPY frontend/package*.json ./
 # Install dependencies
 RUN npm install
 
-# Force install the correct SWC binary and remove any ARM64 binaries
-RUN npm install @next/swc-linux-x64-gnu --save-optional && \
-    npm uninstall @next/swc-linux-arm64-gnu @next/swc-linux-arm64-musl 2>/dev/null || true
+# Let npm install the correct SWC binary for the platform automatically
+# Next.js will detect and install the appropriate binary during npm install
 
 # Create symlink to shared package BEFORE copying source
 RUN mkdir -p node_modules/@agentdb9 && \
