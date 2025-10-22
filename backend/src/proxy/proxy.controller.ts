@@ -95,11 +95,28 @@ export class ProxyController {
     
     try {
       
-      // Keep the full path including /proxy/{port}/ prefix
-      // This allows dev server to be configured with PUBLIC_URL=/proxy/{port}/
-      const path = req.url;
-      console.log('Full request path:', path);
-      console.log('Query string:', req.url.includes('?') ? req.url.split('?')[1] : 'none');
+      // Handle path differently for VS Code vs dev servers
+      // - VS Code (8080): Strip /proxy/8080 prefix, send only /?folder=...
+      // - Dev servers (5173, 3000, etc.): Keep full path /proxy/{port}/ for PUBLIC_URL
+      const proxyPrefix = `/proxy/${port}`;
+      let path = req.url;
+      
+      // For VS Code (port 8080), strip the proxy prefix
+      if (port === '8080' && path.startsWith(proxyPrefix)) {
+        path = path.substring(proxyPrefix.length);
+        // Ensure path starts with /
+        if (!path.startsWith('/')) {
+          path = '/' + path;
+        }
+        console.log('VS Code proxy: stripped prefix');
+      } else {
+        // For dev servers, keep the full path for PUBLIC_URL compatibility
+        console.log('Dev server proxy: keeping full path');
+      }
+      
+      console.log('Original URL:', req.url);
+      console.log('Target path:', path);
+      console.log('Query string:', path.includes('?') ? path.split('?')[1] : 'none');
       
       // Map ports to Docker service names (for inter-container communication)
       // Can be overridden via PROXY_SERVICE_MAP env var: "3000:vscode,5173:devserver"
