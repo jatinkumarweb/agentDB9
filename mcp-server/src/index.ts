@@ -119,6 +119,46 @@ async function startMCPServer() {
       return await terminalTools.executeCommand(params.command, params.cwd);
     });
     
+    mcpServer.registerHandler('terminal_create', async (params) => {
+      logger.info(`[HANDLER] terminal_create called with name: ${params.name}`);
+      return await terminalTools.createTerminal(params.name, params.cwd, params.shell);
+    });
+    
+    mcpServer.registerHandler('terminal_send_text', async (params) => {
+      logger.info(`[HANDLER] terminal_send_text called for terminal: ${params.terminalId}`);
+      return await terminalTools.sendText(params.terminalId, params.text, params.addNewLine);
+    });
+    
+    mcpServer.registerHandler('terminal_list', async (params) => {
+      logger.info(`[HANDLER] terminal_list called`);
+      return await terminalTools.listTerminals();
+    });
+    
+    mcpServer.registerHandler('terminal_get_active', async (params) => {
+      logger.info(`[HANDLER] terminal_get_active called`);
+      return await terminalTools.getActiveTerminal();
+    });
+    
+    mcpServer.registerHandler('terminal_set_active', async (params) => {
+      logger.info(`[HANDLER] terminal_set_active called for terminal: ${params.terminalId}`);
+      return await terminalTools.setActiveTerminal(params.terminalId);
+    });
+    
+    mcpServer.registerHandler('terminal_dispose', async (params) => {
+      logger.info(`[HANDLER] terminal_dispose called for terminal: ${params.terminalId}`);
+      return await terminalTools.disposeTerminal(params.terminalId);
+    });
+    
+    mcpServer.registerHandler('terminal_resize', async (params) => {
+      logger.info(`[HANDLER] terminal_resize called for terminal: ${params.terminalId}`);
+      return await terminalTools.resizeTerminal(params.terminalId, params.cols, params.rows);
+    });
+    
+    mcpServer.registerHandler('terminal_clear', async (params) => {
+      logger.info(`[HANDLER] terminal_clear called for terminal: ${params.terminalId}`);
+      return await terminalTools.clearTerminal(params.terminalId);
+    });
+    
     logger.info('Tool handlers registered successfully');
 
     // Register resources
