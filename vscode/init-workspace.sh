@@ -111,6 +111,9 @@ fi
 mkdir -p /home/coder/.local/share/code-server/User
 SETTINGS_FILE="/home/coder/.local/share/code-server/User/settings.json"
 
+# Get the proxy base URL from environment or use default
+PROXY_BASE_URL="${PROXY_BASE_URL:-http://localhost:8000}"
+
 # Read existing settings or create empty object
 if [ -f "$SETTINGS_FILE" ]; then
   EXISTING_SETTINGS=$(cat "$SETTINGS_FILE")
@@ -120,37 +123,41 @@ fi
 
 # Add port forwarding configuration using jq if available, otherwise use simple merge
 if command -v jq &> /dev/null; then
-  echo "$EXISTING_SETTINGS" | jq '. + {
+  echo "$EXISTING_SETTINGS" | jq --arg proxyUrl "$PROXY_BASE_URL" '. + {
+    "terminal.integrated.env.linux": {
+      "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${env:PATH}"
+    },
+    "terminal.integrated.inheritEnv": true,
     "remote.autoForwardPorts": true,
     "remote.autoForwardPortsSource": "process",
     "remote.forwardOnOpen": true,
     "remote.portsAttributes": {
-      "3000": {"label": "React/CRA", "onAutoForward": "notify"},
-      "3001": {"label": "React Alt", "onAutoForward": "notify"},
-      "5173": {"label": "Vite", "onAutoForward": "notify"},
-      "8080": {"label": "Webpack", "onAutoForward": "notify"},
-      "4200": {"label": "Angular", "onAutoForward": "notify"},
-      "8000": {"label": "Django/Python", "onAutoForward": "notify"}
+      "3000": {"label": "React/CRA", "onAutoForward": "notify", "protocol": "http", "proxyUrl": ($proxyUrl + "/proxy/3000")},
+      "3001": {"label": "React Alt", "onAutoForward": "notify", "protocol": "http", "proxyUrl": ($proxyUrl + "/proxy/3001")},
+      "5173": {"label": "Vite", "onAutoForward": "notify", "protocol": "http", "proxyUrl": ($proxyUrl + "/proxy/5173")},
+      "8080": {"label": "Webpack", "onAutoForward": "notify", "protocol": "http", "proxyUrl": ($proxyUrl + "/proxy/8080")},
+      "4200": {"label": "Angular", "onAutoForward": "notify", "protocol": "http", "proxyUrl": ($proxyUrl + "/proxy/4200")},
+      "8000": {"label": "Django/Python", "onAutoForward": "notify", "protocol": "http", "proxyUrl": ($proxyUrl + "/proxy/8000")}
     }
   }' > "$SETTINGS_FILE"
 else
   # Fallback: simple JSON merge (overwrites existing settings)
-  cat > "$SETTINGS_FILE" << 'EOFSETTINGS'
+  cat > "$SETTINGS_FILE" << EOFSETTINGS
 {
   "terminal.integrated.env.linux": {
-    "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${env:PATH}"
+    "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:\${env:PATH}"
   },
   "terminal.integrated.inheritEnv": true,
   "remote.autoForwardPorts": true,
   "remote.autoForwardPortsSource": "process",
   "remote.forwardOnOpen": true,
   "remote.portsAttributes": {
-    "3000": {"label": "React/CRA", "onAutoForward": "notify"},
-    "3001": {"label": "React Alt", "onAutoForward": "notify"},
-    "5173": {"label": "Vite", "onAutoForward": "notify"},
-    "8080": {"label": "Webpack", "onAutoForward": "notify"},
-    "4200": {"label": "Angular", "onAutoForward": "notify"},
-    "8000": {"label": "Django/Python", "onAutoForward": "notify"}
+    "3000": {"label": "React/CRA", "onAutoForward": "notify", "protocol": "http", "proxyUrl": "${PROXY_BASE_URL}/proxy/3000"},
+    "3001": {"label": "React Alt", "onAutoForward": "notify", "protocol": "http", "proxyUrl": "${PROXY_BASE_URL}/proxy/3001"},
+    "5173": {"label": "Vite", "onAutoForward": "notify", "protocol": "http", "proxyUrl": "${PROXY_BASE_URL}/proxy/5173"},
+    "8080": {"label": "Webpack", "onAutoForward": "notify", "protocol": "http", "proxyUrl": "${PROXY_BASE_URL}/proxy/8080"},
+    "4200": {"label": "Angular", "onAutoForward": "notify", "protocol": "http", "proxyUrl": "${PROXY_BASE_URL}/proxy/4200"},
+    "8000": {"label": "Django/Python", "onAutoForward": "notify", "protocol": "http", "proxyUrl": "${PROXY_BASE_URL}/proxy/8000"}
   }
 }
 EOFSETTINGS

@@ -302,6 +302,7 @@ services:
       - DISABLE_WORKSPACE_TRUST=true
       - VSCODE_PROXY=true  # Enable proxy mode for dev servers
       - REQUIRE_AUTH=false  # Disable authentication for local development
+      - PROXY_BASE_URL=http://localhost:8000  # Backend proxy URL for port forwarding
     volumes:
       - ./.volumes/agentdb9/workspace:/home/coder/workspace:cached
       - ./.volumes/agentdb9/vscode-data:/home/coder/.local/share/code-server
