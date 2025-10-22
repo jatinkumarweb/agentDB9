@@ -183,6 +183,46 @@ wscat -c ws://localhost:8000/proxy/8080/
 
 ---
 
+### Test 2.6: WebSocket Message Flow
+**Purpose:** Verify bidirectional WebSocket communication
+
+**Steps:**
+1. Open browser to `http://localhost:3000/workspace`
+2. Wait for VS Code to load
+3. Open DevTools → Network → WS → Select WebSocket connection
+4. Click "Messages" tab
+5. Open a file in VS Code
+
+**Expected Result:**
+- Messages flow in both directions (sent/received)
+- File operations trigger WebSocket messages
+- No connection drops
+- Real-time updates work
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
+### Test 2.7: WebSocket Reconnection After Backend Restart
+**Purpose:** Verify WebSocket reconnects after temporary disconnection
+
+**Steps:**
+1. Open browser to `http://localhost:3000/workspace`
+2. Wait for VS Code to load completely
+3. Restart backend: `docker-compose restart backend`
+4. Wait 30 seconds
+5. Try to use VS Code (open file, use terminal)
+
+**Expected Result:**
+- WebSocket reconnects automatically
+- VS Code continues to function
+- No permanent connection loss
+- User sees brief disconnection message (if any)
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
 ## Test Suite 3: Path Handling (REGRESSION TESTS)
 
 ### Test 3.1: VS Code Path Stripping ⚠️ CRITICAL
@@ -504,6 +544,26 @@ curl -I http://localhost:8000/proxy/4200/
 
 ---
 
+### Test 7.2: Port Mapping Configuration
+**Purpose:** Verify all dev server ports are properly mapped
+
+**Steps:**
+```bash
+# Check service mappings in proxy controller
+grep -A 10 "defaultServiceMap" backend/src/proxy/proxy.controller.ts
+```
+
+**Expected Result:**
+- Port 3000 → vscode
+- Port 3001 → vscode
+- Port 5173 → vscode
+- Port 4200 → vscode
+- Port 8080 → vscode
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
 ## Rollback Plan
 
 If tests fail, rollback to previous configuration:
@@ -612,14 +672,14 @@ All tests must pass for the fix to be considered successful:
 | Test Suite | Tests | Passed | Failed | Status |
 |------------|-------|--------|--------|--------|
 | Service Health | 3 | - | - | ⏳ Pending |
-| Proxy Controller | 5 | - | - | ⏳ Pending |
+| Proxy Controller | 7 | - | - | ⏳ Pending |
 | **Path Handling (REGRESSION)** | **6** | **-** | **-** | ⚠️ **CRITICAL** |
 | Frontend Integration | 3 | - | - | ⏳ Pending |
 | Backward Compatibility | 2 | - | - | ⏳ Pending |
 | Error Handling | 2 | - | - | ⏳ Pending |
 | Performance | 1 | - | - | ⏳ Pending |
-| Multiple Dev Servers | 1 | - | - | ⏳ Pending |
-| **TOTAL** | **23** | **-** | **-** | ⏳ Pending |
+| Multiple Dev Servers | 2 | - | - | ⏳ Pending |
+| **TOTAL** | **26** | **-** | **-** | ⏳ Pending |
 
 ### ⚠️ Critical Regression Tests (Suite 3)
 

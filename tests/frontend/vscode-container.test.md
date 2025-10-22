@@ -272,6 +272,64 @@ sandbox="allow-same-origin allow-scripts allow-forms allow-downloads allow-modal
 
 ---
 
+### Test 6.4: Extensions Work
+**Purpose:** Verify VS Code extensions function properly
+
+**Steps:**
+1. Navigate to `http://localhost:3000/workspace`
+2. Wait for VS Code to load
+3. Click Extensions icon (Ctrl+Shift+X)
+4. Browse available extensions
+
+**Expected Result:**
+- Extensions panel opens
+- Extensions list loads
+- Can search for extensions
+- WebSocket connection stable
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
+### Test 6.5: Settings Sync
+**Purpose:** Verify VS Code settings persist
+
+**Steps:**
+1. Navigate to `http://localhost:3000/workspace`
+2. Wait for VS Code to load
+3. Change a setting (e.g., theme, font size)
+4. Refresh the page
+5. Wait for VS Code to reload
+
+**Expected Result:**
+- Settings persist across reloads
+- User preferences maintained
+- No settings loss
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
+### Test 6.6: Multi-file Editing
+**Purpose:** Verify multiple files can be edited simultaneously
+
+**Steps:**
+1. Navigate to `http://localhost:3000/workspace`
+2. Wait for VS Code to load
+3. Open multiple files (3-5 files)
+4. Switch between tabs
+5. Edit each file
+
+**Expected Result:**
+- All files open successfully
+- Tab switching works smoothly
+- Edits in all files work
+- No WebSocket connection issues
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
 ## Test Suite 7: Project Context
 
 ### Test 7.1: Project Folder Opens
@@ -316,9 +374,9 @@ sandbox="allow-same-origin allow-scripts allow-forms allow-downloads allow-modal
 | **WebSocket Connection** | **3** | **-** | **-** | ⚠️ **CRITICAL** |
 | Error Handling | 2 | - | - | ⏳ Pending |
 | Iframe Security | 2 | - | - | ⏳ Pending |
-| Functional Tests | 3 | - | - | ⏳ Pending |
+| Functional Tests | 6 | - | - | ⏳ Pending |
 | Project Context | 2 | - | - | ⏳ Pending |
-| **TOTAL** | **16** | **-** | **-** | ⏳ Pending |
+| **TOTAL** | **19** | **-** | **-** | ⏳ Pending |
 
 ### Critical Tests
 

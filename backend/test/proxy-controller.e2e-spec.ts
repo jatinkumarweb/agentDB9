@@ -207,4 +207,125 @@ describe('ProxyController (e2e)', () => {
         });
     });
   });
+
+  describe('Multiple Dev Servers', () => {
+    it('should handle port 3000 (React)', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/proxy/3000/')
+        .expect((res) => {
+          expect([200, 302, 502]).toContain(res.status);
+        });
+    });
+
+    it('should handle port 5173 (Vite)', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/proxy/5173/')
+        .expect((res) => {
+          expect([200, 302, 502]).toContain(res.status);
+        });
+    });
+
+    it('should handle port 4200 (Angular)', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/proxy/4200/')
+        .expect((res) => {
+          expect([200, 302, 502]).toContain(res.status);
+        });
+    });
+
+    it('should handle port 3001 (React Alt)', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/proxy/3001/')
+        .expect((res) => {
+          expect([200, 302, 502]).toContain(res.status);
+        });
+    });
+  });
+
+  describe('Concurrent Requests', () => {
+    it('should handle multiple simultaneous requests', async () => {
+      const requests = [
+        request(app.getHttpServer()).get('/proxy/8080/'),
+        request(app.getHttpServer()).get('/proxy/5173/'),
+        request(app.getHttpServer()).get('/proxy/3000/'),
+      ];
+
+      const responses = await Promise.all(requests);
+      
+      responses.forEach(response => {
+        expect([200, 302, 502]).toContain(response.status);
+      });
+    });
+
+    it('should handle rapid sequential requests', async () => {
+      for (let i = 0; i < 5; i++) {
+        await request(app.getHttpServer())
+          .get('/proxy/8080/')
+          .expect((res) => {
+            expect([200, 302, 502]).toContain(res.status);
+          });
+      }
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle very long query strings', async () => {
+      const longQuery = '?param=' + 'a'.repeat(1000);
+      const response = await request(app.getHttpServer())
+        .get(`/proxy/8080/${longQuery}`)
+        .expect((res) => {
+          expect([200, 302, 502, 414]).toContain(res.status);
+        });
+    });
+
+    it('should handle special characters in path', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/proxy/8080/?folder=/test%20folder')
+        .expect((res) => {
+          expect([200, 302, 502]).toContain(res.status);
+        });
+    });
+
+    it('should handle missing trailing slash', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/proxy/8080')
+        .expect((res) => {
+          expect([200, 302, 502]).toContain(res.status);
+        });
+    });
+
+    it('should handle double slashes in path', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/proxy/8080//')
+        .expect((res) => {
+          expect([200, 302, 502]).toContain(res.status);
+        });
+    });
+  });
+
+  describe('Security', () => {
+    it('should not expose internal service names in errors', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/proxy/9999/')
+        .expect(502);
+      
+      // Error message should not contain internal hostnames
+      expect(response.body.message).not.toMatch(/vscode|host\.docker\.internal/i);
+    });
+
+    it('should handle malicious port numbers', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/proxy/99999/')
+        .expect(502);
+    });
+
+    it('should handle port injection attempts', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/proxy/8080;rm%20-rf/')
+        .expect((res) => {
+          // Should either reject or handle safely
+          expect([400, 404, 502]).toContain(res.status);
+        });
+    });
+  });
 });

@@ -342,6 +342,102 @@ run_test "Port 8080 mapped to vscode service in proxy controller" \
     "grep -A 5 \"'8080': 'vscode'\" backend/src/proxy/proxy.controller.ts" \
     "8080.*vscode"
 
+# Test Suite 6: Frontend Integration
+echo ""
+echo "========================================="
+echo "Test Suite 6: Frontend Integration"
+echo "========================================="
+
+# Test 6.1: Frontend uses proxy URL
+run_test "Frontend VSCodeContainer uses backend proxy URL" \
+    "grep -q 'backendUrl.*proxy/8080' frontend/src/components/VSCodeContainer.tsx" \
+    ""
+
+# Test 6.2: Frontend has proper iframe sandbox attributes
+run_test "Frontend iframe has sandbox attributes" \
+    "grep -q 'sandbox=' frontend/src/components/VSCodeContainer.tsx" \
+    ""
+
+# Test 6.3: Frontend handles project context
+run_test "Frontend handles projectName parameter" \
+    "grep -q 'projectName' frontend/src/components/VSCodeContainer.tsx" \
+    ""
+
+# Test Suite 7: Backward Compatibility
+echo ""
+echo "========================================="
+echo "Test Suite 7: Backward Compatibility"
+echo "========================================="
+
+# Test 7.1: Direct VS Code access still works
+if curl -s -f -m 5 "http://localhost:8080" > /dev/null 2>&1; then
+    run_test "Direct VS Code access (port 8080) still works" \
+        "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080" \
+        "200\|302"
+else
+    print_status "SKIP" "Direct VS Code access - service not accessible"
+    ((TOTAL_TESTS++))
+fi
+
+# Test 7.2: Environment variable support
+run_test "Frontend supports NEXT_PUBLIC_BACKEND_URL environment variable" \
+    "grep -q 'NEXT_PUBLIC_BACKEND_URL' frontend/src/components/VSCodeContainer.tsx" \
+    ""
+
+# Test Suite 8: Performance
+echo ""
+echo "========================================="
+echo "Test Suite 8: Performance"
+echo "========================================="
+
+# Test 8.1: Proxy response time
+print_status "INFO" "Testing proxy response time"
+
+if curl -s -f -m 5 "http://localhost:8000/proxy/8080/" > /dev/null 2>&1; then
+    ((TOTAL_TESTS++))
+    # Measure response time
+    response_time=$(curl -s -o /dev/null -w '%{time_total}' http://localhost:8000/proxy/8080/ 2>/dev/null)
+    if [ -n "$response_time" ]; then
+        # Check if response time is reasonable (< 5 seconds)
+        if awk "BEGIN {exit !($response_time < 5.0)}"; then
+            print_status "PASS" "Proxy response time acceptable: ${response_time}s"
+        else
+            print_status "FAIL" "Proxy response time too slow: ${response_time}s"
+        fi
+    else
+        print_status "SKIP" "Could not measure response time"
+    fi
+else
+    print_status "SKIP" "Proxy not accessible for performance test"
+    ((TOTAL_TESTS++))
+fi
+
+# Test Suite 9: Multiple Dev Servers
+echo ""
+echo "========================================="
+echo "Test Suite 9: Multiple Dev Servers"
+echo "========================================="
+
+# Test 9.1: Multiple port mappings configured
+run_test "Proxy controller supports multiple dev server ports" \
+    "grep -c \"'[0-9]*': 'vscode'\" backend/src/proxy/proxy.controller.ts | awk '{exit !(\$1 >= 5)}'" \
+    ""
+
+# Test 9.2: Port 5173 (Vite) mapping
+run_test "Port 5173 (Vite) mapped to vscode service" \
+    "grep -q \"'5173': 'vscode'\" backend/src/proxy/proxy.controller.ts" \
+    ""
+
+# Test 9.3: Port 3000 (React) mapping
+run_test "Port 3000 (React) mapped to vscode service" \
+    "grep -q \"'3000': 'vscode'\" backend/src/proxy/proxy.controller.ts" \
+    ""
+
+# Test 9.4: Port 4200 (Angular) mapping
+run_test "Port 4200 (Angular) mapped to vscode service" \
+    "grep -q \"'4200': 'vscode'\" backend/src/proxy/proxy.controller.ts" \
+    ""
+
 # Summary
 echo ""
 echo "========================================="
