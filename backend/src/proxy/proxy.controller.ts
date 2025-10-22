@@ -61,28 +61,30 @@ export class ProxyController {
           // For dev servers, keep full path
           return path;
         },
-        onProxyReq: (proxyReq, req, res) => {
-          console.log(`[Proxy] ${req.method} ${req.url} → ${target}`);
-        },
-        onProxyReqWs: (proxyReq, req, socket, options, head) => {
-          console.log(`[WebSocket Proxy] Upgrading connection to ${target}`);
-          console.log(`[WebSocket Proxy] Original URL: ${req.url}`);
-        },
-        onError: (err, req, res) => {
-          console.error(`[Proxy Error] ${err.message}`);
-          // Check if response is Express Response and headers not sent
-          const expressRes = res as any;
-          if (expressRes && typeof expressRes.status === 'function' && !expressRes.headersSent) {
-            expressRes.status(502).json({
-              error: 'Bad Gateway',
-              message: `Proxy error: ${err.message}`,
-            });
-          }
-        },
-        onProxyRes: (proxyRes, req, res) => {
-          // Remove headers that block iframe embedding
-          delete proxyRes.headers['x-frame-options'];
-          delete proxyRes.headers['content-security-policy'];
+        on: {
+          proxyReq: (proxyReq, req, res) => {
+            console.log(`[Proxy] ${req.method} ${req.url} → ${target}`);
+          },
+          proxyReqWs: (proxyReq, req, socket, options, head) => {
+            console.log(`[WebSocket Proxy] Upgrading connection to ${target}`);
+            console.log(`[WebSocket Proxy] Original URL: ${req.url}`);
+          },
+          error: (err, req, res) => {
+            console.error(`[Proxy Error] ${err.message}`);
+            // Check if response is Express Response and headers not sent
+            const expressRes = res as any;
+            if (expressRes && typeof expressRes.status === 'function' && !expressRes.headersSent) {
+              expressRes.status(502).json({
+                error: 'Bad Gateway',
+                message: `Proxy error: ${err.message}`,
+              });
+            }
+          },
+          proxyRes: (proxyRes, req, res) => {
+            // Remove headers that block iframe embedding
+            delete proxyRes.headers['x-frame-options'];
+            delete proxyRes.headers['content-security-policy'];
+          },
         },
       });
       
