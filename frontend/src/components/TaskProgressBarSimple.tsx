@@ -1,5 +1,5 @@
-import React from 'react';
-import { CheckCircle2, Circle, Loader2, XCircle, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { CheckCircle2, Circle, Loader2, XCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
 export interface TaskMilestone {
   id: string;
@@ -46,9 +46,11 @@ interface TaskProgressBarProps {
 }
 
 const TaskProgressBar: React.FC<TaskProgressBarProps> = ({ taskPlan, currentProgress }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
   const completedMilestones = taskPlan.milestones.filter(m => m.status === 'completed').length;
   const totalMilestones = taskPlan.milestones.length;
   const progressPercentage = (completedMilestones / totalMilestones) * 100;
+  const currentMilestone = taskPlan.milestones.find(m => m.status === 'in_progress');
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -76,71 +78,98 @@ const TaskProgressBar: React.FC<TaskProgressBarProps> = ({ taskPlan, currentProg
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 text-white">
-        <h3 className="font-bold text-lg">Task Progress</h3>
-        <p className="text-sm text-indigo-100 mt-1">{taskPlan.objective}</p>
-      </div>
+    <div className="border-t border-gray-200 bg-white">
+      {/* Accordion Header - Always Visible */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center space-x-3 flex-1">
+          {/* Progress Indicator */}
+          <div className="flex items-center space-x-2">
+            {currentMilestone ? (
+              <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-green-500" />
+            )}
+            <span className="text-sm font-medium text-gray-700">
+              Step {completedMilestones + 1}/{totalMilestones}
+            </span>
+          </div>
 
-      {/* Progress Bar */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between text-sm mb-2">
-          <span className="text-gray-700 font-medium">
-            {completedMilestones} of {totalMilestones} milestones completed
-          </span>
-          <span className="text-gray-600">{Math.round(progressPercentage)}%</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
-          <div
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 h-2.5 rounded-full transition-all duration-500"
-            style={{ width: `${progressPercentage}%` }}
-          />
-        </div>
-      </div>
+          {/* Current Step Title */}
+          {currentMilestone && (
+            <span className="text-sm text-gray-600 truncate">
+              {currentMilestone.title}
+            </span>
+          )}
 
-      {/* Milestones */}
-      <div className="max-h-64 overflow-y-auto p-4 space-y-3">
-        {taskPlan.milestones.map((milestone, idx) => (
-          <div
-            key={milestone.id}
-            className={`p-3 rounded-lg border ${getStatusColor(milestone.status)}`}
-          >
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0 mt-0.5">
-                {getStatusIcon(milestone.status)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-sm truncate">{milestone.title}</h4>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-white bg-opacity-50 ml-2">
-                    {idx + 1}/{totalMilestones}
-                  </span>
-                </div>
-                <p className="text-xs mt-1 text-gray-600">{milestone.description}</p>
-                {milestone.status === 'in_progress' && currentProgress.message && (
-                  <p className="text-xs mt-2 text-blue-600 font-medium">
-                    {currentProgress.message}
-                  </p>
-                )}
-                {milestone.error && (
-                  <p className="text-xs mt-2 text-red-600">
-                    Error: {milestone.error}
-                  </p>
-                )}
-              </div>
+          {/* Progress Bar */}
+          <div className="flex-1 max-w-xs">
+            <div className="w-full bg-gray-200 rounded-full h-1.5">
+              <div
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 h-1.5 rounded-full transition-all duration-500"
+                style={{ width: `${progressPercentage}%` }}
+              />
             </div>
           </div>
-        ))}
-      </div>
 
-      {/* Current Status */}
-      {currentProgress.message && (
-        <div className="p-4 bg-gray-50 border-t border-gray-200">
-          <p className="text-sm text-gray-700">
-            <span className="font-medium">Current: </span>
-            {currentProgress.message}
-          </p>
+          {/* Percentage */}
+          <span className="text-xs text-gray-500 font-medium">
+            {Math.round(progressPercentage)}%
+          </span>
+        </div>
+
+        {/* Expand/Collapse Icon */}
+        {isExpanded ? (
+          <ChevronUp className="w-4 h-4 text-gray-400" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-gray-400" />
+        )}
+      </button>
+
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="border-t border-gray-200 bg-gray-50">
+          {/* Objective */}
+          <div className="px-4 py-2 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-gray-200">
+            <p className="text-sm font-medium text-gray-700">{taskPlan.objective}</p>
+          </div>
+
+          {/* Milestones List */}
+          <div className="max-h-48 overflow-y-auto p-3 space-y-2">
+            {taskPlan.milestones.map((milestone, idx) => (
+              <div
+                key={milestone.id}
+                className={`p-2 rounded-lg border ${getStatusColor(milestone.status)}`}
+              >
+                <div className="flex items-start space-x-2">
+                  <div className="flex-shrink-0 mt-0.5">
+                    {getStatusIcon(milestone.status)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-xs truncate">{milestone.title}</h4>
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-white bg-opacity-50 ml-2">
+                        {idx + 1}/{totalMilestones}
+                      </span>
+                    </div>
+                    <p className="text-xs mt-0.5 text-gray-600">{milestone.description}</p>
+                    {milestone.status === 'in_progress' && currentProgress.message && (
+                      <p className="text-xs mt-1 text-blue-600 font-medium">
+                        {currentProgress.message}
+                      </p>
+                    )}
+                    {milestone.error && (
+                      <p className="text-xs mt-1 text-red-600">
+                        Error: {milestone.error}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

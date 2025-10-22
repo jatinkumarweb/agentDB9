@@ -991,6 +991,16 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                 </div>
               </div>
 
+              {/* Task Progress Bar */}
+              {taskProgress && currentTaskPlan && (
+                <div className="px-4 pb-2">
+                  <TaskProgressBar
+                    taskPlan={currentTaskPlan}
+                    currentProgress={taskProgress}
+                  />
+                </div>
+              )}
+
               {/* Message Input */}
               <div className="px-4 pb-4">
                 <div className="flex space-x-2">
@@ -1038,14 +1048,6 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
           request={pendingApproval}
           onApprove={approveRequest}
           onReject={rejectRequest}
-        />
-      )}
-
-      {/* Task Progress Bar */}
-      {taskProgress && currentTaskPlan && (
-        <TaskProgressBar
-          taskPlan={currentTaskPlan}
-          currentProgress={taskProgress}
         />
       )}
     </>

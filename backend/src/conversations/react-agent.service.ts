@@ -24,7 +24,7 @@ interface ReActResult {
 @Injectable()
 export class ReActAgentService {
   private readonly logger = new Logger(ReActAgentService.name);
-  private readonly DEFAULT_MAX_ITERATIONS = 5;
+  private readonly DEFAULT_MAX_ITERATIONS = 10; // Increased from 5 to handle more complex tasks
 
   constructor(private readonly mcpService: MCPService) {}
 
@@ -249,14 +249,26 @@ Provide a complete answer based on the data you already have.`;
   private shouldGenerateTaskPlan(userMessage: string): boolean {
     const lowerMessage = userMessage.toLowerCase();
     
-    // Generate plan for complex tasks
-    const complexTaskKeywords = [
-      'create app', 'create application', 'build app', 'setup project',
-      'initialize project', 'create react', 'create next', 'create vue',
-      'implement', 'develop', 'build a', 'create a complete'
+    // Only generate plan for VERY complex multi-step tasks
+    // Simple tasks like "create react app" should NOT generate a plan
+    const veryComplexTaskKeywords = [
+      'create a complete', 'build a complete', 'full stack',
+      'implement entire', 'develop entire', 'create multiple',
+      'build multiple', 'setup entire', 'migrate', 'refactor entire'
     ];
     
-    return complexTaskKeywords.some(keyword => lowerMessage.includes(keyword));
+    // Don't generate plan for simple single-command tasks
+    const simpleTaskKeywords = [
+      'create react app', 'create next app', 'create vue app',
+      'create a file', 'create a component', 'update a file',
+      'read a file', 'delete a file', 'run', 'install'
+    ];
+    
+    const isSimple = simpleTaskKeywords.some(keyword => lowerMessage.includes(keyword));
+    const isVeryComplex = veryComplexTaskKeywords.some(keyword => lowerMessage.includes(keyword));
+    
+    // Only generate plan if very complex AND not simple
+    return isVeryComplex && !isSimple;
   }
 
   /**
@@ -273,27 +285,30 @@ Provide a complete answer based on the data you already have.`;
 
 User Request: ${userMessage}
 
+IMPORTANT: Keep it simple and focused. Only create 2-4 milestones for most tasks.
+
 Provide a JSON response with this structure:
 {
-  "objective": "Brief description of the overall goal",
-  "description": "Detailed description of what will be accomplished",
+  "objective": "Brief description of the overall goal (one sentence)",
+  "description": "What will be accomplished (one sentence)",
   "milestones": [
     {
-      "title": "Milestone title",
-      "description": "What this milestone accomplishes",
+      "title": "Short milestone title (3-5 words)",
+      "description": "What this milestone accomplishes (one sentence)",
       "type": "analysis|file_operation|command_execution|validation|git_operation",
       "requiresApproval": true/false,
       "tools": ["tool1", "tool2"]
     }
   ],
-  "estimatedSteps": 5
+  "estimatedSteps": 3
 }
 
-Focus on:
-1. Breaking complex tasks into 3-7 clear milestones
-2. Marking milestones that need user approval (commands, installations, deletions)
-3. Logical ordering of steps
-4. Realistic tool usage
+Guidelines:
+1. Create 2-4 milestones maximum (not 5+)
+2. Each milestone should be a distinct phase
+3. Mark milestones that need user approval (commands, installations, deletions)
+4. Be concise - avoid over-planning
+5. Combine related steps into single milestones
 
 Respond with ONLY the JSON, no other text.`;
 

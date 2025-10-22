@@ -1197,6 +1197,14 @@ if (cachedMessages) {
                 </div>
               )}
 
+              {/* Task Progress Bar - Above Input */}
+              {taskProgress && currentTaskPlan && (
+                <TaskProgressBar
+                  taskPlan={currentTaskPlan}
+                  currentProgress={taskProgress}
+                />
+              )}
+
               {/* Message Input */}
               <div className="p-4 border-t border-white border-opacity-30">
                 <div className="flex space-x-2">
@@ -1293,14 +1301,6 @@ if (cachedMessages) {
           request={pendingApproval}
           onApprove={approveRequest}
           onReject={rejectRequest}
-        />
-      )}
-
-      {/* Task Progress Bar */}
-      {taskProgress && currentTaskPlan && (
-        <TaskProgressBar
-          taskPlan={currentTaskPlan}
-          currentProgress={taskProgress}
         />
       )}
     </div>
