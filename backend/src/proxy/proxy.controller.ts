@@ -51,7 +51,6 @@ export class ProxyController {
         target,
         changeOrigin: true,
         ws: true, // Enable WebSocket proxying
-        logLevel: 'debug',
         pathRewrite: (path, req) => {
           // For VS Code (port 8080), strip /proxy/8080 prefix
           if (port === '8080' && path.startsWith(`/proxy/${port}`)) {
