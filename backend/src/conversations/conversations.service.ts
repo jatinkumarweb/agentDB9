@@ -367,7 +367,7 @@ export class ConversationsService {
         if (isOllamaHealthy && availableModels.length > 0) {
           try {
             // Use ReAct for tool-based queries, streaming for simple queries
-            const useReAct = this.shouldUseReAct(userMessage);
+            const useReAct = this.shouldUseReAct(userMessage, conversation);
             console.log(`🔍 Query analysis: "${userMessage.substring(0, 50)}..." -> ReAct: ${useReAct}`);
             
             if (useReAct) {
@@ -395,7 +395,7 @@ export class ConversationsService {
           console.log(`🌐 Calling external API for model: ${model}`);
           
           // Check if we should use ReACT pattern for external LLMs
-          const useReAct = this.shouldUseReAct(userMessage);
+          const useReAct = this.shouldUseReAct(userMessage, conversation);
           console.log(`🔍 Query analysis for external LLM: "${userMessage.substring(0, 50)}..." -> ReAct: ${useReAct}`);
           
           if (useReAct) {
@@ -793,10 +793,17 @@ Error: ${error.message}`;
     return systemPrompt;
   }
 
-  private shouldUseReAct(userMessage: string): boolean {
+  private shouldUseReAct(userMessage: string, conversation?: any): boolean {
     const lowerMessage = userMessage.toLowerCase();
     
-    // Use ReACT ONLY for tasks that REQUIRE tool usage
+    // ALWAYS use ReAct for workspace conversations (projectId exists)
+    // Workspace conversations almost always need tool access for file operations
+    if (conversation?.projectId) {
+      console.log(`🔍 ReACT decision: TRUE (workspace conversation with projectId: ${conversation.projectId})`);
+      return true;
+    }
+    
+    // For regular chat (no projectId), use ReACT ONLY for tasks that REQUIRE tool usage
     // ReACT is for multi-step tasks that need:
     // - Reading/analyzing workspace files
     // - Making code modifications
@@ -817,7 +824,7 @@ Error: ${error.message}`;
       'read the file', 'check the file', 'look at the file',
       // Modification tasks (requires file operations)
       'update the', 'modify the', 'change the', 'edit the', 'add to', 'remove from', 'delete the',
-      'fix the', 'improve the', 'refactor the', 'enhance the',
+      'fix the', 'improve the', 'refactor the', 'enhance the', 'add styling', 'style the', 'add styles',
       // Creation tasks (requires file creation)
       'create a file', 'create a component', 'create a', 'create an', 'build a', 'make a file', 'generate a file',
       'setup the', 'initialize the', 'implement in', 'write to file', 'create react', 'create next',
@@ -2097,20 +2104,33 @@ You: TOOL_CALL:
       });
       const savedTempMessage = await this.messagesRepository.save(tempMessage);
       
-      // Execute ReAct loop with external LLM
+      // Execute ReAct loop with external LLM using the unified ReAct agent service
       // Workspace (with projectId) gets more iterations for complex tool chains
       const maxIterations = conversation.projectId ? 10 : 2;
-      console.log(`⚙️ ReAct (External LLM): Starting ReAct loop with model ${model} (max ${maxIterations} iterations for ${conversation.projectId ? 'workspace' : 'chat'})`);
-      const result = await this.executeExternalReActLoop(
+      const workingDir = await this.getWorkingDirectory(conversation);
+      console.log(`⚙️ ReAct (External LLM): Starting ReAct loop with model ${model} (max ${maxIterations} iterations for ${conversation.projectId ? 'workspace' : 'chat'}, workingDir: ${workingDir})`);
+      
+      const result = await this.reactAgentService.executeReActLoop(
         userMessage,
         systemPrompt,
         model,
-        llmServiceUrl,
-        userId,
+        llmServiceUrl, // Will be ignored for external models, but required parameter
         conversationHistory,
         conversation.id,
         (status: string) => {
-          // Broadcast progress via WebSocket
+          // Check if status is a JSON string (task progress update)
+          try {
+            const parsed = JSON.parse(status);
+            if (parsed.type) {
+              // This is a task progress update
+              this.websocketGateway.broadcastTaskProgress(conversation.id, parsed);
+              return;
+            }
+          } catch (e) {
+            // Not JSON, treat as regular status string
+          }
+          
+          // Broadcast regular progress via WebSocket
           this.websocketGateway.broadcastMessageUpdate(
             conversation.id,
             savedTempMessage.id,
@@ -2134,7 +2154,10 @@ You: TOOL_CALL:
             ).catch(err => console.error('Failed to save tool memory:', err));
           }
         },
-        conversation
+        workingDir,
+        conversation.agentId,
+        true, // Enable task planning
+        userId // Pass userId for external API models
       );
       
       // Update the temporary message with final response
