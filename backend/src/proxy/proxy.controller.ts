@@ -71,8 +71,10 @@ export class ProxyController {
         },
         onError: (err, req, res) => {
           console.error(`[Proxy Error] ${err.message}`);
-          if (res instanceof Response && !res.headersSent) {
-            res.status(502).json({
+          // Check if response is Express Response and headers not sent
+          const expressRes = res as any;
+          if (expressRes && typeof expressRes.status === 'function' && !expressRes.headersSent) {
+            expressRes.status(502).json({
               error: 'Bad Gateway',
               message: `Proxy error: ${err.message}`,
             });
