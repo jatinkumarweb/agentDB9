@@ -22,8 +22,7 @@
     "noFallthroughCasesInSwitch": false,
     "strict": false,
     "paths": {
-      "jsonrepair": ["../node_modules/jsonrepair"],
-      "http-proxy-middleware": ["../node_modules/http-proxy-middleware"]
+      "jsonrepair": ["../node_modules/jsonrepair"]
     }
   }
 }

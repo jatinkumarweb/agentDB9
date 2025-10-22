@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import axios from 'axios';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import * as httpProxyMiddleware from 'http-proxy-middleware';
 
 /**
  * Proxy Controller - Forwards requests to local dev servers
@@ -47,7 +47,7 @@ export class ProxyController {
     if (!this.proxyCache.has(cacheKey)) {
       console.log(`Creating WebSocket-aware proxy for ${cacheKey}`);
       
-      const proxy = createProxyMiddleware({
+      const proxy = httpProxyMiddleware.createProxyMiddleware({
         target,
         changeOrigin: true,
         ws: true, // Enable WebSocket proxying
