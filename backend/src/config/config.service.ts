@@ -94,8 +94,12 @@ export class AppConfigService {
     return this.configService.get('security');
   }
 
-  get corsOrigins(): (string | RegExp)[] {
-    return this.configService.get<(string | RegExp)[]>('security.corsOrigins') || ['http://localhost:3000'];
+  get corsOrigins(): string[] {
+    return this.configService.get<string[]>('security.corsOrigins') || ['http://localhost:3000'];
+  }
+
+  get allowLocalhostPattern(): boolean {
+    return this.configService.get<boolean>('security.allowLocalhostPattern') || false;
   }
 
   // Logging

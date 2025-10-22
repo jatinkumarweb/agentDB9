@@ -106,8 +106,12 @@ export default () => ({
       'http://localhost:3000',  // Frontend
       'http://localhost:8000',  // Backend (for proxy)
       'http://localhost:8080',  // VS Code
-      /^http:\/\/localhost:\d+$/,  // Any localhost port (dev servers)
+      'http://localhost:5173',  // Vite
+      'http://localhost:4200',  // Angular
+      'http://localhost:3001',  // Additional dev server
     ],
+    // Pattern for dynamic localhost port matching (used in main.ts)
+    allowLocalhostPattern: true,
     rateLimitWindow: parseInt(process.env.RATE_LIMIT_WINDOW || "0", 10) || 15 * 60 * 1000, // 15 minutes
     rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || "0", 10) || 100,
     bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || "0", 10) || 12,

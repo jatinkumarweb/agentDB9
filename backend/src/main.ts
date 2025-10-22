@@ -43,19 +43,15 @@ async function bootstrap() {
         }
 
         const allowedOrigins = configService.corsOrigins;
+        const allowLocalhostPattern = configService.allowLocalhostPattern;
         
-        // Check if origin matches any allowed origin (string or regex)
-        const isAllowed = allowedOrigins.some(allowed => {
-          if (typeof allowed === 'string') {
-            return origin === allowed;
-          }
-          if (allowed instanceof RegExp) {
-            return allowed.test(origin);
-          }
-          return false;
-        });
+        // Check if origin matches any allowed origin
+        const isAllowed = allowedOrigins.some(allowed => origin === allowed);
+        
+        // If not in allowed list, check localhost pattern if enabled
+        const isLocalhost = allowLocalhostPattern && /^http:\/\/localhost:\d+$/.test(origin);
 
-        if (isAllowed) {
+        if (isAllowed || isLocalhost) {
           callback(null, true);
         } else {
           console.warn(`CORS blocked origin: ${origin}`);
