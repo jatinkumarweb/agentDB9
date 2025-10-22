@@ -7,8 +7,8 @@ When running dev servers (Vite, React, Angular) inside the VS Code container, th
 ### The Flow
 
 1. **Browser** → `http://localhost:8000/proxy/5173/`
-2. **Backend Proxy** → strips `/proxy/5173` → forwards to `vscode:5173/`
-3. **Vite Server** → serves content from `/`
+2. **Backend Proxy** → keeps full path → forwards to `vscode:5173/proxy/5173/`
+3. **Vite Server** → configured with base `/proxy/5173/` → serves content
 
 ### Running Vite (Port 5173)
 
@@ -20,20 +20,22 @@ npm create vite@latest my-app -- --template react
 cd my-app
 npm install
 
-# Run WITHOUT base path configuration
-npm run dev -- --host 0.0.0.0 --port 5173
+# Run WITH base path configuration
+npm run dev -- --host 0.0.0.0 --port 5173 --base /proxy/5173/
 ```
 
-**Important:** Do NOT configure a base path in `vite.config.js`. The proxy handles the path routing.
+**Important:** Vite MUST be configured with `--base /proxy/5173/` or set in `vite.config.js`.
 
 ### Running React (Create React App) - Port 3000
 
 ```bash
 # Inside VS Code terminal
-npm start
+PUBLIC_URL=/proxy/3000 npm start
 ```
 
-React dev server will run on port 3000. Access via: `http://localhost:8000/proxy/3000/`
+**Important:** Set `PUBLIC_URL=/proxy/3000` so React generates correct asset paths.
+
+Access via: `http://localhost:8000/proxy/3000/`
 
 ### Running Angular - Port 4200
 
@@ -99,7 +101,7 @@ netstat -tlnp | grep 5173
 
 ### Correct Vite Configuration
 
-If you need a `vite.config.js`, use this minimal configuration:
+Create or update `vite.config.js` with base path:
 
 ```javascript
 import { defineConfig } from 'vite'
@@ -107,14 +109,16 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  base: '/proxy/5173/',  // REQUIRED: Must match proxy path
   server: {
     host: '0.0.0.0',  // Listen on all interfaces
     port: 5173,
     strictPort: true,  // Fail if port is already in use
-    // DO NOT set base path - proxy handles routing
   }
 })
 ```
+
+**Critical:** The `base: '/proxy/5173/'` setting is required for Vite to generate correct asset paths.
 
 ### Port Mappings
 
@@ -148,7 +152,25 @@ cd /home/coder/workspace
 npm create vite@latest my-vite-app -- --template react-ts
 cd my-vite-app
 npm install
-npm run dev -- --host 0.0.0.0 --port 5173
+
+# Create vite.config.js with base path
+cat > vite.config.js << 'EOF'
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  base: '/proxy/5173/',
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
+  }
+})
+EOF
+
+# Run Vite
+npm run dev
 ```
 
 Then access in browser: `http://localhost:8000/proxy/5173/`

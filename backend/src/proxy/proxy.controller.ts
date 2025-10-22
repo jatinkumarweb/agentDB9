@@ -213,19 +213,23 @@ export class ProxyController {
     
     try {
       
-      // Strip /proxy/{port} prefix from all requests
-      // The backend proxy adds this prefix, but the target service doesn't expect it
-      // Dev servers should run WITHOUT base path configuration
+      // Handle path differently for VS Code vs dev servers
+      // - VS Code (8080): Strip /proxy/8080 prefix - VS Code doesn't know about proxy
+      // - Dev servers (5173, 3000, etc.): Keep full path - they're configured with PUBLIC_URL=/proxy/{port}
       const proxyPrefix = `/proxy/${port}`;
       let path = req.url;
       
-      if (path.startsWith(proxyPrefix)) {
+      // For VS Code (port 8080), strip the proxy prefix
+      if (port === '8080' && path.startsWith(proxyPrefix)) {
         path = path.substring(proxyPrefix.length);
         // Ensure path starts with /
         if (!path.startsWith('/')) {
           path = '/' + path;
         }
-        console.log('Stripped proxy prefix');
+        console.log('VS Code proxy: stripped prefix');
+      } else {
+        // For dev servers, keep the full path for PUBLIC_URL compatibility
+        console.log('Dev server proxy: keeping full path');
       }
       
       console.log('Original URL:', req.url);
