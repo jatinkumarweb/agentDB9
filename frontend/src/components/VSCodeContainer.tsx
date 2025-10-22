@@ -33,10 +33,11 @@ export const VSCodeContainer: React.FC<VSCodeContainerProps> = ({
   const { currentWorkspace } = useWorkspaceStore();
 
   useEffect(() => {
-    // Use VSCode through backend proxy to ensure same-origin for dev server previews
-    // This prevents CORS issues when VS Code generates preview URLs like /proxy/5173/
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-    const baseUrl = `${backendUrl}/proxy/8080`;
+    // Access VS Code directly on port 8080 (not through proxy)
+    // VS Code is exposed directly and handles its own static resources
+    // Only dev servers running inside VS Code container need proxy (ports 3000, 5173, etc.)
+    const vscodeDirectUrl = process.env.NEXT_PUBLIC_VSCODE_URL || 'http://localhost:8080';
+    const baseUrl = vscodeDirectUrl;
     
     // Determine which folder/workspace to open
     // If projectName is provided, open the project folder directly
