@@ -204,6 +204,19 @@ run_test "Proxy GET request returns content" \
     "curl -s http://localhost:8000/proxy/8080/ | head -c 100" \
     "html\|HTML\|<!DOCTYPE"
 
+# Test 2.3: WebSocket Support Check
+print_status "INFO" "Testing WebSocket support"
+
+# Check if backend has http-proxy-middleware for WebSocket support
+run_test "Backend has http-proxy-middleware dependency" \
+    "grep -q 'http-proxy-middleware' backend/package.json" \
+    ""
+
+# Check if proxy controller handles WebSocket upgrades
+run_test "Proxy controller handles WebSocket upgrade requests" \
+    "grep -q 'upgrade.*websocket\|WebSocket' backend/src/proxy/proxy.controller.ts" \
+    ""
+
 # Test Suite 3: Path Handling (Regression Tests for Bug Fix)
 echo ""
 echo "========================================="

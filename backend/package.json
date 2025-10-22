@@ -52,6 +52,7 @@
     "compression": "^1.8.1",
     "dockerode": "^4.0.9",
     "helmet": "^8.1.0",
+    "http-proxy-middleware": "^2.0.9",
     "joi": "^18.0.1",
     "jsonrepair": "^3.13.1",
     "nest-winston": "^1.10.2",

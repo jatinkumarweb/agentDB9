@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import axios from 'axios';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 /**
  * Proxy Controller - Forwards requests to local dev servers
@@ -19,6 +20,9 @@ import axios from 'axios';
 @Controller('proxy')
 export class ProxyController {
   
+  // Cache for proxy middleware instances (supports WebSocket)
+  private proxyCache: Map<string, any> = new Map();
+  
   /**
    * Add CORS headers for proxy routes only
    * This allows browser access to proxied dev servers without compromising app security
@@ -31,6 +35,60 @@ export class ProxyController {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+  }
+  
+  /**
+   * Get or create a proxy middleware for a specific target
+   * Supports WebSocket connections for VS Code
+   */
+  private getProxyMiddleware(target: string, port: string) {
+    const cacheKey = `${target}:${port}`;
+    
+    if (!this.proxyCache.has(cacheKey)) {
+      console.log(`Creating WebSocket-aware proxy for ${cacheKey}`);
+      
+      const proxy = createProxyMiddleware({
+        target,
+        changeOrigin: true,
+        ws: true, // Enable WebSocket proxying
+        logLevel: 'debug',
+        pathRewrite: (path, req) => {
+          // For VS Code (port 8080), strip /proxy/8080 prefix
+          if (port === '8080' && path.startsWith(`/proxy/${port}`)) {
+            const newPath = path.substring(`/proxy/${port}`.length) || '/';
+            console.log(`[WebSocket Proxy] Path rewrite: ${path} → ${newPath}`);
+            return newPath;
+          }
+          // For dev servers, keep full path
+          return path;
+        },
+        onProxyReq: (proxyReq, req, res) => {
+          console.log(`[Proxy] ${req.method} ${req.url} → ${target}`);
+        },
+        onProxyReqWs: (proxyReq, req, socket, options, head) => {
+          console.log(`[WebSocket Proxy] Upgrading connection to ${target}`);
+          console.log(`[WebSocket Proxy] Original URL: ${req.url}`);
+        },
+        onError: (err, req, res) => {
+          console.error(`[Proxy Error] ${err.message}`);
+          if (res instanceof Response && !res.headersSent) {
+            res.status(502).json({
+              error: 'Bad Gateway',
+              message: `Proxy error: ${err.message}`,
+            });
+          }
+        },
+        onProxyRes: (proxyRes, req, res) => {
+          // Remove headers that block iframe embedding
+          delete proxyRes.headers['x-frame-options'];
+          delete proxyRes.headers['content-security-policy'];
+        },
+      });
+      
+      this.proxyCache.set(cacheKey, proxy);
+    }
+    
+    return this.proxyCache.get(cacheKey);
   }
 
   /**
@@ -59,6 +117,18 @@ export class ProxyController {
       return;
     }
     
+    // Check if this is a WebSocket upgrade request
+    const isWebSocket = req.headers.upgrade?.toLowerCase() === 'websocket';
+    
+    if (isWebSocket) {
+      console.log('=== WEBSOCKET UPGRADE REQUEST ===');
+      console.log('Port:', port);
+      console.log('URL:', req.url);
+      
+      // Use http-proxy-middleware for WebSocket support
+      return this.proxyRequestWithWebSocket(port, req, res);
+    }
+    
     // TODO: TEMPORARILY DISABLED - Re-enable for production
     // For non-OPTIONS requests, require authentication
     // if (!user) {
@@ -72,6 +142,51 @@ export class ProxyController {
     
     // Proceed with proxy request (auth check disabled for now)
     return this.proxyRequest(port, user, req, res);
+  }
+  
+  /**
+   * Proxy request with WebSocket support using http-proxy-middleware
+   */
+  private async proxyRequestWithWebSocket(
+    port: string,
+    req: Request,
+    res: Response,
+  ) {
+    console.log('=== WEBSOCKET PROXY START ===');
+    console.log('Port:', port);
+    console.log('URL:', req.url);
+    
+    // Map ports to Docker service names
+    const defaultServiceMap: Record<string, string> = {
+      '3000': 'vscode',
+      '3001': 'vscode',
+      '5173': 'vscode',
+      '4200': 'vscode',
+      '8080': 'vscode',
+    };
+    
+    const serviceMap = { ...defaultServiceMap };
+    if (process.env.PROXY_SERVICE_MAP) {
+      const customMappings = process.env.PROXY_SERVICE_MAP.split(',');
+      customMappings.forEach(mapping => {
+        const [mapPort, service] = mapping.split(':');
+        if (mapPort && service) {
+          serviceMap[mapPort.trim()] = service.trim();
+        }
+      });
+    }
+    
+    // Determine target host
+    const host = serviceMap[port] || 'localhost';
+    const target = `http://${host}:${port}`;
+    
+    console.log(`WebSocket target: ${target}`);
+    
+    // Get or create proxy middleware
+    const proxy = this.getProxyMiddleware(target, port);
+    
+    // Use the proxy middleware
+    return proxy(req, res);
   }
 
   /**

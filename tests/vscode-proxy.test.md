@@ -134,6 +134,55 @@ curl -I http://localhost:8000/proxy/5173/
 
 ---
 
+### Test 2.4: WebSocket Upgrade Support ⚠️ CRITICAL
+**Purpose:** Verify proxy supports WebSocket connections for VS Code
+
+**Bug Context:**
+- VS Code requires WebSocket for real-time communication
+- Error: "WebSocket close with status code 1006" indicates connection failure
+- Proxy must handle HTTP upgrade to WebSocket protocol
+
+**Steps:**
+```bash
+# Check if backend has WebSocket support
+grep "http-proxy-middleware" backend/package.json
+
+# Check if proxy controller handles WebSocket upgrades
+grep -A 10 "upgrade.*websocket" backend/src/proxy/proxy.controller.ts
+
+# Test WebSocket connection (requires wscat or similar)
+# npm install -g wscat
+wscat -c ws://localhost:8000/proxy/8080/
+```
+
+**Expected Result:**
+- Backend has `http-proxy-middleware` dependency
+- Proxy controller checks for `upgrade: websocket` header
+- WebSocket connection establishes successfully
+- No 1006 close code errors
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
+### Test 2.5: VS Code Workbench Connection
+**Purpose:** Verify VS Code workbench connects through WebSocket
+
+**Steps:**
+1. Open browser to `http://localhost:3000/workspace`
+2. Open browser DevTools → Network tab → WS (WebSocket) filter
+3. Look for WebSocket connections to `/proxy/8080/`
+
+**Expected Result:**
+- WebSocket connection shows status: 101 Switching Protocols
+- Connection remains open (green indicator)
+- No 1006 close codes
+- VS Code workbench loads and functions
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
 ## Test Suite 3: Path Handling (REGRESSION TESTS)
 
 ### Test 3.1: VS Code Path Stripping ⚠️ CRITICAL
@@ -563,14 +612,14 @@ All tests must pass for the fix to be considered successful:
 | Test Suite | Tests | Passed | Failed | Status |
 |------------|-------|--------|--------|--------|
 | Service Health | 3 | - | - | ⏳ Pending |
-| Proxy Controller | 3 | - | - | ⏳ Pending |
+| Proxy Controller | 5 | - | - | ⏳ Pending |
 | **Path Handling (REGRESSION)** | **6** | **-** | **-** | ⚠️ **CRITICAL** |
 | Frontend Integration | 3 | - | - | ⏳ Pending |
 | Backward Compatibility | 2 | - | - | ⏳ Pending |
 | Error Handling | 2 | - | - | ⏳ Pending |
 | Performance | 1 | - | - | ⏳ Pending |
 | Multiple Dev Servers | 1 | - | - | ⏳ Pending |
-| **TOTAL** | **21** | **-** | **-** | ⏳ Pending |
+| **TOTAL** | **23** | **-** | **-** | ⏳ Pending |
 
 ### ⚠️ Critical Regression Tests (Suite 3)
 
