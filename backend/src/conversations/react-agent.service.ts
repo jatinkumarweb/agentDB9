@@ -43,7 +43,8 @@ export class ReActAgentService {
     toolExecutionCallback?: (toolName: string, toolResult: any, observation: string) => Promise<void>,
     workingDir?: string,
     agentId?: string,
-    enableTaskPlanning: boolean = true
+    enableTaskPlanning: boolean = true,
+    userId?: string
   ): Promise<ReActResult> {
     const MAX_ITERATIONS = maxIterations || this.DEFAULT_MAX_ITERATIONS;
     const steps: ReActStep[] = [];
@@ -67,7 +68,8 @@ export class ReActAgentService {
         userMessage,
         systemPrompt,
         model,
-        ollamaUrl
+        ollamaUrl,
+        userId
       );
       
       if (taskPlan && progressCallback) {
@@ -108,7 +110,8 @@ export class ReActAgentService {
         currentMessage,
         conversationHistory,
         model,
-        ollamaUrl
+        ollamaUrl,
+        userId
       );
 
       this.logger.log(`💭 LLM Response: ${llmResponse.substring(0, 200)}...`);
@@ -278,7 +281,8 @@ Provide a complete answer based on the data you already have.`;
     userMessage: string,
     systemPrompt: string,
     model: string,
-    ollamaUrl: string
+    ollamaUrl: string,
+    userId?: string
   ): Promise<TaskPlan | undefined> {
     try {
       const planningPrompt = `You are a task planning assistant. Break down the following user request into clear, actionable milestones.
@@ -317,7 +321,8 @@ Respond with ONLY the JSON, no other text.`;
         '',
         [],
         model,
-        ollamaUrl
+        ollamaUrl,
+        userId
       );
 
       // Parse the JSON response
@@ -409,13 +414,15 @@ Respond with ONLY the JSON, no other text.`;
 
   /**
    * Call LLM with current context
+   * Supports both Ollama and external API models (OpenAI, Anthropic, etc.)
    */
   private async callLLM(
     systemPrompt: string,
     userMessage: string,
     history: any[],
     model: string,
-    ollamaUrl: string
+    ollamaUrl: string,
+    userId?: string
   ): Promise<string> {
     const messages = [
       { role: 'system', content: systemPrompt },
@@ -423,9 +430,53 @@ Respond with ONLY the JSON, no other text.`;
       { role: 'user', content: userMessage }
     ];
 
-    console.log(`🤖 [ReAct] Sending to Ollama with system prompt length: ${systemPrompt.length}`);
+    console.log(`🤖 [ReAct] Calling LLM with model: ${model}, system prompt length: ${systemPrompt.length}`);
     console.log(`🤖 [ReAct] System prompt preview: ${systemPrompt.substring(0, 300)}...`);
 
+    // Check if this is an external API model (not Ollama)
+    const isExternalModel = !model.includes('llama') && 
+                           !model.includes('mistral') && 
+                           !model.includes('codellama') &&
+                           !model.includes('qwen') &&
+                           !model.includes('deepseek') &&
+                           !model.includes('gemma') &&
+                           !model.includes('phi') &&
+                           !model.includes('starcoder');
+
+    if (isExternalModel) {
+      // Use LLM service for external API models
+      const llmServiceUrl = process.env.LLM_SERVICE_URL || 'http://llm-service:9000';
+      console.log(`🌐 [ReAct] Using LLM service for external model: ${model}`);
+      
+      if (!userId) {
+        throw new Error('User ID required for external API models');
+      }
+      
+      const url = `${llmServiceUrl}/api/generate?userId=${userId}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelId: model,
+          prompt: userMessage,
+          systemPrompt: systemPrompt,
+          messages: messages,
+          temperature: 0.3,
+          maxTokens: 1024
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `LLM service error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.data?.content || data.content || '';
+    }
+
+    // Use Ollama for local models
+    console.log(`🦙 [ReAct] Using Ollama for local model: ${model}`);
     const response = await fetch(`${ollamaUrl}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -442,7 +493,7 @@ Respond with ONLY the JSON, no other text.`;
     });
 
     if (!response.ok) {
-      throw new Error(`LLM API error: ${response.status}`);
+      throw new Error(`Ollama API error: ${response.status}`);
     }
 
     const data = await response.json();

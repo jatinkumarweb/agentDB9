@@ -37,6 +37,7 @@ export interface LLMRequest {
   provider?: ModelProvider;
   stream?: boolean;
   systemPrompt?: string;
+  messages?: Array<{ role: string; content: string }>; // For multi-turn conversations
 }
 
 export interface LLMResponse {

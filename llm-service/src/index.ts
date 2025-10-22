@@ -517,12 +517,70 @@ app.post('/api/generate', async (req, res) => {
       }
     }
     
-    // For non-Ollama models, return helpful message
-    res.status(501).json({
-      success: false,
-      error: 'External API models not yet implemented',
-      message: 'Please configure API keys for OpenAI, Anthropic, or use Ollama models'
-    });
+    // Handle external API models (OpenAI, Anthropic, etc.)
+    const userId = req.query.userId as string;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID required for external API models'
+      });
+    }
+    
+    // Get user's API key for this provider
+    const apiKey = await getUserApiKey(userId, model.provider);
+    if (!apiKey) {
+      return res.status(400).json({
+        success: false,
+        error: `API key not configured for ${model.provider}`,
+        requiresApiKey: true
+      });
+    }
+    
+    try {
+      // Build messages array from request
+      const messages = request.messages || [
+        { role: 'system', content: request.systemPrompt || 'You are a helpful assistant.' },
+        { role: 'user', content: request.prompt }
+      ];
+      
+      // Call external API
+      const result = await callExternalAPI(
+        model.provider,
+        model.id,
+        messages,
+        apiKey,
+        {
+          temperature: request.temperature || 0.7,
+          max_tokens: request.maxTokens || 1024
+        }
+      );
+      
+      const response: LLMResponse = {
+        content: result.response || result.message || '',
+        modelId: model.id,
+        provider: model.provider,
+        usage: result.usage || {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        }
+      };
+      
+      const apiResponse: APIResponse<LLMResponse> = {
+        success: true,
+        data: response,
+        message: 'Generated successfully'
+      };
+      
+      return res.json(apiResponse);
+    } catch (externalError: any) {
+      console.error(`External API (${model.provider}) generation error:`, externalError);
+      return res.status(500).json({
+        success: false,
+        error: `${model.provider} API error`,
+        details: externalError?.message || 'Unknown error'
+      });
+    }
   } catch (error) {
     console.error('LLM generation error:', error);
     res.status(500).json({

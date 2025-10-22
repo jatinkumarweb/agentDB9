@@ -932,7 +932,8 @@ Error: ${error.message}`;
         },
         workingDir,
         conversation.agentId,
-        true // Enable task planning
+        true, // Enable task planning
+        conversation.userId // Pass userId for external API models
       );
       
       // Update the temporary message with final response
