@@ -20,7 +20,8 @@ if [ ! -d "node_modules" ] || \
    [ ! -d "node_modules/@nestjs/common" ] || \
    [ ! -d "node_modules/@nestjs/event-emitter" ] || \
    [ ! -d "node_modules/@nestjs/schedule" ] || \
-   [ ! -d "node_modules/dockerode" ]; then
+   [ ! -d "node_modules/dockerode" ] || \
+   [ ! -d "node_modules/http-proxy-middleware" ]; then
   echo "📦 Installing app dependencies..."
   npm install
 fi
