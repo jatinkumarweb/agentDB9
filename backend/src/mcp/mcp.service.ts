@@ -304,7 +304,7 @@ export class MCPService {
    */
   async getAvailableTools(): Promise<string[]> {
     try {
-      // Simulate available tools
+      // Return all available tools including dev server management
       return [
         'read_file',
         'write_file',
@@ -314,7 +314,11 @@ export class MCPService {
         'git_commit',
         'create_directory',
         'delete_file',
-        'get_workspace_summary'
+        'get_workspace_summary',
+        'stop_dev_server',
+        'stop_all_dev_servers',
+        'check_dev_server',
+        'list_dev_servers'
       ];
     } catch (error) {
       this.logger.error('Failed to get available MCP tools:', error);

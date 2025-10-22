@@ -783,7 +783,11 @@ Error: ${error.message}`;
     systemPrompt += '- write_file: Write files. Args: {"path": "file.js", "content": "..."}\n';
     systemPrompt += '- delete_file: Delete a file. Args: {"path": "file.js"}\n';
     systemPrompt += '- create_directory: Create directory. Args: {"path": "src"}\n';
-    systemPrompt += '- execute_command: Run commands. Args: {"command": "npm install"}\n\n';
+    systemPrompt += '- execute_command: Run commands. Args: {"command": "npm install"}\n';
+    systemPrompt += '- list_dev_servers: List all running dev servers. Args: {}\n';
+    systemPrompt += '- check_dev_server: Check if dev server is running on port. Args: {"port": 5173}\n';
+    systemPrompt += '- stop_dev_server: Stop dev server by port or terminal ID. Args: {"port": 5173} or {"terminalId": "terminal-123"}\n';
+    systemPrompt += '- stop_all_dev_servers: Stop all running dev servers. Args: {}\n\n';
     systemPrompt += 'MULTI-STEP REASONING:\n';
     systemPrompt += '1. ALWAYS check workspace context first (use list_files or get_workspace_summary)\n';
     systemPrompt += '2. Use tools in sequence to gather information and perform actions\n';
@@ -1151,7 +1155,11 @@ Available tools:`;
 - write_file: Write/create file with content. Args: {"path": "src/App.jsx", "content": "..."}
 - create_directory: Create directory. Args: {"path": "src/components"}
 - git_commit: Commit changes. Args: {"message": "Initial commit", "files": ["."]}
-- delete_file: Delete file. Args: {"path": "file.js"}`;
+- delete_file: Delete file. Args: {"path": "file.js"}
+- list_dev_servers: List all running dev servers. Args: {}
+- check_dev_server: Check if dev server is running on port. Args: {"port": 5173}
+- stop_dev_server: Stop dev server by port or terminal ID. Args: {"port": 5173}
+- stop_all_dev_servers: Stop all running dev servers. Args: {}`;
         }
 
         systemPrompt += `
