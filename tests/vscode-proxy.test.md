@@ -3,6 +3,10 @@
 ## Overview
 These test cases verify that VS Code and dev server preview URLs work correctly through the backend proxy.
 
+**IMPORTANT:** These tests include regression tests for the path handling bug fix (commit 5ea81c8).
+The bug was: backend was forwarding `/proxy/8080/` prefix to VS Code, causing it to fail.
+The fix: backend now strips `/proxy/8080` prefix for port 8080, but preserves full path for dev servers.
+
 ## Prerequisites
 - All services running: `docker-compose up -d`
 - Backend accessible at `http://localhost:8000`
@@ -130,9 +134,150 @@ curl -I http://localhost:8000/proxy/5173/
 
 ---
 
-## Test Suite 3: Frontend Integration
+## Test Suite 3: Path Handling (REGRESSION TESTS)
 
-### Test 3.1: VS Code Container Component
+### Test 3.1: VS Code Path Stripping ⚠️ CRITICAL
+**Purpose:** Verify backend strips `/proxy/8080` prefix when forwarding to VS Code
+
+**Bug Context:** 
+- Original bug: Backend forwarded `http://vscode:8080/proxy/8080/?folder=...`
+- VS Code expected: `http://vscode:8080/?folder=...`
+- Fix: Strip `/proxy/8080` prefix for port 8080 only
+
+**Steps:**
+```bash
+# Make request to VS Code through proxy
+curl -s "http://localhost:8000/proxy/8080/?folder=/home/coder/workspace" > /dev/null
+
+# Check backend logs
+docker-compose logs --tail=30 backend | grep -A 5 "proxy/8080"
+```
+
+**Expected Result:**
+- Logs show: `VS Code proxy: stripped prefix`
+- Logs show: `Target path: /?folder=/home/coder/workspace`
+- Logs do NOT show: `/proxy/8080/proxy/8080` (double prefix)
+- VS Code loads successfully
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
+### Test 3.2: Dev Server Path Preservation ⚠️ CRITICAL
+**Purpose:** Verify backend preserves full path for dev servers (non-8080 ports)
+
+**Bug Context:**
+- Dev servers can be configured with `PUBLIC_URL=/proxy/5173/`
+- They expect the full path including prefix
+- Backend should NOT strip prefix for these ports
+
+**Steps:**
+```bash
+# Make request to dev server port
+curl -s "http://localhost:8000/proxy/5173/" > /dev/null
+
+# Check backend logs
+docker-compose logs --tail=30 backend | grep -A 5 "proxy/5173"
+```
+
+**Expected Result:**
+- Logs show: `Dev server proxy: keeping full path`
+- Logs show: `Target path: /proxy/5173/`
+- Full path is preserved
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
+### Test 3.3: No Double Prefix Bug ⚠️ CRITICAL REGRESSION
+**Purpose:** Ensure the original bug is fixed and doesn't return
+
+**Bug Context:**
+- Original bug caused: `http://vscode:8080/proxy/8080/...`
+- This test ensures we never send double prefix again
+
+**Steps:**
+```bash
+# Make multiple requests
+curl -s "http://localhost:8000/proxy/8080/" > /dev/null
+curl -s "http://localhost:8000/proxy/8080/?folder=/test" > /dev/null
+curl -s "http://localhost:8000/proxy/8080/static/test.js" > /dev/null
+
+# Check logs for double prefix
+docker-compose logs --tail=50 backend | grep "/proxy/8080/proxy/8080"
+```
+
+**Expected Result:**
+- No matches found (grep returns nothing)
+- If matches found: ❌ BUG REGRESSION DETECTED
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
+### Test 3.4: Query Parameter Preservation
+**Purpose:** Verify query parameters are preserved after path stripping
+
+**Steps:**
+```bash
+curl -I "http://localhost:8000/proxy/8080/?folder=/home/coder/workspace&test=123"
+```
+
+**Expected Result:**
+- HTTP 200 or 302
+- Backend logs show: `Target path: /?folder=/home/coder/workspace&test=123`
+- Query parameters intact
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
+### Test 3.5: Complex Path Handling
+**Purpose:** Verify complex paths work correctly
+
+**Steps:**
+```bash
+# Test VS Code static resources
+curl -I "http://localhost:8000/proxy/8080/static/out/vs/code/electron-sandbox/workbench/workbench.html"
+
+# Check logs
+docker-compose logs --tail=20 backend | grep "Target path"
+```
+
+**Expected Result:**
+- Backend strips `/proxy/8080` prefix
+- Target path: `/static/out/vs/code/electron-sandbox/workbench/workbench.html`
+- No double prefix
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
+### Test 3.6: Code Verification
+**Purpose:** Verify the fix is present in the code
+
+**Steps:**
+```bash
+# Check for path stripping logic
+grep -A 10 "port === '8080'" backend/src/proxy/proxy.controller.ts
+
+# Check for dev server path preservation
+grep -B 2 -A 2 "keeping full path" backend/src/proxy/proxy.controller.ts
+```
+
+**Expected Result:**
+- Code contains: `if (port === '8080' && path.startsWith(proxyPrefix))`
+- Code contains: `path = path.substring(proxyPrefix.length)`
+- Code contains: `console.log('VS Code proxy: stripped prefix')`
+- Code contains: `console.log('Dev server proxy: keeping full path')`
+
+**Status:** ✅ PASS / ❌ FAIL
+
+---
+
+## Test Suite 4: Frontend Integration
+
+### Test 4.1: VS Code Container Component
 **Purpose:** Verify VSCodeContainer loads VS Code through proxy
 
 **Steps:**
@@ -419,12 +564,29 @@ All tests must pass for the fix to be considered successful:
 |------------|-------|--------|--------|--------|
 | Service Health | 3 | - | - | ⏳ Pending |
 | Proxy Controller | 3 | - | - | ⏳ Pending |
+| **Path Handling (REGRESSION)** | **6** | **-** | **-** | ⚠️ **CRITICAL** |
 | Frontend Integration | 3 | - | - | ⏳ Pending |
 | Backward Compatibility | 2 | - | - | ⏳ Pending |
 | Error Handling | 2 | - | - | ⏳ Pending |
 | Performance | 1 | - | - | ⏳ Pending |
 | Multiple Dev Servers | 1 | - | - | ⏳ Pending |
-| **TOTAL** | **15** | **-** | **-** | ⏳ Pending |
+| **TOTAL** | **21** | **-** | **-** | ⏳ Pending |
+
+### ⚠️ Critical Regression Tests (Suite 3)
+
+The **Path Handling** test suite contains critical regression tests for bug fix commit 5ea81c8:
+
+**Bug Fixed:** Backend was forwarding `/proxy/8080/` prefix to VS Code, causing failures.
+
+**Critical Tests:**
+- ✅ Test 3.1: VS Code path stripping - Ensures `/proxy/8080` prefix is stripped
+- ✅ Test 3.2: Dev server path preservation - Ensures other ports keep full path  
+- ✅ Test 3.3: No double prefix bug - Prevents regression of original bug
+- ✅ Test 3.4: Query parameter preservation - Ensures params survive stripping
+- ✅ Test 3.5: Complex path handling - Tests nested paths
+- ✅ Test 3.6: Code verification - Confirms fix is in codebase
+
+**⚠️ These tests MUST pass before any deployment.**
 
 ---
 
@@ -432,5 +594,7 @@ All tests must pass for the fix to be considered successful:
 
 - Tests should be run in order
 - Each test suite builds on previous ones
+- **Path Handling tests (Suite 3) are regression tests - failures indicate bug regression**
 - Document any failures with logs and screenshots
 - Update this document with actual test results
+- Run automated tests with: `./tests/vscode-proxy-test.sh`
