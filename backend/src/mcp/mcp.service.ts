@@ -1107,7 +1107,39 @@ export class MCPService {
    */
   private async stopAllDevServers(): Promise<string> {
     try {
-      // Get list of terminals from MCP server
+      // Common dev server ports to check
+      const commonPorts = [3000, 3001, 4200, 5000, 5173, 8080, 8081, 8000, 8888, 9000];
+      const stoppedPorts: number[] = [];
+      const failedPorts: number[] = [];
+      
+      // Check and stop processes on each common port
+      for (const port of commonPorts) {
+        try {
+          const { stdout } = await this.execAsync(`lsof -ti:${port}`, { 
+            cwd: this.workspaceRoot 
+          });
+          
+          if (stdout.trim()) {
+            const pids = stdout.trim().split('\n');
+            
+            // Kill all PIDs on this port
+            for (const pid of pids) {
+              try {
+                await this.execAsync(`kill -9 ${pid}`, { cwd: this.workspaceRoot });
+                this.logger.log(`Killed process ${pid} on port ${port}`);
+              } catch (killError) {
+                this.logger.warn(`Failed to kill process ${pid}: ${killError.message}`);
+              }
+            }
+            
+            stoppedPorts.push(port);
+          }
+        } catch {
+          // Port not in use, continue
+        }
+      }
+      
+      // Also stop tracked terminals
       const listResponse = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1117,24 +1149,34 @@ export class MCPService {
         }),
       });
 
-      if (!listResponse.ok) {
-        return 'Failed to list terminals';
+      let stoppedTerminals = 0;
+      if (listResponse.ok) {
+        const listResult = await listResponse.json();
+        const terminalIds = listResult.result || [];
+        
+        for (const terminal of terminalIds) {
+          try {
+            await this.stopDevServer(terminal.id);
+            stoppedTerminals++;
+          } catch {
+            // Continue on error
+          }
+        }
       }
 
-      const listResult = await listResponse.json();
-      const terminalIds = listResult.result || [];
-
-      if (terminalIds.length === 0) {
+      if (stoppedPorts.length === 0 && stoppedTerminals === 0) {
         return 'No dev servers running';
       }
 
-      // Stop each terminal
-      const results = await Promise.all(
-        terminalIds.map(id => this.stopDevServer(id))
-      );
-
-      const stopped = results.filter(r => r.includes('successfully')).length;
-      return `Stopped ${stopped} dev servers`;
+      let message = '';
+      if (stoppedPorts.length > 0) {
+        message += `Stopped dev servers on ports: ${stoppedPorts.join(', ')}`;
+      }
+      if (stoppedTerminals > 0) {
+        message += `${message ? '\n' : ''}Stopped ${stoppedTerminals} tracked terminal(s)`;
+      }
+      
+      return message;
     } catch (error) {
       return `Failed to stop dev servers: ${error.message}`;
     }
@@ -1173,7 +1215,39 @@ export class MCPService {
    */
   private async listDevServers(): Promise<string> {
     try {
-      // Get list of terminals from MCP server
+      // Common dev server ports to check
+      const commonPorts = [3000, 3001, 4200, 5000, 5173, 8080, 8081, 8000, 8888, 9000];
+      const runningServers: Array<{port: number; pid: string; command?: string}> = [];
+      
+      // Check each common port for running processes
+      for (const port of commonPorts) {
+        try {
+          const { stdout } = await this.execAsync(`lsof -ti:${port}`, { 
+            cwd: this.workspaceRoot 
+          });
+          
+          if (stdout.trim()) {
+            const pid = stdout.trim().split('\n')[0]; // Get first PID if multiple
+            
+            // Try to get command name
+            let command = 'unknown';
+            try {
+              const { stdout: cmdOut } = await this.execAsync(`ps -p ${pid} -o comm=`, {
+                cwd: this.workspaceRoot
+              });
+              command = cmdOut.trim();
+            } catch {
+              // Ignore if we can't get command
+            }
+            
+            runningServers.push({ port, pid, command });
+          }
+        } catch {
+          // Port not in use, continue
+        }
+      }
+      
+      // Also check tracked terminals from MCP server
       const listResponse = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1183,23 +1257,37 @@ export class MCPService {
         }),
       });
 
-      if (!listResponse.ok) {
-        return 'Failed to list terminals';
+      let trackedTerminals = [];
+      if (listResponse.ok) {
+        const listResult = await listResponse.json();
+        trackedTerminals = listResult.result || [];
       }
 
-      const listResult = await listResponse.json();
-      const terminals = listResult.result || [];
-
-      if (terminals.length === 0) {
+      // Build output
+      if (runningServers.length === 0 && trackedTerminals.length === 0) {
         return 'No dev servers running';
       }
 
-      let output = `Running dev servers (${terminals.length}):\n\n`;
+      let output = '';
       
-      for (const terminal of terminals) {
-        output += `Terminal ID: ${terminal.id}\n`;
-        output += `Name: ${terminal.name}\n`;
-        output += `Working Dir: ${terminal.cwd}\n\n`;
+      if (runningServers.length > 0) {
+        output += `Found ${runningServers.length} dev server(s) running:\n\n`;
+        
+        for (const server of runningServers) {
+          output += `Port: ${server.port}\n`;
+          output += `PID: ${server.pid}\n`;
+          output += `Process: ${server.command}\n`;
+          output += `URL: http://localhost:${server.port}\n\n`;
+        }
+      }
+      
+      if (trackedTerminals.length > 0) {
+        output += `\nTracked terminals (${trackedTerminals.length}):\n\n`;
+        for (const terminal of trackedTerminals) {
+          output += `Terminal ID: ${terminal.id}\n`;
+          output += `Name: ${terminal.name}\n`;
+          output += `Working Dir: ${terminal.cwd}\n\n`;
+        }
       }
       
       return output;
