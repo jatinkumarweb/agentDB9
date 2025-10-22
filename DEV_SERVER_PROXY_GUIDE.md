@@ -46,15 +46,42 @@ Access via: `http://localhost:8000/proxy/4200/`
 
 ### Troubleshooting
 
-#### 404 on `/@vite/client` or other assets
+#### 404 on `/@vite/client` or `/src/main.jsx`
 
-**Cause:** Vite server isn't running or isn't accessible on the expected port.
+**Cause:** Vite is running but from the wrong directory (can't find project files).
+
+**Symptoms:**
+- Proxy logs show: `✅ Success with vscode:5173`
+- But response status: `404`
+- Vite is running but can't find files
 
 **Solution:**
-1. Check if Vite is running: `ps aux | grep vite`
-2. Check if port 5173 is listening: `netstat -tlnp | grep 5173`
-3. Ensure Vite is bound to `0.0.0.0` not `localhost`
-4. Check Vite output for the actual port it's using
+```bash
+# Inside VS Code terminal, check current directory
+pwd
+
+# Should be in your project directory with package.json and src/
+ls -la
+# Should see: package.json, src/, node_modules/, vite.config.js
+
+# If not in project directory, navigate there:
+cd /home/coder/workspace/my-vite-app
+
+# Then run Vite:
+npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+**Quick Diagnostic:**
+```bash
+# Check if Vite is running
+ps aux | grep vite
+
+# Check what directory Vite is running from
+lsof -p $(pgrep -f vite) | grep cwd
+
+# Check if port 5173 is listening
+netstat -tlnp | grep 5173
+```
 
 #### CORS Errors
 
