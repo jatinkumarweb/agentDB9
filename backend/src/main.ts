@@ -35,29 +35,14 @@ async function bootstrap() {
 
   // Enable CORS
   if (configService.isCorsEnabled) {
+    // In development, allow all origins for flexibility with dev servers
+    // In production, use specific origins from CORS_ORIGINS env var
+    const corsOrigin = configService.isDevelopment 
+      ? true  // Allow all origins in development
+      : configService.corsOrigins;  // Use specific origins in production
+    
     app.enableCors({
-      origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps, curl, Postman)
-        if (!origin) {
-          return callback(null, true);
-        }
-
-        const allowedOrigins = configService.corsOrigins;
-        const allowLocalhostPattern = configService.allowLocalhostPattern;
-        
-        // Check if origin matches any allowed origin
-        const isAllowed = allowedOrigins.some(allowed => origin === allowed);
-        
-        // If not in allowed list, check localhost pattern if enabled
-        const isLocalhost = allowLocalhostPattern && /^http:\/\/localhost:\d+$/.test(origin);
-
-        if (isAllowed || isLocalhost) {
-          callback(null, true);
-        } else {
-          console.warn(`CORS blocked origin: ${origin}`);
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
+      origin: corsOrigin,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       credentials: true,
     });
