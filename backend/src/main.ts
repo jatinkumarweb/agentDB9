@@ -36,8 +36,33 @@ async function bootstrap() {
   // Enable CORS
   if (configService.isCorsEnabled) {
     app.enableCors({
-      origin: configService.corsOrigins,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, Postman)
+        if (!origin) {
+          return callback(null, true);
+        }
+
+        const allowedOrigins = configService.corsOrigins;
+        
+        // Check if origin matches any allowed origin (string or regex)
+        const isAllowed = allowedOrigins.some(allowed => {
+          if (typeof allowed === 'string') {
+            return origin === allowed;
+          }
+          if (allowed instanceof RegExp) {
+            return allowed.test(origin);
+          }
+          return false;
+        });
+
+        if (isAllowed) {
+          callback(null, true);
+        } else {
+          console.warn(`CORS blocked origin: ${origin}`);
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       credentials: true,
     });
   }
