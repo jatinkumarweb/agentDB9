@@ -1,24 +1,39 @@
 import { spawn, ChildProcess } from 'child_process';
-import * as pty from 'node-pty';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { MCPTool, CommandResult, TerminalInfo } from '@agentdb9/shared';
 import { logger } from '../utils/logger';
 
+// Conditional import for node-pty (may not be available in all environments)
+let pty: any;
+try {
+  pty = require('node-pty');
+} catch (error) {
+  logger.warn('node-pty not available, terminal features will be limited');
+  pty = null;
+}
+
 export interface Terminal {
   id: string;
   name: string;
   cwd: string;
-  process: pty.IPty;
+  process: any; // pty.IPty when available
   active: boolean;
 }
 
 export class TerminalTools {
   private terminals = new Map<string, Terminal>();
   private nextTerminalId = 1;
-  private terminalLogPath = '/workspace/.agent-terminal.log';
+  private terminalLogPath: string;
   private terminalLogStream: fs.FileHandle | null = null;
   private terminalLogInitialized = false;
+
+  constructor() {
+    // Use Gitpod workspace if available, otherwise use WORKSPACE_PATH env var or default
+    const workspacePath = process.env.GITPOD_REPO_ROOT || process.env.WORKSPACE_PATH || '/workspace';
+    this.terminalLogPath = `${workspacePath}/.agent-terminal.log`;
+    logger.info(`Terminal log path: ${this.terminalLogPath}`);
+  }
 
   private async ensureTerminalLogInitialized(): Promise<void> {
     if (this.terminalLogInitialized) {
@@ -193,12 +208,38 @@ export class TerminalTools {
            `${separator}\n\n`;
   }
 
+  /**
+   * Check if a command is a dev server command that runs indefinitely
+   */
+  private isDevServerCommand(command: string): boolean {
+    const devServerPatterns = [
+      /npm\s+(run\s+)?(dev|start|serve)/,
+      /yarn\s+(run\s+)?(dev|start|serve)/,
+      /pnpm\s+(run\s+)?(dev|start|serve)/,
+      /vite(\s|$)/,
+      /next\s+dev/,
+      /react-scripts\s+start/,
+      /ng\s+serve/,
+      /vue-cli-service\s+serve/,
+      /webpack-dev-server/,
+      /parcel(\s|$)/
+    ];
+    
+    return devServerPatterns.some(pattern => pattern.test(command));
+  }
+
   public async executeCommand(
     command: string, 
     cwd?: string, 
     timeout: number = 30000,
     shell: string = '/bin/sh'
   ): Promise<CommandResult> {
+    // Check if this is a dev server command
+    if (this.isDevServerCommand(command)) {
+      logger.info(`Detected dev server command: ${command}`);
+      return this.executeDevServer(command, cwd, shell);
+    }
+    
     const startTime = Date.now();
     
     return new Promise(async (resolve) => {
@@ -208,7 +249,7 @@ export class TerminalTools {
       let timedOut = false;
 
       // Use workspace directory if no cwd specified
-      const workingDir = cwd || process.env.WORKSPACE_PATH || '/workspace';
+      const workingDir = cwd || process.env.GITPOD_REPO_ROOT || process.env.WORKSPACE_PATH || '/workspace';
       
       // Prepare environment variables
       const env = { ...process.env };
@@ -312,12 +353,147 @@ export class TerminalTools {
     });
   }
 
+  /**
+   * Execute a dev server command in a persistent terminal
+   * Returns immediately without waiting for the process to exit
+   */
+  private async executeDevServer(
+    command: string,
+    cwd?: string,
+    shell: string = '/bin/sh'
+  ): Promise<CommandResult> {
+    const startTime = Date.now();
+    const workingDir = cwd || process.env.GITPOD_REPO_ROOT || process.env.WORKSPACE_PATH || '/workspace';
+    
+    try {
+      // Log command start
+      await this.ensureTerminalLogInitialized();
+      await this.logToTerminal(this.formatTerminalHeader(command, workingDir));
+      await this.logToTerminal(`\x1b[1;33m⚠️  Dev server detected - running in background\x1b[0m\n\n`);
+      
+      // Prepare environment
+      const env = { ...process.env };
+      delete env.PORT; // Avoid port conflicts
+      env.NODE_ENV = 'development';
+      
+      const options: any = {
+        cwd: workingDir,
+        env,
+        detached: true, // Run in background
+        stdio: ['ignore', 'pipe', 'pipe'] // Capture output
+      };
+      
+      logger.info(`Starting dev server in background: ${command}`, { cwd: workingDir });
+      
+      // Start the process in background
+      const child: ChildProcess = spawn(shell, ['-c', command], options);
+      
+      // Capture initial output for a few seconds
+      let output = '';
+      let error = '';
+      
+      const outputHandler = (data: Buffer) => {
+        const text = data.toString();
+        output += text;
+        this.logToTerminal(text).catch(err => 
+          logger.error('Failed to stream stdout:', err)
+        );
+      };
+      
+      const errorHandler = (data: Buffer) => {
+        const text = data.toString();
+        error += text;
+        this.logToTerminal(`\x1b[1;31m${text}\x1b[0m`).catch(err => 
+          logger.error('Failed to stream stderr:', err)
+        );
+      };
+      
+      child.stdout?.on('data', outputHandler);
+      child.stderr?.on('data', errorHandler);
+      
+      // Wait for initial startup (3 seconds)
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Check if process is still running
+      const isRunning = child.pid && !child.killed;
+      
+      if (!isRunning) {
+        // Process died immediately - probably an error
+        const duration = Date.now() - startTime;
+        await this.logToTerminal(this.formatTerminalFooter(1, duration));
+        
+        return {
+          success: false,
+          output: output.trim(),
+          error: error.trim() || 'Dev server failed to start',
+          exitCode: 1,
+          duration
+        };
+      }
+      
+      // Process is running - detach and return success
+      child.unref(); // Allow parent to exit without waiting
+      
+      const duration = Date.now() - startTime;
+      const successMessage = 
+        `\x1b[1;32m✓ Dev server started successfully\x1b[0m\n` +
+        `\x1b[1;90mPID: ${child.pid}\x1b[0m\n` +
+        `\x1b[1;90mRunning in background...\x1b[0m\n\n`;
+      
+      await this.logToTerminal(successMessage);
+      await this.logToTerminal(this.formatTerminalFooter(0, duration));
+      
+      // Store terminal info for management
+      const terminalId = `dev-server-${child.pid}`;
+      
+      logger.info(`Dev server started successfully`, { 
+        pid: child.pid, 
+        command, 
+        cwd: workingDir 
+      });
+      
+      return {
+        success: true,
+        output: output.trim() + '\n\n' +
+                `Dev server started in background (PID: ${child.pid})\n` +
+                `Command: ${command}\n` +
+                `Working directory: ${workingDir}\n\n` +
+                `The server is running and will continue in the background.\n` +
+                `Check the terminal log for output: ${this.terminalLogPath}\n` +
+                `Use 'stop_dev_server' tool with port number to stop it.`,
+        error: error.trim(),
+        exitCode: 0,
+        duration
+      };
+    } catch (err) {
+      const duration = Date.now() - startTime;
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      
+      await this.logToTerminal(`\x1b[1;31mERROR: ${errorMessage}\x1b[0m\n`);
+      await this.logToTerminal(this.formatTerminalFooter(1, duration));
+      
+      logger.error(`Failed to start dev server: ${command}`, err);
+      
+      return {
+        success: false,
+        output: '',
+        error: errorMessage,
+        exitCode: 1,
+        duration
+      };
+    }
+  }
+
   public async createTerminal(
     name: string, 
     cwd?: string, 
     shell: string = '/bin/bash'
   ): Promise<string> {
     try {
+      if (!pty) {
+        throw new Error('node-pty not available - cannot create terminal');
+      }
+      
       const terminalId = `terminal_${this.nextTerminalId++}`;
       
       const ptyProcess = pty.spawn(shell, [], {
@@ -337,12 +513,12 @@ export class TerminalTools {
       };
 
       // Set up data handler
-      ptyProcess.onData((data) => {
+      ptyProcess.onData((data: any) => {
         // Handle terminal output if needed
         logger.debug(`Terminal ${terminalId} output:`, data);
       });
 
-      ptyProcess.onExit((exitCode) => {
+      ptyProcess.onExit((exitCode: any) => {
         logger.info(`Terminal ${terminalId} exited with code ${exitCode}`);
         this.terminals.delete(terminalId);
       });

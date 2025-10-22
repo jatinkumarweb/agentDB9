@@ -30,10 +30,17 @@ export interface MCPExecutionContext {
 export class MCPService {
   private readonly logger = new Logger(MCPService.name);
   private readonly mcpServerUrl = process.env.MCP_SERVER_URL || 'http://mcp-server:9001';
-  private readonly workspaceRoot = process.env.VSCODE_WORKSPACE || '/workspace';
+  private readonly workspaceRoot = process.env.GITPOD_REPO_ROOT || process.env.VSCODE_WORKSPACE || '/workspace';
   private readonly execAsync = promisify(exec);
-  private readonly COMMAND_LOG = '/workspace/.agent-commands.log';
-  private readonly TERMINAL_LOG = '/workspace/.agent-terminal.log';
+  private readonly COMMAND_LOG = `${process.env.GITPOD_REPO_ROOT || '/workspace'}/.agent-commands.log`;
+  private readonly TERMINAL_LOG = `${process.env.GITPOD_REPO_ROOT || '/workspace'}/.agent-terminal.log`;
+  private terminals = new Map<string, {
+    process: any;
+    port: number;
+    command: string;
+    workingDir: string;
+    startTime: Date;
+  }>();
 
   constructor(
     @Inject(forwardRef(() => ApprovalService))
@@ -416,6 +423,30 @@ export class MCPService {
           this.logger.log(`📁 Creating directory: ${args.path}`);
           result = await this.createDirectory(args.path, workingDir);
           this.logger.log(`✅ Directory created`);
+          return result;
+          
+        case 'stop_dev_server':
+          this.logger.log(`🛑 Stopping dev server`);
+          result = await this.stopDevServer(args.terminalId, args.port, workingDir);
+          this.logger.log(`✅ Dev server stopped`);
+          return result;
+          
+        case 'stop_all_dev_servers':
+          this.logger.log(`🛑 Stopping all dev servers`);
+          result = await this.stopAllDevServers();
+          this.logger.log(`✅ All dev servers stopped`);
+          return result;
+          
+        case 'check_dev_server':
+          this.logger.log(`🔍 Checking dev server on port ${args.port}`);
+          result = await this.checkDevServer(args.port);
+          this.logger.log(`✅ Dev server check complete`);
+          return result;
+          
+        case 'list_dev_servers':
+          this.logger.log(`📋 Listing dev servers`);
+          result = await this.listDevServers();
+          this.logger.log(`✅ Dev servers listed`);
           return result;
           
         case 'delete_file':
@@ -976,5 +1007,220 @@ export class MCPService {
     }
     
     return formatted;
+  }
+
+  /**
+   * Stop a dev server by terminal ID or port
+   */
+  private async stopDevServer(
+    terminalId?: string,
+    port?: number,
+    workingDir?: string,
+  ): Promise<string> {
+    try {
+      // If terminal ID provided, kill it directly
+      if (terminalId) {
+        const response = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tool: 'terminal_kill',
+            arguments: { terminalId },
+          }),
+        });
+
+        if (!response.ok) {
+          return `Failed to stop terminal ${terminalId}`;
+        }
+
+        const result = await response.json();
+        this.terminals.delete(terminalId);
+        return result.result || `Terminal ${terminalId} stopped successfully`;
+      }
+
+      // If port provided, find PID and kill it
+      if (port) {
+        // Find PID using lsof
+        const findPidResponse = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tool: 'execute_command',
+            arguments: {
+              command: `lsof -ti:${port}`,
+              workingDir: workingDir || this.workspaceRoot,
+            },
+          }),
+        });
+
+        if (!findPidResponse.ok) {
+          return `Failed to find process on port ${port}`;
+        }
+
+        const findPidResult = await findPidResponse.json();
+        const pid = findPidResult.result?.output?.trim();
+
+        if (!pid) {
+          return `No dev server found on port ${port}`;
+        }
+
+        // Kill the process
+        const killResponse = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tool: 'execute_command',
+            arguments: {
+              command: `kill -9 ${pid}`,
+              workingDir: workingDir || this.workspaceRoot,
+            },
+          }),
+        });
+
+        if (!killResponse.ok) {
+          return `Failed to kill process ${pid}`;
+        }
+
+        // Remove from terminals map if exists
+        for (const [id, term] of this.terminals.entries()) {
+          if (term.port === port && (!workingDir || term.workingDir === workingDir)) {
+            this.terminals.delete(id);
+            break;
+          }
+        }
+
+        return `Dev server on port ${port} stopped successfully`;
+      }
+
+      return 'Either terminalId or port must be provided';
+    } catch (error) {
+      return `Failed to stop dev server: ${error.message}`;
+    }
+  }
+
+  /**
+   * Stop all running dev servers
+   */
+  private async stopAllDevServers(): Promise<string> {
+    try {
+      // Get list of terminals from MCP server
+      const listResponse = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool: 'terminal_list',
+          arguments: {},
+        }),
+      });
+
+      if (!listResponse.ok) {
+        return 'Failed to list terminals';
+      }
+
+      const listResult = await listResponse.json();
+      const terminalIds = listResult.result || [];
+
+      if (terminalIds.length === 0) {
+        return 'No dev servers running';
+      }
+
+      // Stop each terminal
+      const results = await Promise.all(
+        terminalIds.map(id => this.stopDevServer(id))
+      );
+
+      const stopped = results.filter(r => r.includes('successfully')).length;
+      return `Stopped ${stopped} dev servers`;
+    } catch (error) {
+      return `Failed to stop dev servers: ${error.message}`;
+    }
+  }
+
+  /**
+   * Check if a dev server is running on a specific port
+   */
+  private async checkDevServer(port: number, workingDir?: string): Promise<string> {
+    try {
+      // Check in terminals map first
+      for (const [id, terminal] of this.terminals.entries()) {
+        if (terminal.port === port && (!workingDir || terminal.workingDir === workingDir)) {
+          const uptime = Date.now() - terminal.startTime.getTime();
+          const uptimeStr = this.formatUptime(uptime);
+          return `Dev server running on port ${port}\nTerminal ID: ${id}\nCommand: ${terminal.command}\nUptime: ${uptimeStr}`;
+        }
+      }
+
+      // Check using lsof
+      const checkCmd = `lsof -ti:${port}`;
+      const { stdout } = await this.execAsync(checkCmd, { cwd: workingDir || this.workspaceRoot });
+      
+      if (stdout.trim()) {
+        return `Dev server running on port ${port} (PID: ${stdout.trim()})`;
+      }
+
+      return `Dev server not running on port ${port}`;
+    } catch (error) {
+      return `Dev server not running on port ${port}`;
+    }
+  }
+
+  /**
+   * List all running dev servers
+   */
+  private async listDevServers(): Promise<string> {
+    try {
+      // Get list of terminals from MCP server
+      const listResponse = await fetch(`${this.mcpServerUrl}/api/tools/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool: 'terminal_list',
+          arguments: {},
+        }),
+      });
+
+      if (!listResponse.ok) {
+        return 'Failed to list terminals';
+      }
+
+      const listResult = await listResponse.json();
+      const terminals = listResult.result || [];
+
+      if (terminals.length === 0) {
+        return 'No dev servers running';
+      }
+
+      let output = `Running dev servers (${terminals.length}):\n\n`;
+      
+      for (const terminal of terminals) {
+        output += `Terminal ID: ${terminal.id}\n`;
+        output += `Name: ${terminal.name}\n`;
+        output += `Working Dir: ${terminal.cwd}\n\n`;
+      }
+      
+      return output;
+    } catch (error) {
+      return `Failed to list dev servers: ${error.message}`;
+    }
+  }
+
+  /**
+   * Format uptime in human-readable format
+   */
+  private formatUptime(ms: number): string {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) {
+      return `${days}d ${hours % 24}h ${minutes % 60}m`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`;
+    } else {
+      return `${seconds}s`;
+    }
   }
 }

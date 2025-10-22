@@ -884,6 +884,260 @@ describe('MCPService - Command Execution (TDD)', () => {
     });
   });
 
+  describe('Dev Server Management - Stop', () => {
+    it('should stop dev server by terminal ID', async () => {
+      // Arrange
+      const terminalId = 'terminal-dev-123';
+
+      // Mock terminal_kill
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          result: 'Terminal killed successfully',
+        }),
+      });
+
+      // Act
+      const result = await service.executeTool(
+        {
+          name: 'stop_dev_server',
+          arguments: { terminalId },
+        },
+        '/workspace',
+        { requireApproval: false }
+      );
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/tools/execute'),
+        expect.objectContaining({
+          body: expect.stringContaining('terminal_kill'),
+        })
+      );
+    });
+
+    it('should stop dev server by port number', async () => {
+      // Arrange
+      const port = 5173;
+
+      // Mock finding process by port
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            success: true,
+            result: {
+              output: '12345',
+              error: '',
+              exitCode: 0,
+            },
+          }),
+        })
+        // Mock killing process
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            success: true,
+            result: {
+              output: 'Process killed',
+              error: '',
+              exitCode: 0,
+            },
+          }),
+        });
+
+      // Act
+      const result = await service.executeTool(
+        {
+          name: 'stop_dev_server',
+          arguments: { port },
+        },
+        '/workspace',
+        { requireApproval: false }
+      );
+
+      // Assert
+      expect(result.success).toBe(true);
+      // Should find PID using lsof
+      const findPidCall = (global.fetch as jest.Mock).mock.calls.find(
+        call => call[1]?.body?.includes('lsof')
+      );
+      expect(findPidCall).toBeDefined();
+    });
+
+    it('should stop all dev servers', async () => {
+      // Arrange
+      // Mock listing terminals
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            success: true,
+            result: ['terminal-dev-1', 'terminal-dev-2'],
+          }),
+        })
+        // Mock killing terminal 1
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true }),
+        })
+        // Mock killing terminal 2
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true }),
+        });
+
+      // Act
+      const result = await service.executeTool(
+        {
+          name: 'stop_all_dev_servers',
+          arguments: {},
+        },
+        '/workspace',
+        { requireApproval: false }
+      );
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.result).toContain('Stopped 2 dev servers');
+    });
+
+    it('should handle no running dev servers gracefully', async () => {
+      // Arrange
+      // Mock empty terminal list
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          result: [],
+        }),
+      });
+
+      // Act
+      const result = await service.executeTool(
+        {
+          name: 'stop_all_dev_servers',
+          arguments: {},
+        },
+        '/workspace',
+        { requireApproval: false }
+      );
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.result).toContain('No dev servers running');
+    });
+  });
+
+  describe('Dev Server Management - Status', () => {
+    it('should check if dev server is running on port', async () => {
+      // Arrange
+      const port = 5173;
+
+      // Mock checking port
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          result: {
+            output: '12345',
+            error: '',
+            exitCode: 0,
+          },
+        }),
+      });
+
+      // Act
+      const result = await service.executeTool(
+        {
+          name: 'check_dev_server',
+          arguments: { port },
+        },
+        '/workspace',
+        { requireApproval: false }
+      );
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.result).toContain('running');
+      expect(result.result).toContain('5173');
+    });
+
+    it('should report when dev server is not running', async () => {
+      // Arrange
+      const port = 5173;
+
+      // Mock port not in use
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          result: {
+            output: '',
+            error: '',
+            exitCode: 1,
+          },
+        }),
+      });
+
+      // Act
+      const result = await service.executeTool(
+        {
+          name: 'check_dev_server',
+          arguments: { port },
+        },
+        '/workspace',
+        { requireApproval: false }
+      );
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.result).toContain('not running');
+    });
+
+    it('should list all running dev servers', async () => {
+      // Arrange
+      // Mock listing terminals
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          result: [
+            {
+              id: 'terminal-dev-1',
+              name: 'Agent Dev Server - dev',
+              cwd: '/workspace/projects/app1',
+            },
+            {
+              id: 'terminal-dev-2',
+              name: 'Agent Dev Server - start',
+              cwd: '/workspace/projects/app2',
+            },
+          ],
+        }),
+      });
+
+      // Act
+      const result = await service.executeTool(
+        {
+          name: 'list_dev_servers',
+          arguments: {},
+        },
+        '/workspace',
+        { requireApproval: false }
+      );
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.result).toContain('terminal-dev-1');
+      expect(result.result).toContain('terminal-dev-2');
+      expect(result.result).toContain('app1');
+      expect(result.result).toContain('app2');
+    });
+  });
+
   describe('Other Affected Flows', () => {
     it('should still work for non-npm commands', async () => {
       // Arrange

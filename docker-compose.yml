@@ -368,12 +368,14 @@ services:
       - VSCODE_PORT=8080
       - LLM_SERVICE_URL=http://llm-service:9000
       - BACKEND_URL=http://backend:8000
-      - WORKSPACE_PATH=/workspace
+      # Use Gitpod workspace if available, otherwise default
+      - WORKSPACE_PATH=${GITPOD_REPO_ROOT:-/workspace}
+      - GITPOD_REPO_ROOT=${GITPOD_REPO_ROOT}
       # Allow Node.js to resolve hoisted packages from root node_modules
       - NODE_PATH=/workspace/node_modules
     volumes:
-      # Use consistent workspace path and cached mount for better performance
-      - ./.volumes/agentdb9/workspace:/workspace:cached
+      # Use Gitpod workspace path if available, otherwise use local volume
+      - ${GITPOD_REPO_ROOT:-./.volumes/agentdb9/workspace}:/workspace:cached
       # Mount root node_modules as read-only for hoisted package resolution
       - ./node_modules:/workspace/node_modules:ro
     depends_on:
