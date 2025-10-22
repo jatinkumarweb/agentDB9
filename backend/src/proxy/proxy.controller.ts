@@ -215,6 +215,7 @@ export class ProxyController {
       
       // Strip /proxy/{port} prefix from all requests
       // The backend proxy adds this prefix, but the target service doesn't expect it
+      // Dev servers should run WITHOUT base path configuration
       const proxyPrefix = `/proxy/${port}`;
       let path = req.url;
       
